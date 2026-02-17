@@ -1,0 +1,17 @@
+{
+  "tasks": {
+    "dev": "deno run --tunnel --allow-net --allow-env --allow-read --watch main.ts"
+  },
+  "imports": {
+    "hono": "jsr:@hono/hono@^4",
+    "octokit": "npm:octokit@^4.1.2",
+    "pg": "npm:pg@^8"
+  },
+  "compilerOptions": {
+    "lib": ["deno.window"]
+  },
+  "deploy": {
+    "org": "drdreo",
+    "app": "github-sights"
+  }
+}
