@@ -2,7 +2,6 @@
   "name": "github-sights",
   "compatibility_date": "2026-02-20",
   "assets": {
-    "binding": "ASSETS",
     "directory": "./dist",
     "not_found_handling": "single-page-application"
   }
