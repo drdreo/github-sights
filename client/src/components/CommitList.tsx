@@ -43,6 +43,8 @@ export function CommitList({ commits, loading }: CommitListProps) {
                         <div className="flex items-start justify-between gap-4 mb-1">
                             <a
                                 href={commit.html_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="text-sm font-semibold text-gray-100 line-clamp-1 group-hover:text-blue-400 transition-colors cursor-pointer"
                             >
                                 {commit.message}
