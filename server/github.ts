@@ -346,11 +346,67 @@ export class GitHubService {
                 head: { ref: pr.head.ref },
             }));
 
+
+            await this._enrichPRsWithFileStats(owner, repo, mapped);
+
             await prCache.set(cacheKey, mapped);
             console.log(`[cache] PRs miss: ${cacheKey} → fetched ${mapped.length}`);
             return mapped;
         } catch (error) {
             throw githubApiError(`list PRs for ${owner}/${repo}`, error);
+        }
+    }
+
+
+    /**
+     * Enrich PRs with file-level stats (additions, deletions, changed_files)
+     * by calling the "list pull request files" endpoint for each PR.
+     * Uses batched concurrency to avoid rate limits.
+     */
+    private async _enrichPRsWithFileStats(
+        owner: string,
+        repo: string,
+        prs: PullRequest[],
+    ): Promise<void> {
+        // Skip PRs that already have stats (e.g. from a previous enrichment)
+        const toEnrich = prs.filter(
+            (pr) => pr.additions === undefined || pr.additions === null,
+        );
+
+        if (toEnrich.length === 0) return;
+
+        console.log(
+            `[github] Enriching ${toEnrich.length}/${prs.length} PRs with file stats for ${owner}/${repo}`,
+        );
+
+        const CONCURRENCY = 3;
+        for (let i = 0; i < toEnrich.length; i += CONCURRENCY) {
+            const batch = toEnrich.slice(i, i + CONCURRENCY);
+            const results = await Promise.allSettled(
+                batch.map(async (pr) => {
+                    const files = await this.octokit.paginate(
+                        this.octokit.rest.pulls.listFiles,
+                        {
+                            owner,
+                            repo,
+                            pull_number: pr.number,
+                            per_page: 100,
+                        },
+                    );
+
+                    pr.additions = files.reduce((sum, f) => sum + (f.additions ?? 0), 0);
+                    pr.deletions = files.reduce((sum, f) => sum + (f.deletions ?? 0), 0);
+                    pr.changed_files = files.length;
+                }),
+            );
+
+            for (const r of results) {
+                if (r.status === "rejected") {
+                    console.warn(
+                        `[github] Failed to fetch file stats for PR in ${owner}/${repo}: ${r.reason}`,
+                    );
+                }
+            }
         }
     }
 
