@@ -15,24 +15,18 @@ const sync = new Hono();
 //   until — ISO date string (defaults to now)
 
 sync.post("/api/sync", async (c) => {
-  try {
-    const { service, config } = requireService();
-    const since =
-      c.req.query("since") ||
-      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const until = c.req.query("until") || undefined;
+    try {
+        const { service, config } = requireService();
+        const since =
+            c.req.query("since") || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const until = c.req.query("until") || undefined;
 
-    const result = await service.syncCommits(
-      config.owner,
-      config.ownerType,
-      since,
-      until,
-    );
+        const result = await service.syncCommits(config.owner, config.ownerType, since, until);
 
-    return c.json(result);
-  } catch (error) {
-    return errorResponse(c, error);
-  }
+        return c.json(result);
+    } catch (error) {
+        return errorResponse(c, error);
+    }
 });
 
 export { sync };

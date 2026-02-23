@@ -37,32 +37,32 @@ const SCHEMA_DDL = `
  * Must be called once at startup before any queries.
  */
 export async function initDb(): Promise<void> {
-  const connectionString = Deno.env.get("DATABASE_URL");
-  if (!connectionString) {
-    console.warn(
-      "[db] DATABASE_URL not set — database features disabled. Set it in Deno Deploy dashboard or use --tunnel.",
-    );
-    return;
-  }
+    const connectionString = Deno.env.get("DATABASE_URL");
+    if (!connectionString) {
+        console.warn(
+            "[db] DATABASE_URL not set — database features disabled. Set it in Deno Deploy dashboard or use --tunnel.",
+        );
+        return;
+    }
 
-  pool = new Pool({
-    connectionString,
-    max: 3,
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 10_000,
-  });
+    pool = new Pool({
+        connectionString,
+        max: 3,
+        idleTimeoutMillis: 30_000,
+        connectionTimeoutMillis: 10_000,
+    });
 
-  pool.on("error", (err: Error) => {
-    console.error("[db] Unexpected pool error:", err.message);
-  });
+    pool.on("error", (err: Error) => {
+        console.error("[db] Unexpected pool error:", err.message);
+    });
 
-  try {
-    await pool.query(SCHEMA_DDL);
-    console.log("[db] Connected and schema verified");
-  } catch (err) {
-    console.error("[db] Failed to initialize:", err);
-    throw err;
-  }
+    try {
+        await pool.query(SCHEMA_DDL);
+        console.log("[db] Connected and schema verified");
+    } catch (err) {
+        console.error("[db] Failed to initialize:", err);
+        throw err;
+    }
 }
 
 /**
@@ -72,15 +72,15 @@ export async function initDb(): Promise<void> {
  * const rows = await query<{ owner: string }>("SELECT owner FROM config WHERE id = 1");
  */
 export async function query<T extends Record<string, unknown> = Record<string, unknown>>(
-  text: string,
-  params?: unknown[],
+    text: string,
+    params?: unknown[],
 ): Promise<T[]> {
-  if (!pool) return [];
-  const result = await pool.query(text, params);
-  return result.rows as T[];
+    if (!pool) return [];
+    const result = await pool.query(text, params);
+    return result.rows as T[];
 }
 
 /** Check if the database is connected and available. */
 export function isDbAvailable(): boolean {
-  return !!pool;
+    return !!pool;
 }
