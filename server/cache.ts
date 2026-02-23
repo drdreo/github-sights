@@ -39,7 +39,7 @@ const commitCacheStore = new Map<string, CommitBlobEntry>();
 class DataCache<T> {
     constructor(
         private store: Map<string, T>,
-        private prefix: string,
+        private prefix: string
     ) {}
 
     async get(key: string): Promise<T | null> {
@@ -52,7 +52,7 @@ class DataCache<T> {
 
         const dbKey = `${this.prefix}:${key}`;
         const rows = await query<{ data: T }>(`SELECT data FROM data_cache WHERE key = $1`, [
-            dbKey,
+            dbKey
         ]);
 
         if (rows.length === 0) return null;
@@ -75,7 +75,7 @@ class DataCache<T> {
             `INSERT INTO data_cache (key, data)
        VALUES ($1, $2)
        ON CONFLICT (key) DO UPDATE SET data = $2`,
-            [dbKey, JSON.stringify(data)],
+            [dbKey, JSON.stringify(data)]
         );
     }
 
@@ -144,7 +144,7 @@ class CommitCache {
             last_fetched_at: string;
         }>(
             `SELECT data, fetched_since, fetched_until, last_fetched_at FROM repo_commits WHERE repo_key = $1`,
-            [repoKey],
+            [repoKey]
         );
 
         if (rows.length === 0) return null;
@@ -158,7 +158,7 @@ class CommitCache {
             bySha,
             fetchedSince: toDateStrSafe(row.fetched_since),
             fetchedUntil: toDateStrSafe(row.fetched_until),
-            lastFetchedAt: new Date(row.last_fetched_at).getTime(),
+            lastFetchedAt: new Date(row.last_fetched_at).getTime()
         };
 
         this.store.set(repoKey, entry);
@@ -177,7 +177,7 @@ class CommitCache {
         owner: string,
         repo: string,
         since?: string,
-        until?: string,
+        until?: string
     ): Promise<{
         gaps: Array<{ since?: string; until?: string }>;
         cached: Commit[];
@@ -201,7 +201,7 @@ class CommitCache {
         if (reqSince && cachedSince && reqSince < cachedSince) {
             gaps.push({
                 since: startOfDay(reqSince),
-                until: startOfDay(cachedSince),
+                until: startOfDay(cachedSince)
             });
         }
 
@@ -213,7 +213,7 @@ class CommitCache {
             const fetchFrom = cachedUntil < today ? endOfDay(cachedUntil) : undefined;
             gaps.push({
                 since: fetchFrom || startOfDay(cachedUntil),
-                until: until || undefined,
+                until: until || undefined
             });
         }
 
@@ -232,7 +232,7 @@ class CommitCache {
         repo: string,
         commits: Commit[],
         fetchedSince?: string,
-        fetchedUntil?: string,
+        fetchedUntil?: string
     ): Promise<void> {
         const k = this.key(owner, repo);
         let entry = this.store.get(k);
@@ -243,7 +243,7 @@ class CommitCache {
                 bySha: new Set(),
                 fetchedSince: null,
                 fetchedUntil: null,
-                lastFetchedAt: Date.now(),
+                lastFetchedAt: Date.now()
             };
             this.store.set(k, entry);
         }
@@ -286,7 +286,7 @@ class CommitCache {
          fetched_since = LEAST(repo_commits.fetched_since, $3),
          fetched_until = GREATEST(repo_commits.fetched_until, $4),
          last_fetched_at = NOW()`,
-            [k, JSON.stringify(entry.commits), entry.fetchedSince, entry.fetchedUntil],
+            [k, JSON.stringify(entry.commits), entry.fetchedSince, entry.fetchedUntil]
         );
     }
 

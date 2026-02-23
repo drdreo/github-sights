@@ -26,7 +26,7 @@ export function StatCards({ stats, loading }: StatCardsProps) {
             subtext: `~${stats.avgCommitsPerDay} per day`,
             icon: GitCommit,
             color: "text-blue-400",
-            bg: "bg-blue-500/10",
+            bg: "bg-blue-500/10"
         },
         {
             label: "Pull Requests",
@@ -34,7 +34,7 @@ export function StatCards({ stats, loading }: StatCardsProps) {
             subtext: `${stats.mergedPRs} merged (${stats.totalPRs > 0 ? Math.round((stats.mergedPRs / stats.totalPRs) * 100) : 0}%)`,
             icon: GitPullRequest,
             color: "text-purple-400",
-            bg: "bg-purple-500/10",
+            bg: "bg-purple-500/10"
         },
         {
             label: "Active Contributors",
@@ -42,7 +42,7 @@ export function StatCards({ stats, loading }: StatCardsProps) {
             subtext: "Across all repos",
             icon: Users,
             color: "text-orange-400",
-            bg: "bg-orange-500/10",
+            bg: "bg-orange-500/10"
         },
         {
             label: "Longest Streak",
@@ -50,7 +50,7 @@ export function StatCards({ stats, loading }: StatCardsProps) {
             subtext: `Current: ${stats.currentStreak} days`,
             icon: Flame,
             color: "text-red-400",
-            bg: "bg-red-500/10",
+            bg: "bg-red-500/10"
         },
         {
             label: "Total Repos",
@@ -58,7 +58,7 @@ export function StatCards({ stats, loading }: StatCardsProps) {
             subtext: "Tracking activity",
             icon: Box,
             color: "text-gray-400",
-            bg: "bg-gray-800",
+            bg: "bg-gray-800"
         },
         {
             label: "Most Active Repo",
@@ -66,8 +66,8 @@ export function StatCards({ stats, loading }: StatCardsProps) {
             subtext: `${stats.mostActiveRepo?.commits || 0} commits`,
             icon: Activity,
             color: "text-emerald-400",
-            bg: "bg-emerald-500/10",
-        },
+            bg: "bg-emerald-500/10"
+        }
     ];
 
     return (

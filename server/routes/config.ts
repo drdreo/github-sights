@@ -13,7 +13,7 @@ config.get("/api/config", (c) => {
         return c.json({
             configured: true,
             owner: current.owner,
-            ownerType: current.ownerType,
+            ownerType: current.ownerType
         });
     }
     return c.json({ configured: false });
@@ -34,21 +34,21 @@ config.post("/api/config", async (c) => {
         if (!token) {
             throw validationError(
                 "Missing required field: token",
-                "Provide a GitHub personal access token (starts with 'ghp_' or 'github_pat_').",
+                "Provide a GitHub personal access token (starts with 'ghp_' or 'github_pat_')."
             );
         }
 
         if (!owner) {
             throw validationError(
                 "Missing required field: owner",
-                "Provide the GitHub username or organization name to fetch repos for.",
+                "Provide the GitHub username or organization name to fetch repos for."
             );
         }
 
         if (!ownerType || (ownerType !== "user" && ownerType !== "org")) {
             throw validationError(
                 'Invalid ownerType — must be "user" or "org"',
-                'Set ownerType to "user" for personal accounts or "org" for GitHub organizations.',
+                'Set ownerType to "user" for personal accounts or "org" for GitHub organizations.'
             );
         }
 
@@ -61,7 +61,7 @@ config.post("/api/config", async (c) => {
         ) {
             throw validationError(
                 "Token format not recognized",
-                "GitHub tokens typically start with 'ghp_' (classic PAT) or 'github_pat_' (fine-grained). Check that you copied the full token.",
+                "GitHub tokens typically start with 'ghp_' (classic PAT) or 'github_pat_' (fine-grained). Check that you copied the full token."
             );
         }
 
@@ -76,7 +76,7 @@ config.post("/api/config", async (c) => {
 
             if (message.includes("Bad credentials")) {
                 throw badCredentials(
-                    "Token was rejected by GitHub. It may have expired or been revoked.",
+                    "Token was rejected by GitHub. It may have expired or been revoked."
                 );
             }
 
@@ -95,18 +95,18 @@ config.post("/api/config", async (c) => {
         await setConfig({
             token,
             owner,
-            ownerType: ownerType as "user" | "org",
+            ownerType: ownerType as "user" | "org"
         });
 
         console.log(
-            `[config] Configured for ${ownerType}:${owner} (authenticated as ${authResult.login})`,
+            `[config] Configured for ${ownerType}:${owner} (authenticated as ${authResult.login})`
         );
 
         return c.json({
             configured: true,
             owner,
             ownerType,
-            authenticatedAs: authResult.login,
+            authenticatedAs: authResult.login
         });
     } catch (error) {
         return errorResponse(c, error);

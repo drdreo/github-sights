@@ -40,7 +40,7 @@ export async function initDb(): Promise<void> {
     const connectionString = Deno.env.get("DATABASE_URL");
     if (!connectionString) {
         console.warn(
-            "[db] DATABASE_URL not set — database features disabled. Set it in Deno Deploy dashboard or use --tunnel.",
+            "[db] DATABASE_URL not set — database features disabled. Set it in Deno Deploy dashboard or use --tunnel."
         );
         return;
     }
@@ -49,7 +49,7 @@ export async function initDb(): Promise<void> {
         connectionString,
         max: 3,
         idleTimeoutMillis: 30_000,
-        connectionTimeoutMillis: 10_000,
+        connectionTimeoutMillis: 10_000
     });
 
     pool.on("error", (err: Error) => {
@@ -73,7 +73,7 @@ export async function initDb(): Promise<void> {
  */
 export async function query<T extends Record<string, unknown> = Record<string, unknown>>(
     text: string,
-    params?: unknown[],
+    params?: unknown[]
 ): Promise<T[]> {
     if (!pool) return [];
     const result = await pool.query(text, params);

@@ -29,7 +29,12 @@ export function RepoGrid({ repos, owner, loading, commitCounts }: RepoGridProps)
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {repos.map((repo) => (
-                        <RepoCard key={repo.id} repo={repo} owner={owner} totalCommits={commitCounts?.get(repo.name)} />
+                        <RepoCard
+                            key={repo.id}
+                            repo={repo}
+                            owner={owner}
+                            totalCommits={commitCounts?.get(repo.name)}
+                        />
                     ))}
                 </div>
             )}

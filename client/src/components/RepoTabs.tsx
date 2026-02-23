@@ -57,7 +57,7 @@ export function RepoTabs({
     pulls,
     pullsLoading,
     contributors,
-    contribLoading,
+    contribLoading
 }: RepoTabsProps) {
     const [activeTab, setActiveTab] = useState<TabId>("commits");
 

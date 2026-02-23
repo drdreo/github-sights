@@ -14,7 +14,7 @@ stats.get("/api/stats/:owner", async (c) => {
         const until = c.req.query("until") || undefined;
         const cacheOnly = c.req.query("cacheOnly") === "true";
         const data = await service.getOverviewStats(owner, config.ownerType, since, until, {
-            cacheOnly,
+            cacheOnly
         });
         return c.json(data);
     } catch (error) {

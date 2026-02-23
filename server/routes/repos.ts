@@ -40,7 +40,7 @@ repos.get("/api/commits/:owner", async (c) => {
         const until = c.req.query("until") || undefined;
         const cacheOnly = c.req.query("cacheOnly") === "true";
         const data = await service.listAllCommits(owner, config.ownerType, since, until, {
-            cacheOnly,
+            cacheOnly
         });
         return c.json(data);
     } catch (error) {

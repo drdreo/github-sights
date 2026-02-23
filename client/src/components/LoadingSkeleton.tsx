@@ -11,7 +11,7 @@ export function LoadingSkeleton({
     className = "",
     variant = "text",
     width,
-    height,
+    height
 }: LoadingSkeletonProps) {
     const baseClasses = "animate-pulse bg-gray-800 rounded";
 

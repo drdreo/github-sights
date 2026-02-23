@@ -43,7 +43,7 @@ const LANGUAGE_COLORS: Record<string, string> = {
     HTML: "#e34c26",
     CSS: "#563d7c",
     Vue: "#41b883",
-    Svelte: "#ff3e00",
+    Svelte: "#ff3e00"
 };
 
 // ── GitHub Service ──────────────────────────────────────────────────────────────
@@ -60,10 +60,10 @@ export class GitHubService {
                     retryAfter: number,
                     options: { method: string; url: string },
                     _octokit: Octokit,
-                    retryCount: number,
+                    retryCount: number
                 ) => {
                     console.warn(
-                        `[rate-limit] ${options.method} ${options.url} — retry after ${retryAfter}s (attempt ${retryCount + 1})`,
+                        `[rate-limit] ${options.method} ${options.url} — retry after ${retryAfter}s (attempt ${retryCount + 1})`
                     );
                     if (retryCount < 2) return true;
                     return false;
@@ -72,15 +72,15 @@ export class GitHubService {
                     retryAfter: number,
                     options: { method: string; url: string },
                     _octokit: Octokit,
-                    retryCount: number,
+                    retryCount: number
                 ) => {
                     console.warn(
-                        `[secondary-rate-limit] ${options.method} ${options.url} — retry after ${retryAfter}s (attempt ${retryCount + 1})`,
+                        `[secondary-rate-limit] ${options.method} ${options.url} — retry after ${retryAfter}s (attempt ${retryCount + 1})`
                     );
                     if (retryCount < 1) return true;
                     return false;
-                },
-            },
+                }
+            }
         });
 
         // Log rate limit status periodically
@@ -93,7 +93,7 @@ export class GitHubService {
                     ? new Date(Number(headers["x-ratelimit-reset"]) * 1000).toISOString()
                     : "unknown";
                 console.warn(
-                    `[rate-limit] ${remaining}/${limit} remaining — resets at ${resetAt} — ${options.method} ${options.url}`,
+                    `[rate-limit] ${remaining}/${limit} remaining — resets at ${resetAt} — ${options.method} ${options.url}`
                 );
             }
         });
@@ -138,7 +138,7 @@ export class GitHubService {
     private async _fetchRepos(
         owner: string,
         type: "user" | "org",
-        cacheKey: string,
+        cacheKey: string
     ): Promise<Repository[]> {
         try {
             // deno-lint-ignore no-explicit-any
@@ -147,19 +147,19 @@ export class GitHubService {
                     ? await this.octokit.paginate(this.octokit.rest.repos.listForOrg, {
                           org: owner,
                           per_page: 100,
-                          type: "all",
+                          type: "all"
                       })
                     : await this.octokit.paginate(this.octokit.rest.repos.listForUser, {
                           username: owner,
                           per_page: 100,
-                          sort: "updated",
+                          sort: "updated"
                       });
 
             const mapped = repos.map(mapRepo);
 
             // Remove blacklisted repos
             const filtered = mapped.filter(
-                (r) => !excludedRepos.has(r.name.toLowerCase()) && !r.fork,
+                (r) => !excludedRepos.has(r.name.toLowerCase()) && !r.fork
             );
 
             // Sort by most recently pushed first (most active repos on top)
@@ -171,7 +171,7 @@ export class GitHubService {
 
             await repoCache.set(cacheKey, filtered);
             console.log(
-                `[cache] repos miss: ${cacheKey} → fetched ${filtered.length} (excluded ${mapped.length - filtered.length})`,
+                `[cache] repos miss: ${cacheKey} → fetched ${filtered.length} (excluded ${mapped.length - filtered.length})`
             );
             return filtered;
         } catch (error) {
@@ -191,7 +191,7 @@ export class GitHubService {
     async listCommits(
         owner: string,
         repo: string,
-        options?: { since?: string; until?: string; cacheOnly?: boolean },
+        options?: { since?: string; until?: string; cacheOnly?: boolean }
     ): Promise<Commit[]> {
         // Default to last 30 days if no `since` provided — prevents fetching all history
         const since =
@@ -210,7 +210,7 @@ export class GitHubService {
 
         if (gaps.length === 0) {
             console.log(
-                `[cache] commits hit: ${owner}/${repo} (${cached.length} commits, fully covered)`,
+                `[cache] commits hit: ${owner}/${repo} (${cached.length} commits, fully covered)`
             );
             return cached;
         }
@@ -220,7 +220,7 @@ export class GitHubService {
         const existing = this.inflight.get(inflightKey);
         if (existing) {
             console.log(
-                `[cache] commits inflight: ${owner}/${repo} — waiting for existing request`,
+                `[cache] commits inflight: ${owner}/${repo} — waiting for existing request`
             );
             return existing as Promise<Commit[]>;
         }
@@ -239,7 +239,7 @@ export class GitHubService {
         repo: string,
         since: string,
         until: string | undefined,
-        gaps: Array<{ since?: string; until?: string }>,
+        gaps: Array<{ since?: string; until?: string }>
     ): Promise<Commit[]> {
         console.log(`[cache] commits partial: ${owner}/${repo} — ${gaps.length} gap(s) to fetch`);
 
@@ -254,7 +254,7 @@ export class GitHubService {
 
                     const raw = await this.octokit.paginate(
                         this.octokit.rest.repos.listCommits,
-                        params,
+                        params
                     );
 
                     // deno-lint-ignore no-explicit-any
@@ -264,12 +264,12 @@ export class GitHubService {
                     await commitCache.merge(owner, repo, commits, gap.since, gap.until);
 
                     return commits;
-                }),
+                })
             );
 
             const fetched = gapResults.flat();
             console.log(
-                `[cache] commits fetched: ${owner}/${repo} — ${fetched.length} new commits`,
+                `[cache] commits fetched: ${owner}/${repo} — ${fetched.length} new commits`
             );
 
             // Return the full set from cache (now complete for the range)
@@ -282,7 +282,7 @@ export class GitHubService {
     async listPullRequests(
         owner: string,
         repo: string,
-        state: "all" | "open" | "closed" = "all",
+        state: "all" | "open" | "closed" = "all"
     ): Promise<PullRequest[]> {
         const cacheKey = `${owner}/${repo}:${state}`;
         const cached = await prCache.get(cacheKey);
@@ -312,14 +312,14 @@ export class GitHubService {
         owner: string,
         repo: string,
         state: "all" | "open" | "closed",
-        cacheKey: string,
+        cacheKey: string
     ): Promise<PullRequest[]> {
         try {
             const pulls = await this.octokit.paginate(this.octokit.rest.pulls.list, {
                 owner,
                 repo,
                 state,
-                per_page: 100,
+                per_page: 100
             });
 
             // deno-lint-ignore no-explicit-any
@@ -332,7 +332,7 @@ export class GitHubService {
                 user: {
                     login: pr.user.login,
                     avatar_url: pr.user.avatar_url,
-                    html_url: pr.user.html_url,
+                    html_url: pr.user.html_url
                 },
                 created_at: pr.created_at,
                 updated_at: pr.updated_at,
@@ -343,9 +343,8 @@ export class GitHubService {
                 deletions: pr.deletions,
                 changed_files: pr.changed_files,
                 base: { ref: pr.base.ref },
-                head: { ref: pr.head.ref },
+                head: { ref: pr.head.ref }
             }));
-
 
             await this._enrichPRsWithFileStats(owner, repo, mapped);
 
@@ -357,7 +356,6 @@ export class GitHubService {
         }
     }
 
-
     /**
      * Enrich PRs with file-level stats (additions, deletions, changed_files)
      * by calling the "list pull request files" endpoint for each PR.
@@ -366,17 +364,15 @@ export class GitHubService {
     private async _enrichPRsWithFileStats(
         owner: string,
         repo: string,
-        prs: PullRequest[],
+        prs: PullRequest[]
     ): Promise<void> {
         // Skip PRs that already have stats (e.g. from a previous enrichment)
-        const toEnrich = prs.filter(
-            (pr) => pr.additions === undefined || pr.additions === null,
-        );
+        const toEnrich = prs.filter((pr) => pr.additions === undefined || pr.additions === null);
 
         if (toEnrich.length === 0) return;
 
         console.log(
-            `[github] Enriching ${toEnrich.length}/${prs.length} PRs with file stats for ${owner}/${repo}`,
+            `[github] Enriching ${toEnrich.length}/${prs.length} PRs with file stats for ${owner}/${repo}`
         );
 
         const CONCURRENCY = 3;
@@ -384,26 +380,23 @@ export class GitHubService {
             const batch = toEnrich.slice(i, i + CONCURRENCY);
             const results = await Promise.allSettled(
                 batch.map(async (pr) => {
-                    const files = await this.octokit.paginate(
-                        this.octokit.rest.pulls.listFiles,
-                        {
-                            owner,
-                            repo,
-                            pull_number: pr.number,
-                            per_page: 100,
-                        },
-                    );
+                    const files = await this.octokit.paginate(this.octokit.rest.pulls.listFiles, {
+                        owner,
+                        repo,
+                        pull_number: pr.number,
+                        per_page: 100
+                    });
 
                     pr.additions = files.reduce((sum, f) => sum + (f.additions ?? 0), 0);
                     pr.deletions = files.reduce((sum, f) => sum + (f.deletions ?? 0), 0);
                     pr.changed_files = files.length;
-                }),
+                })
             );
 
             for (const r of results) {
                 if (r.status === "rejected") {
                     console.warn(
-                        `[github] Failed to fetch file stats for PR in ${owner}/${repo}: ${r.reason}`,
+                        `[github] Failed to fetch file stats for PR in ${owner}/${repo}: ${r.reason}`
                     );
                 }
             }
@@ -423,7 +416,7 @@ export class GitHubService {
         const existing = this.inflight.get(inflightKey);
         if (existing) {
             console.log(
-                `[cache] contributors inflight: ${cacheKey} — waiting for existing request`,
+                `[cache] contributors inflight: ${cacheKey} — waiting for existing request`
             );
             return existing as Promise<Contributor[]>;
         }
@@ -440,7 +433,7 @@ export class GitHubService {
     private async _fetchContributors(
         owner: string,
         repo: string,
-        cacheKey: string,
+        cacheKey: string
     ): Promise<Contributor[]> {
         try {
             const contributors = await this.octokit.paginate(
@@ -448,8 +441,8 @@ export class GitHubService {
                 {
                     owner,
                     repo,
-                    per_page: 100,
-                },
+                    per_page: 100
+                }
             );
 
             // deno-lint-ignore no-explicit-any
@@ -457,7 +450,7 @@ export class GitHubService {
                 login: c.login,
                 avatar_url: c.avatar_url,
                 html_url: c.html_url,
-                contributions: c.contributions,
+                contributions: c.contributions
             }));
 
             await contributorCache.set(cacheKey, mapped);
@@ -473,7 +466,7 @@ export class GitHubService {
         type: "user" | "org",
         since?: string,
         until?: string,
-        options?: { cacheOnly?: boolean },
+        options?: { cacheOnly?: boolean }
     ): Promise<OverviewStats> {
         const allRepos = await this.listRepos(owner, type);
 
@@ -516,18 +509,18 @@ export class GitHubService {
                             this.listCommits(repo.owner.login, repo.name, {
                                 since,
                                 until,
-                                cacheOnly,
+                                cacheOnly
                             }),
                             fetchPRs
                                 ? this.listPullRequests(repo.owner.login, repo.name, "all")
-                                : Promise.resolve([] as PullRequest[]),
+                                : Promise.resolve([] as PullRequest[])
                         ]);
                         return { repo, commits, prs };
                     } catch (err) {
                         console.warn(`[stats] Skipping ${repo.full_name}: ${err}`);
                         return { repo, commits: [] as Commit[], prs: [] as PullRequest[] };
                     }
-                }),
+                })
             );
             repoStats.push(...batchResults);
         }
@@ -565,7 +558,7 @@ export class GitHubService {
                             login: commit.author.login,
                             avatar_url: commit.author.avatar_url || "",
                             html_url: `https://github.com/${commit.author.login}`,
-                            contributions: 1,
+                            contributions: 1
                         });
                     }
                 }
@@ -587,7 +580,7 @@ export class GitHubService {
             .map(([language, count]) => ({
                 language,
                 count,
-                color: LANGUAGE_COLORS[language] || "#8b8b8b",
+                color: LANGUAGE_COLORS[language] || "#8b8b8b"
             }))
             .sort((a, b) => b.count - a.count);
 
@@ -603,7 +596,7 @@ export class GitHubService {
             currentStreak,
             avgCommitsPerDay,
             topContributors,
-            languageBreakdown,
+            languageBreakdown
         };
     }
 
@@ -617,7 +610,7 @@ export class GitHubService {
         type: "user" | "org",
         since?: string,
         until?: string,
-        options?: { cacheOnly?: boolean },
+        options?: { cacheOnly?: boolean }
     ): Promise<Array<{ repo: Repository; commits: Commit[] }>> {
         const allRepos = await this.listRepos(owner, type);
         const nonForkRepos = allRepos.filter((r) => !r.fork);
@@ -634,10 +627,10 @@ export class GitHubService {
                     const commits = await this.listCommits(repo.owner.login, repo.name, {
                         since,
                         until,
-                        cacheOnly,
+                        cacheOnly
                     });
                     return { repo, commits };
-                }),
+                })
             );
 
             for (const r of batchResults) {
@@ -661,7 +654,7 @@ export class GitHubService {
         owner: string,
         type: "user" | "org",
         since?: string,
-        until?: string,
+        until?: string
     ): Promise<{ synced: number; repos: string[]; errors: string[] }> {
         const allRepos = await this.listRepos(owner, type);
         const nonForkRepos = allRepos.filter((r) => !r.fork);
@@ -678,10 +671,10 @@ export class GitHubService {
                     // This will analyze gaps and fetch only what's missing
                     const commits = await this.listCommits(repo.owner.login, repo.name, {
                         since,
-                        until,
+                        until
                     });
                     return { name: repo.full_name, count: commits.length };
-                }),
+                })
             );
 
             for (const r of results) {
@@ -695,7 +688,7 @@ export class GitHubService {
         }
 
         console.log(
-            `[sync] Completed: ${syncedRepos.length} repos, ${totalNewCommits} total commits, ${errors.length} errors`,
+            `[sync] Completed: ${syncedRepos.length} repos, ${totalNewCommits} total commits, ${errors.length} errors`
         );
 
         return { synced: totalNewCommits, repos: syncedRepos, errors };
@@ -725,8 +718,8 @@ function mapRepo(repo: any): Repository {
         owner: {
             login: repo.owner.login,
             avatar_url: repo.owner.avatar_url,
-            html_url: repo.owner.html_url,
-        },
+            html_url: repo.owner.html_url
+        }
     };
 }
 
@@ -740,24 +733,24 @@ function mapCommit(commit: any, repoName: string): Commit {
             email: commit.commit.author?.email || "",
             date: commit.commit.author?.date || new Date().toISOString(),
             login: commit.author?.login,
-            avatar_url: commit.author?.avatar_url,
+            avatar_url: commit.author?.avatar_url
         },
         committer: {
             name: commit.commit.committer?.name || "Unknown",
             email: commit.commit.committer?.email || "",
             date: commit.commit.committer?.date || new Date().toISOString(),
             login: commit.committer?.login,
-            avatar_url: commit.committer?.avatar_url,
+            avatar_url: commit.committer?.avatar_url
         },
         html_url: commit.html_url,
         stats: commit.stats
             ? {
                   additions: commit.stats.additions ?? 0,
                   deletions: commit.stats.deletions ?? 0,
-                  total: commit.stats.total ?? 0,
+                  total: commit.stats.total ?? 0
               }
             : undefined,
-        repo_name: repoName,
+        repo_name: repoName
     };
 }
 
@@ -809,7 +802,7 @@ function calculateStreaks(commits: Commit[]) {
     const lastDateObj = new Date(sortedDates[sortedDates.length - 1]);
     const daysDiff = Math.max(
         1,
-        Math.ceil((lastDateObj.getTime() - firstDate.getTime()) / 86400000) + 1,
+        Math.ceil((lastDateObj.getTime() - firstDate.getTime()) / 86400000) + 1
     );
     const avgCommitsPerDay = Math.round((commits.length / daysDiff) * 100) / 100;
 

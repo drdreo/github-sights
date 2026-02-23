@@ -5,7 +5,7 @@ import {
     Contributor,
     OverviewStats,
     RepoCommitTimeline,
-    DailyCommitActivity,
+    DailyCommitActivity
 } from "../types";
 import { subDays, format } from "date-fns";
 
@@ -18,7 +18,7 @@ const avatars = [
     "https://avatars.githubusercontent.com/u/5?v=4",
     "https://avatars.githubusercontent.com/u/6?v=4",
     "https://avatars.githubusercontent.com/u/7?v=4",
-    "https://avatars.githubusercontent.com/u/8?v=4",
+    "https://avatars.githubusercontent.com/u/8?v=4"
 ];
 
 const users = [
@@ -29,7 +29,7 @@ const users = [
     { login: "ezmobius", avatar_url: avatars[4], html_url: "https://github.com/ezmobius" },
     { login: "ivey", avatar_url: avatars[5], html_url: "https://github.com/ivey" },
     { login: "evanphx", avatar_url: avatars[6], html_url: "https://github.com/evanphx" },
-    { login: "vanpelt", avatar_url: avatars[7], html_url: "https://github.com/vanpelt" },
+    { login: "vanpelt", avatar_url: avatars[7], html_url: "https://github.com/vanpelt" }
 ];
 
 const commitMessages = [
@@ -44,7 +44,7 @@ const commitMessages = [
     "ci: fix github actions workflow",
     "feat: implement dark mode",
     "fix: handle edge case in login",
-    "refactor: simplify state management",
+    "refactor: simplify state management"
 ];
 
 // --- Mock Repositories ---
@@ -65,7 +65,7 @@ export const mockRepos: Repository[] = [
         updated_at: "2023-10-20T14:30:00Z",
         pushed_at: "2023-10-21T09:15:00Z",
         fork: false,
-        owner: users[0],
+        owner: users[0]
     },
     {
         id: 2,
@@ -83,7 +83,7 @@ export const mockRepos: Repository[] = [
         updated_at: "2023-10-19T16:45:00Z",
         pushed_at: "2023-10-21T10:00:00Z",
         fork: false,
-        owner: users[0],
+        owner: users[0]
     },
     {
         id: 3,
@@ -101,7 +101,7 @@ export const mockRepos: Repository[] = [
         updated_at: "2023-10-18T13:10:00Z",
         pushed_at: "2023-10-20T15:20:00Z",
         fork: false,
-        owner: users[0],
+        owner: users[0]
     },
     {
         id: 4,
@@ -119,7 +119,7 @@ export const mockRepos: Repository[] = [
         updated_at: "2023-10-21T11:00:00Z",
         pushed_at: "2023-10-21T11:30:00Z",
         fork: false,
-        owner: users[0],
+        owner: users[0]
     },
     {
         id: 5,
@@ -137,7 +137,7 @@ export const mockRepos: Repository[] = [
         updated_at: "2023-10-15T09:45:00Z",
         pushed_at: "2023-10-19T10:20:00Z",
         fork: false,
-        owner: users[0],
+        owner: users[0]
     },
     {
         id: 6,
@@ -155,8 +155,8 @@ export const mockRepos: Repository[] = [
         updated_at: "2023-10-20T12:00:00Z",
         pushed_at: "2023-10-21T14:45:00Z",
         fork: false,
-        owner: users[0],
-    },
+        owner: users[0]
+    }
 ];
 
 // --- Mock Commits & Timeline ---
@@ -185,27 +185,27 @@ const generateCommits = (repoName: string, days: number = 90): Commit[] => {
                     email: `${author.login}@example.com`,
                     date: new Date(date.setHours(Math.floor(Math.random() * 24))).toISOString(),
                     login: author.login,
-                    avatar_url: author.avatar_url,
+                    avatar_url: author.avatar_url
                 },
                 committer: {
                     name: author.login,
                     email: `${author.login}@example.com`,
                     date: new Date(date.setHours(Math.floor(Math.random() * 24))).toISOString(),
                     login: author.login,
-                    avatar_url: author.avatar_url,
+                    avatar_url: author.avatar_url
                 },
                 html_url: `https://github.com/acme/${repoName}/commit/mocksha`,
                 stats: {
                     additions: Math.floor(Math.random() * 100),
                     deletions: Math.floor(Math.random() * 50),
-                    total: Math.floor(Math.random() * 150),
+                    total: Math.floor(Math.random() * 150)
                 },
-                repo_name: repoName,
+                repo_name: repoName
             });
         }
     }
     return commits.sort(
-        (a, b) => new Date(b.author.date).getTime() - new Date(a.author.date).getTime(),
+        (a, b) => new Date(b.author.date).getTime() - new Date(a.author.date).getTime()
     );
 };
 
@@ -235,7 +235,7 @@ export const mockCommitTimelines: RepoCommitTimeline[] = mockRepos.map((repo) =>
     return {
         repo,
         daily: Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date)),
-        totalCommits: commits.length,
+        totalCommits: commits.length
     };
 });
 
@@ -257,7 +257,7 @@ export const mockPullRequests: PullRequest[] = [
         deletions: 120,
         changed_files: 8,
         base: { ref: "main" },
-        head: { ref: "feat/virtual-scroll" },
+        head: { ref: "feat/virtual-scroll" }
     },
     {
         id: 102,
@@ -275,7 +275,7 @@ export const mockPullRequests: PullRequest[] = [
         deletions: 4,
         changed_files: 2,
         base: { ref: "main" },
-        head: { ref: "fix/z-index" },
+        head: { ref: "fix/z-index" }
     },
     {
         id: 103,
@@ -293,7 +293,7 @@ export const mockPullRequests: PullRequest[] = [
         deletions: 890,
         changed_files: 45,
         base: { ref: "main" },
-        head: { ref: "chore/upgrade-deps" },
+        head: { ref: "chore/upgrade-deps" }
     },
     {
         id: 104,
@@ -311,8 +311,8 @@ export const mockPullRequests: PullRequest[] = [
         deletions: 50,
         changed_files: 12,
         base: { ref: "master" },
-        head: { ref: "feat/oauth" },
-    },
+        head: { ref: "feat/oauth" }
+    }
 ];
 
 // --- Mock Contributors ---
@@ -321,7 +321,7 @@ export const mockContributors: Contributor[] = users
         login: u.login,
         avatar_url: u.avatar_url,
         html_url: u.html_url,
-        contributions: Math.floor(Math.random() * 500) + 20,
+        contributions: Math.floor(Math.random() * 500) + 20
     }))
     .sort((a, b) => b.contributions - a.contributions);
 
@@ -338,7 +338,7 @@ export const mockOverviewStats: OverviewStats = {
     mostActiveRepo: {
         name: "react-dashboard",
         commits:
-            mockCommitTimelines.find((t) => t.repo.name === "react-dashboard")?.totalCommits || 0,
+            mockCommitTimelines.find((t) => t.repo.name === "react-dashboard")?.totalCommits || 0
     },
     longestStreak: 14,
     currentStreak: 3,
@@ -348,6 +348,6 @@ export const mockOverviewStats: OverviewStats = {
         { language: "TypeScript", count: 3, color: "#3178C6" },
         { language: "Python", count: 1, color: "#3572A5" },
         { language: "Go", count: 1, color: "#00ADD8" },
-        { language: "Rust", count: 1, color: "#DEA584" },
-    ],
+        { language: "Rust", count: 1, color: "#DEA584" }
+    ]
 };

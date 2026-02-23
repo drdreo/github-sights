@@ -9,7 +9,7 @@ export function useConfig() {
     return useQuery({
         queryKey: ["config"],
         queryFn: api.getConfig,
-        retry: false,
+        retry: false
     });
 }
 
@@ -19,7 +19,7 @@ export function useSetConfig() {
         mutationFn: api.setConfig,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["config"] });
-        },
+        }
     });
 }
 
@@ -29,14 +29,14 @@ export function useRepos(owner?: string) {
     return useQuery({
         queryKey: ["repos", owner],
         queryFn: () => api.getRepos(owner),
-        enabled: !!owner,
+        enabled: !!owner
     });
 }
 
 export function useRepo(owner: string, repo: string) {
     return useQuery({
         queryKey: ["repo", owner, repo],
-        queryFn: () => api.getRepo(owner, repo),
+        queryFn: () => api.getRepo(owner, repo)
     });
 }
 
@@ -51,7 +51,7 @@ export function useStats(owner: string, since?: string, until?: string) {
     return useQuery({
         queryKey: ["stats", owner, since, until],
         queryFn: () => api.getStats(owner, since, until, true),
-        enabled: !!owner,
+        enabled: !!owner
     });
 }
 
@@ -60,7 +60,7 @@ export function useStats(owner: string, since?: string, until?: string) {
 export function useCommits(owner: string, repo: string, since?: string, until?: string) {
     return useQuery({
         queryKey: ["commits", owner, repo, since, until],
-        queryFn: () => api.getCommits(owner, repo, since, until),
+        queryFn: () => api.getCommits(owner, repo, since, until)
     });
 }
 
@@ -84,7 +84,7 @@ export function useCommitTimelines(owner: string, since?: string, until?: string
 
             return timelines.sort((a, b) => b.totalCommits - a.totalCommits);
         },
-        enabled: !!owner,
+        enabled: !!owner
     });
 }
 
@@ -107,7 +107,7 @@ export function useSync(owner: string, since?: string, until?: string) {
         mutationFn: () => api.sync(since, until),
         onSuccess: (result) => {
             console.log(
-                `[sync] Done: ${result.synced} commits across ${result.repos.length} repos`,
+                `[sync] Done: ${result.synced} commits across ${result.repos.length} repos`
             );
             if (result.errors.length > 0) {
                 console.warn(`[sync] Errors:`, result.errors);
@@ -118,7 +118,7 @@ export function useSync(owner: string, since?: string, until?: string) {
         },
         onError: (error) => {
             console.error("[sync] Failed:", error);
-        },
+        }
     });
 
     useEffect(() => {
@@ -136,7 +136,7 @@ export function useSync(owner: string, since?: string, until?: string) {
     return {
         isSyncing: syncMutation.isPending,
         syncError: syncMutation.error,
-        syncResult: syncMutation.data,
+        syncResult: syncMutation.data
     };
 }
 
@@ -160,14 +160,14 @@ function buildTimeline(repo: RepoCommitTimeline["repo"], commits: Commit[]): Rep
         .map(([date, dayCommits]) => ({
             date,
             count: dayCommits.length,
-            commits: dayCommits,
+            commits: dayCommits
         }))
         .sort((a, b) => a.date.localeCompare(b.date));
 
     return {
         repo,
         daily,
-        totalCommits: commits.length,
+        totalCommits: commits.length
     };
 }
 
@@ -179,23 +179,23 @@ export function useRepoTimeline(owner: string, repo: string, since?: string, unt
         queryFn: async (): Promise<RepoCommitTimeline> => {
             const [repoData, commits] = await Promise.all([
                 api.getRepo(owner, repo),
-                api.getCommits(owner, repo, since, until),
+                api.getCommits(owner, repo, since, until)
             ]);
             return buildTimeline(repoData, commits);
-        },
+        }
     });
 }
 
 export function usePulls(owner: string, repo: string) {
     return useQuery({
         queryKey: ["pulls", owner, repo],
-        queryFn: () => api.getPulls(owner, repo),
+        queryFn: () => api.getPulls(owner, repo)
     });
 }
 
 export function useContributors(owner: string, repo: string) {
     return useQuery({
         queryKey: ["contributors", owner, repo],
-        queryFn: () => api.getContributors(owner, repo),
+        queryFn: () => api.getContributors(owner, repo)
     });
 }

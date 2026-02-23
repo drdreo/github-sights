@@ -7,7 +7,7 @@ import {
     YAxis,
     Tooltip,
     Legend,
-    CartesianGrid,
+    CartesianGrid
 } from "recharts";
 import type { Payload } from "recharts/types/component/DefaultLegendContent";
 import { format, eachDayOfInterval } from "date-fns";
@@ -31,7 +31,7 @@ const LINE_COLORS = [
     "#d946ef",
     "#84cc16",
     "#6366f1",
-    "#ec4899",
+    "#ec4899"
 ];
 
 const getRepoColor = (repoName: string): string => {
@@ -47,7 +47,7 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
     timelines,
     startDate,
     endDate,
-    loading,
+    loading
 }) => {
     const { chartData, topRepoNames } = useMemo(() => {
         if (!timelines.length) return { chartData: [], topRepoNames: [] };
@@ -68,7 +68,7 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
             const point: Record<string, string | number> = {
                 date: dayStr,
                 displayDate: format(day, "MMM d - E"),
-                total: 0,
+                total: 0
             };
 
             let total = 0;
@@ -92,7 +92,7 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
 
         return {
             chartData: data,
-            topRepoNames: topReposList.map((t) => t.repo.name),
+            topRepoNames: topReposList.map((t) => t.repo.name)
         };
     }, [timelines, startDate, endDate]);
 
@@ -109,7 +109,7 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
             }
             setOpacity(next);
         },
-        [topRepoNames],
+        [topRepoNames]
     );
 
     const handleMouseLeave = useCallback(() => {
@@ -158,7 +158,7 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
                         color: "#f3f4f6",
                         borderRadius: "0.5rem",
                         boxShadow:
-                            "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+                            "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)"
                     }}
                     itemStyle={{ padding: 0 }}
                     cursor={{ stroke: "#6b7280", strokeWidth: 1, strokeDasharray: "4 4" }}

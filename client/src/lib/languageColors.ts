@@ -18,7 +18,7 @@ const LANGUAGE_COLORS: Record<string, string> = {
     HTML: "#e34c26",
     CSS: "#563d7c",
     Vue: "#41b883",
-    Svelte: "#ff3e00",
+    Svelte: "#ff3e00"
 };
 
 const FALLBACK_COLOR = "#8b8b8b";

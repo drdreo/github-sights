@@ -29,7 +29,7 @@ const REPO_COLORS = [
     "bg-cyan-500",
     "bg-fuchsia-500",
     "bg-lime-500",
-    "bg-indigo-500",
+    "bg-indigo-500"
 ];
 
 const getRepoColor = (repoName: string) => {
@@ -71,62 +71,62 @@ export function CommitTimeline({ timelines, startDate, endDate, loading }: Commi
 
     return (
         <div
-                ref={containerRef}
-                className="w-full min-h-[400px] max-h-[80vh] bg-gray-900 rounded-xl border border-gray-800 overflow-auto select-none custom-scrollbar"
+            ref={containerRef}
+            className="w-full min-h-[400px] max-h-[80vh] bg-gray-900 rounded-xl border border-gray-800 overflow-auto select-none custom-scrollbar"
+        >
+            <div
+                className="inline-block relative min-w-full"
+                style={{ width: LABEL_WIDTH + totalWidth }}
             >
+                {/* 1. Header Row (Dates) */}
                 <div
-                    className="inline-block relative min-w-full"
-                    style={{ width: LABEL_WIDTH + totalWidth }}
+                    className="sticky top-0 z-30 flex border-b border-gray-800 bg-gray-900/95 backdrop-blur-sm"
+                    style={{ height: HEADER_HEIGHT }}
                 >
-                    {/* 1. Header Row (Dates) */}
+                    {/* Sticky Corner (Repo Label Header) */}
                     <div
-                        className="sticky top-0 z-30 flex border-b border-gray-800 bg-gray-900/95 backdrop-blur-sm"
-                        style={{ height: HEADER_HEIGHT }}
+                        className="sticky left-0 z-40 flex-shrink-0 bg-gray-900 border-r border-gray-800 px-4 flex items-center shadow-[4px_0_12px_-4px_rgba(0,0,0,0.3)]"
+                        style={{ width: LABEL_WIDTH }}
                     >
-                        {/* Sticky Corner (Repo Label Header) */}
-                        <div
-                            className="sticky left-0 z-40 flex-shrink-0 bg-gray-900 border-r border-gray-800 px-4 flex items-center shadow-[4px_0_12px_-4px_rgba(0,0,0,0.3)]"
-                            style={{ width: LABEL_WIDTH }}
-                        >
-                            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                Repositories
-                            </span>
-                        </div>
-
-                        {/* Date Columns Header */}
-                        <div className="flex relative">
-                            {allDays.map((date, i) => (
-                                <div
-                                    key={i}
-                                    className="flex items-center justify-center border-r border-gray-800/50 text-xs font-medium text-gray-400"
-                                    style={{ width: DAY_WIDTH }}
-                                >
-                                    {format(date, "d.M.yyyy")}
-                                </div>
-                            ))}
-                        </div>
+                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                            Repositories
+                        </span>
                     </div>
 
-                    {/* 2. Repo Rows */}
-                    <div className="flex flex-col">
-                        {timelines.map((timeline) => (
-                            <RepoRow
-                                key={timeline.repo.id}
-                                timeline={timeline}
-                                startDate={startDate}
-                                totalDays={totalDays}
-                                allDays={allDays}
-                            />
-                        ))}
-
-                        {timelines.length === 0 && (
-                            <div className="p-12 text-center text-gray-500 text-sm italic sticky left-0 w-full">
-                                No repositories selected or no commit data found for this period.
+                    {/* Date Columns Header */}
+                    <div className="flex relative">
+                        {allDays.map((date, i) => (
+                            <div
+                                key={i}
+                                className="flex items-center justify-center border-r border-gray-800/50 text-xs font-medium text-gray-400"
+                                style={{ width: DAY_WIDTH }}
+                            >
+                                {format(date, "d.M.yyyy")}
                             </div>
-                        )}
+                        ))}
                     </div>
                 </div>
+
+                {/* 2. Repo Rows */}
+                <div className="flex flex-col">
+                    {timelines.map((timeline) => (
+                        <RepoRow
+                            key={timeline.repo.id}
+                            timeline={timeline}
+                            startDate={startDate}
+                            totalDays={totalDays}
+                            allDays={allDays}
+                        />
+                    ))}
+
+                    {timelines.length === 0 && (
+                        <div className="p-12 text-center text-gray-500 text-sm italic sticky left-0 w-full">
+                            No repositories selected or no commit data found for this period.
+                        </div>
+                    )}
+                </div>
             </div>
+        </div>
     );
 }
 
@@ -134,7 +134,7 @@ function RepoRow({
     timeline,
     startDate,
     totalDays,
-    allDays,
+    allDays
 }: {
     timeline: RepoCommitTimeline;
     startDate: Date;
@@ -201,7 +201,7 @@ function RepoRow({
                     {allDays.map((day, i) => {
                         // Find commits for this day
                         const dayData = timeline.daily.find((d) =>
-                            isSameDay(new Date(d.date), day),
+                            isSameDay(new Date(d.date), day)
                         );
                         const commits = dayData ? dayData.commits : [];
 
@@ -246,7 +246,7 @@ function CommitBubble({ commit, color }: { commit: Commit; color: string }) {
             w-full truncate
           `}
                     style={{
-                        height: PILL_HEIGHT,
+                        height: PILL_HEIGHT
                     }}
                 >
                     <span className="truncate w-full drop-shadow-sm opacity-95">

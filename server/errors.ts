@@ -10,7 +10,7 @@ export const ErrorCode = {
     RATE_LIMITED: "RATE_LIMITED",
     NOT_FOUND: "NOT_FOUND",
     GITHUB_API_ERROR: "GITHUB_API_ERROR",
-    INTERNAL_ERROR: "INTERNAL_ERROR",
+    INTERNAL_ERROR: "INTERNAL_ERROR"
 } as const;
 
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -23,7 +23,7 @@ export class ApiError extends Error {
         public readonly code: ErrorCodeType,
         message: string,
         public readonly details?: string,
-        public readonly hint?: string,
+        public readonly hint?: string
     ) {
         super(message);
         this.name = "ApiError";
@@ -38,7 +38,7 @@ export function notConfigured(): ApiError {
         ErrorCode.NOT_CONFIGURED,
         "GitHub API is not configured",
         "No API token has been set up yet.",
-        "POST a valid GitHub token to /api/config before making other requests.",
+        "POST a valid GitHub token to /api/config before making other requests."
     );
 }
 
@@ -48,7 +48,7 @@ export function badCredentials(ghMessage?: string): ApiError {
         ErrorCode.BAD_CREDENTIALS,
         "GitHub authentication failed",
         ghMessage || "The provided token was rejected by GitHub.",
-        "Ensure your token starts with 'ghp_' (classic) or 'github_pat_' (fine-grained) and hasn't expired. You can generate a new one at https://github.com/settings/tokens",
+        "Ensure your token starts with 'ghp_' (classic) or 'github_pat_' (fine-grained) and hasn't expired. You can generate a new one at https://github.com/settings/tokens"
     );
 }
 
@@ -58,7 +58,7 @@ export function tokenMissingScopes(required: string[]): ApiError {
         ErrorCode.TOKEN_MISSING_SCOPES,
         "Token is missing required permissions",
         `Required scopes: ${required.join(", ")}`,
-        "Edit your token at https://github.com/settings/tokens and add the missing scopes, then reconfigure.",
+        "Edit your token at https://github.com/settings/tokens and add the missing scopes, then reconfigure."
     );
 }
 
@@ -72,7 +72,7 @@ export function rateLimited(retryAfterSecs?: number): ApiError {
         ErrorCode.RATE_LIMITED,
         "GitHub API rate limit exceeded",
         retryAfterSecs ? `Retry after ${retryAfterSecs} seconds.` : undefined,
-        "Wait a moment and try again, or use a token with higher rate limits.",
+        "Wait a moment and try again, or use a token with higher rate limits."
     );
 }
 
@@ -82,7 +82,7 @@ export function notFound(resource: string, identifier: string): ApiError {
         ErrorCode.NOT_FOUND,
         `${resource} not found: ${identifier}`,
         undefined,
-        "Check the owner/repo name for typos. If it's a private repo, ensure your token has access.",
+        "Check the owner/repo name for typos. If it's a private repo, ensure your token has access."
     );
 }
 
@@ -100,7 +100,7 @@ export function githubApiError(operation: string, ghError: unknown): ApiError {
         ErrorCode.GITHUB_API_ERROR,
         `GitHub API error during: ${operation}`,
         message,
-        "This may be a temporary GitHub issue. Try again in a moment.",
+        "This may be a temporary GitHub issue. Try again in a moment."
     );
 }
 
@@ -113,9 +113,9 @@ export function errorResponse(c: Context, error: unknown) {
                 error: error.message,
                 code: error.code,
                 ...(error.details && { details: error.details }),
-                ...(error.hint && { hint: error.hint }),
+                ...(error.hint && { hint: error.hint })
             },
-            error.statusCode as 400,
+            error.statusCode as 400
         );
     }
 
@@ -127,9 +127,9 @@ export function errorResponse(c: Context, error: unknown) {
         {
             error: "An unexpected error occurred",
             code: ErrorCode.INTERNAL_ERROR,
-            details: message,
+            details: message
         },
-        500,
+        500
     );
 }
 

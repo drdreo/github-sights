@@ -9,9 +9,7 @@ import { getLanguageColor } from "../lib/languageColors";
 function IconTooltip({ children, label }: { children: React.ReactNode; label: string }) {
     return (
         <Tooltip.Root>
-            <Tooltip.Trigger asChild>
-                {children}
-            </Tooltip.Trigger>
+            <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
             <Tooltip.Portal>
                 <Tooltip.Content
                     className="z-50 bg-gray-900/95 backdrop-blur text-white text-xs rounded-lg px-2.5 py-1.5 shadow-xl border border-gray-800"
@@ -34,11 +32,10 @@ interface RepoCardProps {
 
 export function RepoCard({ repo, owner, totalCommits }: RepoCardProps) {
     return (
-        <div className={`group relative bg-gray-900 rounded-xl border border-gray-800 hover:shadow-lg hover:shadow-black/20 hover:border-blue-500/30 transition-all duration-200 flex flex-col h-full ${repo.fork ? "opacity-60" : ""}`}>
-            <Link
-                to={`/repo/${owner}/${repo.name}`}
-                className="flex flex-col flex-grow p-6"
-            >
+        <div
+            className={`group relative bg-gray-900 rounded-xl border border-gray-800 hover:shadow-lg hover:shadow-black/20 hover:border-blue-500/30 transition-all duration-200 flex flex-col h-full ${repo.fork ? "opacity-60" : ""}`}
+        >
+            <Link to={`/repo/${owner}/${repo.name}`} className="flex flex-col flex-grow p-6">
                 <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3 overflow-hidden">
                         <div
@@ -70,7 +67,10 @@ export function RepoCard({ repo, owner, totalCommits }: RepoCardProps) {
                         {repo.language && (
                             <IconTooltip label="Primary language">
                                 <div className="flex items-center gap-1.5">
-                                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getLanguageColor(repo.language) }} />
+                                    <span
+                                        className="w-2.5 h-2.5 rounded-full"
+                                        style={{ backgroundColor: getLanguageColor(repo.language) }}
+                                    />
                                     <span>{repo.language}</span>
                                 </div>
                             </IconTooltip>

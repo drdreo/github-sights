@@ -13,7 +13,7 @@ import { RepoGrid } from "../components/RepoGrid";
 export default function DashboardPage() {
     const [dateRange, setDateRange] = useState({
         startDate: subDays(new Date(), 30),
-        endDate: new Date(),
+        endDate: new Date()
     });
 
     const { data: config, isLoading: configLoading } = useConfig();
@@ -27,7 +27,7 @@ export default function DashboardPage() {
     const { data: timelines, isLoading: timelinesLoading } = useCommitTimelines(
         owner,
         since,
-        until,
+        until
     );
 
     // Background sync: fills commit gaps from last fetch → now, then refreshes queries
@@ -92,7 +92,12 @@ export default function DashboardPage() {
                     loading={timelinesLoading}
                 />
 
-                <RepoGrid repos={sortedRepos} owner={owner} loading={reposLoading} commitCounts={commitCounts} />
+                <RepoGrid
+                    repos={sortedRepos}
+                    owner={owner}
+                    loading={reposLoading}
+                    commitCounts={commitCounts}
+                />
             </div>
         </div>
     );

@@ -11,8 +11,8 @@ health.get("/api/health", (c) => {
         uptime: Math.floor(performance.now() / 1000),
         cache: {
             cachedRepos: cacheStats.repos,
-            cachedCommits: cacheStats.totalCommits,
-        },
+            cachedCommits: cacheStats.totalCommits
+        }
     });
 });
 

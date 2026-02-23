@@ -23,10 +23,10 @@ export async function loadConfig(): Promise<void> {
         storedConfig = {
             token: row.token,
             owner: row.owner,
-            ownerType: row.owner_type,
+            ownerType: row.owner_type
         };
         console.log(
-            `[config] Loaded from database: ${storedConfig.ownerType}:${storedConfig.owner}`,
+            `[config] Loaded from database: ${storedConfig.ownerType}:${storedConfig.owner}`
         );
     } else {
         console.log("[config] No saved configuration found");
@@ -50,7 +50,7 @@ export async function setConfig(config: ApiConfig): Promise<void> {
        VALUES (1, $1, $2, $3, NOW())
        ON CONFLICT (id) DO UPDATE SET
          token = $1, owner = $2, owner_type = $3, updated_at = NOW()`,
-            [config.token, config.owner, config.ownerType],
+            [config.token, config.owner, config.ownerType]
         );
     }
 
@@ -75,6 +75,6 @@ export function requireService(): { service: GitHubService; config: ApiConfig } 
     if (!storedConfig) throw notConfigured();
     return {
         service: new GitHubService(storedConfig.token),
-        config: storedConfig,
+        config: storedConfig
     };
 }

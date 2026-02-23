@@ -10,7 +10,7 @@ const API_BASE = `${import.meta.env.VITE_API_BASE_URL ?? ""}/api`;
 class ApiError extends Error {
     constructor(
         public status: number,
-        message: string,
+        message: string
     ) {
         super(message);
     }
@@ -21,8 +21,8 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
         ...options,
         headers: {
             "Content-Type": "application/json",
-            ...options?.headers,
-        },
+            ...options?.headers
+        }
     });
 
     if (!response.ok) {
@@ -49,7 +49,7 @@ export const api = {
     setConfig: (config: ApiConfig) =>
         fetchApi<void>("/config", {
             method: "POST",
-            body: JSON.stringify(config),
+            body: JSON.stringify(config)
         }),
 
     getRepos: (owner?: string) => {
@@ -64,7 +64,7 @@ export const api = {
         repo: string,
         since?: string,
         until?: string,
-        cacheOnly?: boolean,
+        cacheOnly?: boolean
     ) => {
         const params = new URLSearchParams();
         if (since) params.append("since", since);
@@ -106,8 +106,8 @@ export const api = {
         return fetchApi<{ synced: number; repos: string[]; errors: string[] }>(
             `/sync${qs ? `?${qs}` : ""}`,
             {
-                method: "POST",
-            },
+                method: "POST"
+            }
         );
-    },
+    }
 };

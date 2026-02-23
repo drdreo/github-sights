@@ -18,7 +18,7 @@ export function DashboardHeader({
     owner,
     isSyncing,
     dateRange,
-    onDateRangeChange,
+    onDateRangeChange
 }: DashboardHeaderProps) {
     return (
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

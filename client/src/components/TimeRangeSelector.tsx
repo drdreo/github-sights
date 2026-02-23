@@ -13,14 +13,14 @@ const PRESETS = [
     { label: "7d", days: 7 },
     { label: "30d", days: 30 },
     { label: "90d", days: 90 },
-    { label: "1y", days: 365 },
+    { label: "1y", days: 365 }
 ];
 
 export function TimeRangeSelector({
     startDate,
     endDate,
     onChange,
-    className = "",
+    className = ""
 }: TimeRangeSelectorProps) {
     const handlePresetClick = (days: number) => {
         const end = endOfDay(new Date());
