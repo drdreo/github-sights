@@ -3,7 +3,7 @@ import { GitCommit, GitPullRequest, Users } from "lucide-react";
 import { CommitList } from "./CommitList";
 import { PullRequestList } from "./PullRequestList";
 import { ContributorGrid } from "./ContributorGrid";
-import type { Commit, PullRequest, Contributor } from "../types";
+import type { Commit, PullRequest, RepoContributorStat } from "../types";
 
 type TabId = "commits" | "pulls" | "contributors";
 
@@ -47,7 +47,7 @@ interface RepoTabsProps {
     commitsLoading: boolean;
     pulls: PullRequest[] | undefined;
     pullsLoading: boolean;
-    contributors: Contributor[] | undefined;
+    contributors: RepoContributorStat[] | undefined;
     contribLoading: boolean;
 }
 

@@ -5,6 +5,7 @@ import SetupPage from "./pages/SetupPage";
 import DashboardPage from "./pages/DashboardPage";
 import RepoDetailPage from "./pages/RepoDetailPage";
 import ContributorsPage from "./pages/ContributorsPage";
+import RepositoriesPage from "./pages/RepositoriesPage";
 import { useConfig } from "./hooks/useGitHub";
 
 /** Redirects to /dashboard if configured, /setup otherwise. */
@@ -29,6 +30,7 @@ export default function App() {
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/repo/:owner/:repo" element={<RepoDetailPage />} />
                     <Route path="/contributors" element={<ContributorsPage />} />
+                    <Route path="/repositories" element={<RepositoriesPage />} />
                 </Route>
                 <Route path="*" element={<RootRedirect />} />
             </Routes>

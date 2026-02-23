@@ -88,7 +88,8 @@ export function StatCards({ stats, loading }: StatCardsProps) {
             subtext: "Tracking activity",
             icon: Box,
             color: "text-gray-400",
-            bg: "bg-gray-800"
+            bg: "bg-gray-800",
+            href: "/repositories"
         },
         {
             label: "Most Active Repo",

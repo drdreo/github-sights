@@ -128,3 +128,12 @@ export interface DateRange {
     startDate: string;
     endDate: string;
 }
+
+export interface RepoContributorStat {
+    login: string;
+    avatar_url: string;
+    html_url: string;
+    totalCommits: number;
+    totalAdditions: number;
+    totalDeletions: number;
+}

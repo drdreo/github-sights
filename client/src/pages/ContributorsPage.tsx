@@ -125,7 +125,7 @@ export default function ContributorsPage() {
                                                             <div className="font-semibold text-gray-100 mb-1 border-b border-gray-700 pb-1">
                                                                 Repositories
                                                             </div>
-                                                            <ul className="space-y-1 max-h-32 overflow-y-auto">
+                                                            <ul className="space-y-1">
                                                                 {contributor.repos.slice(0, 10).map((repo: string) => (
                                                                     <li key={repo} className="truncate">• {repo}</li>
                                                                 ))}

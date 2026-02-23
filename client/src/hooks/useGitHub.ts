@@ -207,3 +207,11 @@ export function useContributorOverview(owner: string, since?: string, until?: st
         enabled: !!owner
     });
 }
+
+export function useRepoContributorStats(owner: string, repo: string) {
+    return useQuery({
+        queryKey: ["repo-contributor-stats", owner, repo],
+        queryFn: () => api.getRepoContributorStats(owner, repo),
+        enabled: !!owner && !!repo
+    });
+}

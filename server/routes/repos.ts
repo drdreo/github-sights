@@ -91,4 +91,43 @@ repos.get("/api/repos/:owner/:repo/contributors", async (c) => {
     }
 });
 
+
+// ── GET /api/repos/:owner/:repo/contributor-stats — Per-repo contributor stats with LOC ──
+
+repos.get("/api/repos/:owner/:repo/contributor-stats", async (c) => {
+    try {
+        const { service } = requireService();
+        const { owner, repo } = c.req.param();
+        const stats = await service.getContributorStats(owner, repo);
+
+        // Aggregate weekly data into per-contributor totals
+        const aggregated = stats
+            .filter((s) => s.author?.login)
+            .map((s) => {
+                let totalCommits = 0;
+                let totalAdditions = 0;
+                let totalDeletions = 0;
+                for (const week of s.weeks) {
+                    totalCommits += week.c;
+                    totalAdditions += week.a;
+                    totalDeletions += week.d;
+                }
+                return {
+                    login: s.author.login,
+                    avatar_url: s.author.avatar_url,
+                    html_url: `https://github.com/${s.author.login}`,
+                    totalCommits,
+                    totalAdditions,
+                    totalDeletions,
+                };
+            })
+            .filter((c) => c.totalCommits > 0)
+            .sort((a, b) => b.totalCommits - a.totalCommits);
+
+        return c.json(aggregated);
+    } catch (error) {
+        return errorResponse(c, error);
+    }
+});
+
 export { repos };

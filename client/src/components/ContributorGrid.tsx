@@ -1,19 +1,24 @@
 import React from "react";
-import { GitCommit } from "lucide-react";
 import { LoadingSkeleton } from "./LoadingSkeleton";
-import type { Contributor } from "../types";
+import type { RepoContributorStat } from "../types";
+
+function formatLoc(n: number): string {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+    return n.toLocaleString();
+}
 
 interface ContributorGridProps {
-    contributors: Contributor[] | undefined;
+    contributors: RepoContributorStat[] | undefined;
     loading: boolean;
 }
 
 export function ContributorGrid({ contributors, loading }: ContributorGridProps) {
     if (loading) {
         return (
-            <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-6">
-                {[...Array(4)].map((_, i) => (
-                    <LoadingSkeleton key={i} className="h-32 w-full rounded-xl" />
+            <div className="p-6 space-y-3">
+                {[...Array(5)].map((_, i) => (
+                    <LoadingSkeleton key={i} className="h-12 w-full rounded-lg" />
                 ))}
             </div>
         );
@@ -24,40 +29,56 @@ export function ContributorGrid({ contributors, loading }: ContributorGridProps)
     }
 
     return (
-        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {contributors.map((contributor, index) => (
-                <a
-                    key={contributor.login}
-                    href={contributor.html_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group flex flex-col items-center text-center p-6 bg-gray-900 rounded-xl border border-gray-800 hover:border-blue-500/30 hover:shadow-lg hover:shadow-black/20 transition-all relative"
-                >
-                    <span className="absolute top-3 left-3 text-xs font-mono text-gray-600">
-                        #{index + 1}
-                    </span>
-                    <div className="relative mb-4">
-                        <img
-                            src={contributor.avatar_url}
-                            alt={contributor.login}
-                            className="w-20 h-20 rounded-full border-4 border-gray-800 group-hover:border-blue-500/20 transition-colors shadow-sm"
-                        />
-                        <div className="absolute -bottom-2 -right-2 bg-gray-900 rounded-full p-1 shadow-sm border border-gray-800">
-                            <div className="bg-green-500/20 text-green-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                                Top
-                            </div>
-                        </div>
-                    </div>
-                    <h3 className="text-base font-semibold text-gray-100 group-hover:text-blue-400 transition-colors">
-                        {contributor.login}
-                    </h3>
-                    <div className="mt-3 flex items-center gap-1.5 text-sm text-gray-400 bg-gray-800 px-3 py-1 rounded-full group-hover:bg-blue-500/10 group-hover:text-blue-400 transition-colors">
-                        <GitCommit className="w-3.5 h-3.5" />
-                        <span className="font-semibold">{contributor.contributions}</span>
-                        <span className="text-xs opacity-75">commits</span>
-                    </div>
-                </a>
-            ))}
+        <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+                <thead>
+                    <tr className="bg-gray-800/50 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        <th className="px-6 py-4 font-medium w-16 text-center">#</th>
+                        <th className="px-6 py-4 font-medium">Contributor</th>
+                        <th className="px-6 py-4 font-medium text-right">Commits</th>
+                        <th className="px-6 py-4 font-medium text-right">Lines Added</th>
+                        <th className="px-6 py-4 font-medium text-right">Lines Deleted</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                    {contributors.map((contributor, index) => (
+                        <tr
+                            key={contributor.login}
+                            className="hover:bg-gray-800/30 transition-colors group"
+                        >
+                            <td className="px-6 py-4 text-center text-gray-500 text-sm font-mono">
+                                {index + 1}
+                            </td>
+                            <td className="px-6 py-4">
+                                <div className="flex items-center gap-3">
+                                    <img
+                                        src={contributor.avatar_url}
+                                        alt={contributor.login}
+                                        className="w-8 h-8 rounded-full bg-gray-800 ring-2 ring-gray-800 group-hover:ring-gray-700 transition-all"
+                                    />
+                                    <a
+                                        href={contributor.html_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-gray-100 hover:text-blue-400 font-medium transition-colors"
+                                    >
+                                        {contributor.login}
+                                    </a>
+                                </div>
+                            </td>
+                            <td className="px-6 py-4 text-right text-gray-300 font-mono text-sm">
+                                {contributor.totalCommits.toLocaleString()}
+                            </td>
+                            <td className="px-6 py-4 text-right text-green-400 font-mono text-sm">
+                                +{formatLoc(contributor.totalAdditions)}
+                            </td>
+                            <td className="px-6 py-4 text-right text-red-400 font-mono text-sm">
+                                -{formatLoc(contributor.totalDeletions)}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
         </div>
     );
 }

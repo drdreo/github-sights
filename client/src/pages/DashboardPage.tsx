@@ -1,14 +1,14 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { subDays } from "date-fns";
 
-import { useConfig, useRepos, useStats, useCommitTimelines, useSync } from "../hooks/useGitHub";
+import { useConfig, useStats, useCommitTimelines, useSync } from "../hooks/useGitHub";
 import { StatCards } from "../components/StatCards";
 import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { DashboardHeader } from "../components/DashboardHeader";
 import { LanguageDistribution } from "../components/LanguageDistribution";
 import { CommitTrends } from "../components/CommitTrends";
 import { CommitActivity } from "../components/CommitActivity";
-import { RepoGrid } from "../components/RepoGrid";
+
 
 export default function DashboardPage() {
     const [dateRange, setDateRange] = useState({
@@ -22,7 +22,7 @@ export default function DashboardPage() {
     const since = dateRange.startDate.toISOString();
     const until = dateRange.endDate.toISOString();
 
-    const { data: repos, isLoading: reposLoading } = useRepos(owner);
+
     const { data: stats, isLoading: statsLoading } = useStats(owner, since, until);
     const { data: timelines, isLoading: timelinesLoading } = useCommitTimelines(
         owner,
@@ -33,21 +33,7 @@ export default function DashboardPage() {
     // Background sync: fills commit gaps from last fetch → now, then refreshes queries
     const { isSyncing } = useSync(owner, since, until);
 
-    // Sort repos: most recently pushed first, then by stars as tiebreaker
-    const sortedRepos = useMemo(() => {
-        if (!repos) return [];
-        return [...repos].sort((a, b) => {
-            const aDate = a.updated_at;
-            const bDate = b.updated_at;
-            const dateCompare = bDate.localeCompare(aDate);
-            if (dateCompare !== 0) return dateCompare;
-            return b.stargazers_count - a.stargazers_count;
-        });
-    }, [repos]);
-    const commitCounts = useMemo(() => {
-        if (!timelines) return new Map<string, number>();
-        return new Map(timelines.map((t) => [t.repo.name, t.totalCommits]));
-    }, [timelines]);
+
 
     if (configLoading) {
         return (
@@ -92,12 +78,7 @@ export default function DashboardPage() {
                     loading={timelinesLoading}
                 />
 
-                <RepoGrid
-                    repos={sortedRepos}
-                    owner={owner}
-                    loading={reposLoading}
-                    commitCounts={commitCounts}
-                />
+
             </div>
         </div>
     );
