@@ -51,6 +51,8 @@ const LANGUAGE_COLORS: Record<string, string> = {
 export class GitHubService {
     private octokit: Octokit;
     private inflight = new Map<string, Promise<unknown>>();
+    private prSearchCache = new Map<string, { data: { totalPRs: number; openPRs: number; mergedPRs: number }; expires: number }>();
+    private static readonly PR_SEARCH_TTL = 10 * 60 * 1000; // 10 minutes
 
     constructor(token: string) {
         this.octokit = new Octokit({
@@ -461,6 +463,57 @@ export class GitHubService {
         }
     }
 
+
+    /**
+     * Uses the GitHub Search API to get aggregate PR counts for an owner.
+     * 3 API calls total regardless of repo count — much cheaper than per-repo pagination.
+     * Search qualifiers: `type:pr` + `user:{owner}` (works for both users and orgs).
+     */
+    private async searchPRCounts(
+        owner: string,
+        since?: string,
+        until?: string
+    ): Promise<{ totalPRs: number; openPRs: number; mergedPRs: number }> {
+        const cacheKey = `${owner}:${since?.slice(0, 10) ?? ''}:${until?.slice(0, 10) ?? ''}`;
+        const cached = this.prSearchCache.get(cacheKey);
+        if (cached && cached.expires > Date.now()) {
+            console.log(`[search] PR counts cache hit for ${owner}`);
+            return cached.data;
+        }
+
+        try {
+            const dateRange = since ? `created:${since.slice(0, 10)}..${until ? until.slice(0, 10) : '*'}` : '';
+            const baseQuery = `type:pr user:${owner}`;
+            const [totalResult, openResult, mergedResult] = await Promise.all([
+                this.octokit.rest.search.issuesAndPullRequests({
+                    q: [baseQuery, dateRange].filter(Boolean).join(' '),
+                    per_page: 1
+                }),
+                this.octokit.rest.search.issuesAndPullRequests({
+                    q: [baseQuery, 'is:open'].filter(Boolean).join(' '),
+                    per_page: 1
+                }),
+                this.octokit.rest.search.issuesAndPullRequests({
+                    q: [baseQuery, 'is:merged', dateRange].filter(Boolean).join(' '),
+                    per_page: 1
+                })
+            ]);
+
+            const data = {
+                totalPRs: totalResult.data.total_count,
+                openPRs: openResult.data.total_count,
+                mergedPRs: mergedResult.data.total_count
+            };
+
+            this.prSearchCache.set(cacheKey, { data, expires: Date.now() + GitHubService.PR_SEARCH_TTL });
+            console.log(`[search] PR counts for ${owner}: total=${data.totalPRs}, open=${data.openPRs}, merged=${data.mergedPRs}`);
+            return data;
+        } catch (error) {
+            console.warn(`[search] PR count search failed for ${owner}:`, error);
+            return { totalPRs: 0, openPRs: 0, mergedPRs: 0 };
+        }
+    }
+
     async getOverviewStats(
         owner: string,
         type: "user" | "org",
@@ -483,69 +536,45 @@ export class GitHubService {
 
         const cacheOnly = options?.cacheOnly ?? false;
 
-        // Only fetch PRs for top N repos to avoid rate limits.
-        // PR listing is expensive (paginated, no date filter) and secondary rate limits
-        // kick in at ~30 req/min. Commits are the core insight; PR stats are supplementary.
-        const PR_FETCH_LIMIT = 10;
-
         // Process repos in batches of CONCURRENCY to avoid GitHub rate limits.
         const CONCURRENCY = 3;
         const repoStats: Array<{
             repo: Repository;
             commits: Commit[];
-            prs: PullRequest[];
         }> = [];
-
+        // Fetch commits per-repo AND PR counts via Search API in parallel.
+        const prCountsPromise = this.searchPRCounts(owner, since, until);
         for (let i = 0; i < nonForkRepos.length; i += CONCURRENCY) {
             const batch = nonForkRepos.slice(i, i + CONCURRENCY);
             const batchResults = await Promise.all(
                 batch.map(async (repo) => {
                     try {
-                        const repoIndex = nonForkRepos.indexOf(repo);
-                        // In cacheOnly mode, skip PR fetching entirely — only use cached commits
-                        const fetchPRs = !cacheOnly && repoIndex < PR_FETCH_LIMIT;
-
-                        const [commits, prs] = await Promise.all([
-                            this.listCommits(repo.owner.login, repo.name, {
-                                since,
-                                until,
-                                cacheOnly
-                            }),
-                            fetchPRs
-                                ? this.listPullRequests(repo.owner.login, repo.name, "all")
-                                : Promise.resolve([] as PullRequest[])
-                        ]);
-                        return { repo, commits, prs };
+                        const commits = await this.listCommits(repo.owner.login, repo.name, {
+                            since,
+                            until,
+                            cacheOnly
+                        });
+                        return { repo, commits };
                     } catch (err) {
                         console.warn(`[stats] Skipping ${repo.full_name}: ${err}`);
-                        return { repo, commits: [] as Commit[], prs: [] as PullRequest[] };
+                        return { repo, commits: [] as Commit[] };
                     }
                 })
             );
             repoStats.push(...batchResults);
         }
 
+        const { totalPRs, openPRs, mergedPRs } = await prCountsPromise;
         let totalCommits = 0;
-        let totalPRs = 0;
-        let openPRs = 0;
-        let mergedPRs = 0;
         const contributorMap = new Map<string, Contributor>();
         const languageCount = new Map<string, number>();
         let mostActiveRepo: { name: string; commits: number } | null = null;
         let maxCommits = 0;
-
-        for (const { repo, commits, prs } of repoStats) {
+        for (const { repo, commits } of repoStats) {
             totalCommits += commits.length;
-            totalPRs += prs.length;
-
             if (commits.length > maxCommits) {
                 maxCommits = commits.length;
                 mostActiveRepo = { name: repo.full_name, commits: commits.length };
-            }
-
-            for (const pr of prs) {
-                if (pr.state === "open") openPRs++;
-                if (pr.merged_at) mergedPRs++;
             }
 
             for (const commit of commits) {

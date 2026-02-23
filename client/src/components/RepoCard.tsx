@@ -87,7 +87,7 @@ export function RepoCard({ repo, owner, totalCommits }: RepoCardProps) {
                             </div>
                         </IconTooltip>
                         {totalCommits != null && totalCommits > 0 && (
-                            <IconTooltip label="Total commits">
+                            <IconTooltip label="Commits">
                                 <div className="flex items-center gap-1">
                                     <GitCommit className="w-4 h-4" />
                                     <span>{totalCommits}</span>
@@ -96,7 +96,7 @@ export function RepoCard({ repo, owner, totalCommits }: RepoCardProps) {
                         )}
                     </div>
                     {repo.updated_at && (
-                        <IconTooltip label="Last updated on">
+                        <IconTooltip label={"Last updated on " + format(new Date(repo.updated_at), "dd.MM.yyyy")}>
                             <span className="text-xs text-gray-500">
                                 {format(new Date(repo.updated_at), "MMM d")}
                             </span>

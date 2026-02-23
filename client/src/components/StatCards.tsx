@@ -31,7 +31,7 @@ export function StatCards({ stats, loading }: StatCardsProps) {
         {
             label: "Pull Requests",
             value: stats.totalPRs.toLocaleString(),
-            subtext: `${stats.mergedPRs} merged (${stats.totalPRs > 0 ? Math.round((stats.mergedPRs / stats.totalPRs) * 100) : 0}%)`,
+            subtext: `${stats.openPRs} open · ${stats.mergedPRs} merged`,
             icon: GitPullRequest,
             color: "text-purple-400",
             bg: "bg-purple-500/10"
