@@ -15,7 +15,13 @@
 //   All writes go to both memory and Postgres (write-through).
 //   Reads check memory first, fall back to Postgres (read-through).
 
-import type { Repository, Commit, PullRequest, Contributor, RepoContributorStats } from "./types.ts";
+import type {
+    Repository,
+    Commit,
+    PullRequest,
+    Contributor,
+    RepoContributorStats
+} from "./types.ts";
 import { query, isDbAvailable } from "./db.ts";
 
 // ── In-memory hot caches ────────────────────────────────────────────────────────

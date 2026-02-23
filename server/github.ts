@@ -65,7 +65,10 @@ const LANGUAGE_COLORS: Record<string, string> = {
 export class GitHubService {
     private octokit: Octokit;
     private inflight = new Map<string, Promise<unknown>>();
-    private prSearchCache = new Map<string, { data: { totalPRs: number; openPRs: number; mergedPRs: number }; expires: number }>();
+    private prSearchCache = new Map<
+        string,
+        { data: { totalPRs: number; openPRs: number; mergedPRs: number }; expires: number }
+    >();
     private static readonly PR_SEARCH_TTL = 10 * 60 * 1000; // 10 minutes
 
     constructor(token: string) {
@@ -446,14 +449,11 @@ export class GitHubService {
         }
     }
 
-
     async getContributorStats(owner: string, repo: string): Promise<RepoContributorStats[]> {
         const cacheKey = `${owner}/${repo}`;
         const cached = await contributorStatsCache.get(cacheKey);
         if (cached) {
-            console.log(
-                `[cache] contributor-stats hit: ${cacheKey} (${cached.length} authors)`
-            );
+            console.log(`[cache] contributor-stats hit: ${cacheKey} (${cached.length} authors)`);
             return cached;
         }
 
@@ -548,7 +548,6 @@ export class GitHubService {
         }
     }
 
-
     /**
      * Uses the GitHub Search API to get aggregate PR counts for an owner.
      * 3 API calls total regardless of repo count — much cheaper than per-repo pagination.
@@ -559,7 +558,7 @@ export class GitHubService {
         since?: string,
         until?: string
     ): Promise<{ totalPRs: number; openPRs: number; mergedPRs: number }> {
-        const cacheKey = `${owner}:${since?.slice(0, 10) ?? ''}:${until?.slice(0, 10) ?? ''}`;
+        const cacheKey = `${owner}:${since?.slice(0, 10) ?? ""}:${until?.slice(0, 10) ?? ""}`;
         const cached = this.prSearchCache.get(cacheKey);
         if (cached && cached.expires > Date.now()) {
             console.log(`[search] PR counts cache hit for ${owner}`);
@@ -567,19 +566,21 @@ export class GitHubService {
         }
 
         try {
-            const dateRange = since ? `created:${since.slice(0, 10)}..${until ? until.slice(0, 10) : '*'}` : '';
+            const dateRange = since
+                ? `created:${since.slice(0, 10)}..${until ? until.slice(0, 10) : "*"}`
+                : "";
             const baseQuery = `type:pr user:${owner}`;
             const [totalResult, openResult, mergedResult] = await Promise.all([
                 this.octokit.rest.search.issuesAndPullRequests({
-                    q: [baseQuery, dateRange].filter(Boolean).join(' '),
+                    q: [baseQuery, dateRange].filter(Boolean).join(" "),
                     per_page: 1
                 }),
                 this.octokit.rest.search.issuesAndPullRequests({
-                    q: [baseQuery, 'is:open'].filter(Boolean).join(' '),
+                    q: [baseQuery, "is:open"].filter(Boolean).join(" "),
                     per_page: 1
                 }),
                 this.octokit.rest.search.issuesAndPullRequests({
-                    q: [baseQuery, 'is:merged', dateRange].filter(Boolean).join(' '),
+                    q: [baseQuery, "is:merged", dateRange].filter(Boolean).join(" "),
                     per_page: 1
                 })
             ]);
@@ -590,8 +591,13 @@ export class GitHubService {
                 mergedPRs: mergedResult.data.total_count
             };
 
-            this.prSearchCache.set(cacheKey, { data, expires: Date.now() + GitHubService.PR_SEARCH_TTL });
-            console.log(`[search] PR counts for ${owner}: total=${data.totalPRs}, open=${data.openPRs}, merged=${data.mergedPRs}`);
+            this.prSearchCache.set(cacheKey, {
+                data,
+                expires: Date.now() + GitHubService.PR_SEARCH_TTL
+            });
+            console.log(
+                `[search] PR counts for ${owner}: total=${data.totalPRs}, open=${data.openPRs}, merged=${data.mergedPRs}`
+            );
             return data;
         } catch (error) {
             console.warn(`[search] PR count search failed for ${owner}:`, error);
@@ -765,10 +771,7 @@ export class GitHubService {
             const batch = nonForkRepos.slice(i, i + CONCURRENCY);
             const results = await Promise.allSettled(
                 batch.map(async (repo) => {
-                    const stats = await this.getContributorStats(
-                        repo.owner.login,
-                        repo.name
-                    );
+                    const stats = await this.getContributorStats(repo.owner.login, repo.name);
                     return { repo: repo.name, stats };
                 })
             );

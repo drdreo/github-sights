@@ -9,7 +9,6 @@ import { LanguageDistribution } from "../components/LanguageDistribution";
 import { CommitTrends } from "../components/CommitTrends";
 import { CommitActivity } from "../components/CommitActivity";
 
-
 export default function DashboardPage() {
     const [dateRange, setDateRange] = useState({
         startDate: subDays(new Date(), 30),
@@ -22,7 +21,6 @@ export default function DashboardPage() {
     const since = dateRange.startDate.toISOString();
     const until = dateRange.endDate.toISOString();
 
-
     const { data: stats, isLoading: statsLoading } = useStats(owner, since, until);
     const { data: timelines, isLoading: timelinesLoading } = useCommitTimelines(
         owner,
@@ -32,8 +30,6 @@ export default function DashboardPage() {
 
     // Background sync: fills commit gaps from last fetch → now, then refreshes queries
     const { isSyncing } = useSync(owner, since, until);
-
-
 
     if (configLoading) {
         return (
@@ -77,8 +73,6 @@ export default function DashboardPage() {
                     endDate={dateRange.endDate}
                     loading={timelinesLoading}
                 />
-
-
             </div>
         </div>
     );

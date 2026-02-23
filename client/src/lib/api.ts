@@ -1,4 +1,13 @@
-import { ApiConfig, ContributorOverview, OverviewStats, Repository, Commit, PullRequest, Contributor, RepoContributorStat } from "../types";
+import {
+    ApiConfig,
+    ContributorOverview,
+    OverviewStats,
+    Repository,
+    Commit,
+    PullRequest,
+    Contributor,
+    RepoContributorStat
+} from "../types";
 
 interface BulkCommitEntry {
     repo: Repository;

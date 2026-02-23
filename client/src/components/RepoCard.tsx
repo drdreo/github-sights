@@ -96,7 +96,11 @@ export function RepoCard({ repo, owner, totalCommits }: RepoCardProps) {
                         )}
                     </div>
                     {repo.updated_at && (
-                        <IconTooltip label={"Last updated on " + format(new Date(repo.updated_at), "dd.MM.yyyy")}>
+                        <IconTooltip
+                            label={
+                                "Last updated on " + format(new Date(repo.updated_at), "dd.MM.yyyy")
+                            }
+                        >
                             <span className="text-xs text-gray-500">
                                 {format(new Date(repo.updated_at), "MMM d")}
                             </span>

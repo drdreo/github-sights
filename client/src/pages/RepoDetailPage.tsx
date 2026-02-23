@@ -2,7 +2,13 @@ import React from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
-import { useRepo, useCommits, usePulls, useRepoContributorStats, useConfig } from "../hooks/useGitHub";
+import {
+    useRepo,
+    useCommits,
+    usePulls,
+    useRepoContributorStats,
+    useConfig
+} from "../hooks/useGitHub";
 import { RepoDetailSkeleton } from "../components/RepoDetailSkeleton";
 import { RepoHeader } from "../components/RepoHeader";
 import { RepoTabs } from "../components/RepoTabs";
@@ -17,7 +23,10 @@ export default function RepoDetailPage() {
     const { data: repository, isLoading: repoLoading } = useRepo(owner, repoName);
     const { data: commits, isLoading: commitsLoading } = useCommits(owner, repoName);
     const { data: pulls, isLoading: pullsLoading } = usePulls(owner, repoName);
-    const { data: contributors, isLoading: contribLoading } = useRepoContributorStats(owner, repoName);
+    const { data: contributors, isLoading: contribLoading } = useRepoContributorStats(
+        owner,
+        repoName
+    );
 
     if (repoLoading) {
         return <RepoDetailSkeleton />;

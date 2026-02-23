@@ -91,7 +91,6 @@ repos.get("/api/repos/:owner/:repo/contributors", async (c) => {
     }
 });
 
-
 // ── GET /api/repos/:owner/:repo/contributor-stats — Per-repo contributor stats with LOC ──
 
 repos.get("/api/repos/:owner/:repo/contributor-stats", async (c) => {
@@ -118,7 +117,7 @@ repos.get("/api/repos/:owner/:repo/contributor-stats", async (c) => {
                     html_url: `https://github.com/${s.author.login}`,
                     totalCommits,
                     totalAdditions,
-                    totalDeletions,
+                    totalDeletions
                 };
             })
             .filter((c) => c.totalCommits > 0)

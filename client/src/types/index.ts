@@ -107,7 +107,6 @@ export interface OverviewStats {
     languageBreakdown: { language: string; count: number; color: string }[];
 }
 
-
 export interface ContributorOverview {
     login: string;
     avatar_url: string;

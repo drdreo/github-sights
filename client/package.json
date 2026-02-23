@@ -12,6 +12,7 @@
         "@radix-ui/react-collapsible": "^1.1.3",
         "@radix-ui/react-tooltip": "^1.1.8",
         "@tanstack/react-query": "^5.66.8",
+        "@tanstack/react-table": "^8.21.3",
         "date-fns": "^4.1.0",
         "lucide-react": "^0.475.0",
         "react": "^19.0.0",
