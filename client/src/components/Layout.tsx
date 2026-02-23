@@ -90,7 +90,7 @@ export default function Layout() {
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in duration-500 slide-in-from-bottom-2">
+            <main className="animate-in fade-in duration-500 slide-in-from-bottom-2">
                 <Outlet />
             </main>
         </div>

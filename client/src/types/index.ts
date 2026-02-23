@@ -107,13 +107,7 @@ export interface OverviewStats {
     languageBreakdown: { language: string; count: number; color: string }[];
 }
 
-export interface ContributorOverview {
-    login: string;
-    avatar_url: string;
-    html_url: string;
-    totalCommits: number;
-    totalAdditions: number;
-    totalDeletions: number;
+export interface ContributorOverview extends RepoContributorStat {
     totalPRs: number;
     repos: string[];
 }

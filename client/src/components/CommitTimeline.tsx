@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef } from "react";
-import { format, differenceInDays, addDays, isSameDay } from "date-fns";
-import { GitCommit, ExternalLink } from "lucide-react";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { RepoCommitTimeline, Commit } from "../types";
+import {addDays, differenceInDays, format, isSameDay, isToday} from "date-fns";
+import {ExternalLink, GitCommit} from "lucide-react";
+import React, {useEffect, useMemo, useRef} from "react";
+import {Commit, RepoCommitTimeline} from "../types";
 
 interface CommitTimelineProps {
     timelines: RepoCommitTimeline[];
@@ -19,17 +19,19 @@ const LABEL_WIDTH = 220; // Sticky repo label width
 const ROW_PADDING = 16; // Vertical padding per row
 const HEADER_HEIGHT = 48; // Height of date header row
 
-// Vibrant palette for repos
-const REPO_COLORS = [
+const TW_COLORS = [
     "bg-blue-500",
     "bg-emerald-500",
     "bg-violet-500",
+    "bg-purple-500",
     "bg-amber-500",
     "bg-rose-500",
     "bg-cyan-500",
     "bg-fuchsia-500",
-    "bg-lime-500",
-    "bg-indigo-500"
+    "bg-lime-600",
+    "bg-indigo-500",
+    "bg-sky-500",
+    "bg-teal-500"
 ];
 
 const getRepoColor = (repoName: string) => {
@@ -37,8 +39,8 @@ const getRepoColor = (repoName: string) => {
     for (let i = 0; i < repoName.length; i++) {
         hash = repoName.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const index = Math.abs(hash) % REPO_COLORS.length;
-    return REPO_COLORS[index];
+    const index = Math.abs(hash) % TW_COLORS.length;
+    return TW_COLORS[index];
 };
 
 export function CommitTimeline({ timelines, startDate, endDate, loading }: CommitTimelineProps) {
@@ -72,7 +74,7 @@ export function CommitTimeline({ timelines, startDate, endDate, loading }: Commi
     return (
         <div
             ref={containerRef}
-            className="w-full min-h-[400px] max-h-[80vh] bg-gray-900 rounded-xl border border-gray-800 overflow-auto select-none custom-scrollbar"
+            className="w-full min-h-[400px] max-h-[80vh] bg-gray-900 border-y border-gray-800 overflow-auto select-none custom-scrollbar"
         >
             <div
                 className="inline-block relative min-w-full"
@@ -95,15 +97,25 @@ export function CommitTimeline({ timelines, startDate, endDate, loading }: Commi
 
                     {/* Date Columns Header */}
                     <div className="flex relative">
-                        {allDays.map((date, i) => (
-                            <div
-                                key={i}
-                                className="flex items-center justify-center border-r border-gray-800/50 text-xs font-medium text-gray-400"
-                                style={{ width: DAY_WIDTH }}
-                            >
-                                {format(date, "d.M.yyyy")}
-                            </div>
-                        ))}
+                        {allDays.map((date, i) => {
+                            const today = isToday(date);
+                            return (
+                                <div
+                                    key={i}
+                                    className={`flex items-center justify-center border-r border-gray-800/50 text-xs font-medium ${
+                                        today ? "text-blue-400 bg-blue-500/10" : "text-gray-400"
+                                    }`}
+                                    style={{ width: DAY_WIDTH }}
+                                >
+                                    {format(date, "d.M.yyyy")}
+                                    {today && (
+                                        <span className="ml-1.5 text-[9px] uppercase tracking-wider text-blue-500/80 font-semibold">
+                                            Today
+                                        </span>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -160,7 +172,7 @@ function RepoRow({
         >
             {/* Sticky Repo Label */}
             <div
-                className="sticky left-0 z-20 flex-shrink-0 bg-gray-900 group-hover:bg-gray-800/30 border-r border-gray-800 p-4 flex flex-col justify-center transition-colors shadow-[4px_0_12px_-4px_rgba(0,0,0,0.3)]"
+                className="sticky left-0 z-20 flex-shrink-0 bg-gray-900 group-hover:bg-gray-800/75 group-hover:backdrop-blur-sm border-r border-gray-800 p-4 flex flex-col justify-center transition-colors shadow-[4px_0_12px_-4px_rgba(0,0,0,0.3)]"
                 style={{ width: LABEL_WIDTH }}
             >
                 <div className="flex items-center gap-2 mb-1">
@@ -191,7 +203,9 @@ function RepoRow({
                 {allDays.map((day, i) => (
                     <div
                         key={`bg-${i}`}
-                        className="border-r border-gray-800/50 h-full flex-shrink-0"
+                        className={`border-r border-gray-800/50 h-full flex-shrink-0 ${
+                            isToday(day) ? "bg-blue-500/5" : ""
+                        }`}
                         style={{ width: DAY_WIDTH }}
                     />
                 ))}
@@ -312,7 +326,7 @@ function CommitBubble({ commit, color }: { commit: Commit; color: string }) {
 
 function TimelineSkeleton() {
     return (
-        <div className="w-full h-[500px] flex flex-col bg-gray-900 rounded-xl border border-gray-800 overflow-hidden animate-pulse">
+        <div className="w-full h-[500px] flex flex-col bg-gray-900 border-y border-gray-800 overflow-hidden animate-pulse">
             {/* Header Skeleton */}
             <div className="h-[48px] border-b border-gray-800 flex">
                 <div className="w-[220px] border-r border-gray-800 bg-gray-800" />

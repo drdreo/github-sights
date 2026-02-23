@@ -1,13 +1,13 @@
-import {subDays} from "date-fns";
-import React, {useState} from "react";
-import {CommitActivity} from "../components/CommitActivity";
-import {CommitTrends} from "../components/CommitTrends";
-import {DashboardHeader} from "../components/DashboardHeader";
-import {LanguageDistribution} from "../components/LanguageDistribution";
-import {StatCards} from "../components/StatCards";
+import { subDays } from "date-fns";
+import React, { useState } from "react";
+import { CommitActivity } from "../components/CommitActivity";
+import { CommitTrends } from "../components/CommitTrends";
+import { DashboardHeader } from "../components/DashboardHeader";
+import { LanguageDistribution } from "../components/LanguageDistribution";
+import { StatCards } from "../components/StatCards";
 
-import {useCommitTimelines, useStats, useSync} from "../hooks/useGitHub";
-import {useOwner} from "../hooks/useOwner";
+import { useCommitTimelines, useStats, useSync } from "../hooks/useGitHub";
+import { useOwner } from "../hooks/useOwner";
 
 export default function DashboardPage() {
     const [dateRange, setDateRange] = useState({
@@ -31,28 +31,30 @@ export default function DashboardPage() {
     const { isSyncing } = useSync(owner, since, until);
 
     return (
-        <div className="min-h-screen bg-gray-950 p-8">
-            <div className="max-w-7xl mx-auto space-y-8">
+        <div className="min-h-screen bg-gray-950">
+            {/* Centered content */}
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
                 <DashboardHeader
                     owner={owner}
                     isSyncing={isSyncing}
                     dateRange={dateRange}
                     onDateRangeChange={setDateRange}
                 />
-
                 <div className="grid grid-cols-1 gap-6">
                     <StatCards stats={stats} loading={statsLoading} owner={owner} />
                 </div>
 
                 <LanguageDistribution stats={stats} loading={statsLoading} />
-
                 <CommitTrends
                     timelines={timelines || []}
                     startDate={dateRange.startDate}
                     endDate={dateRange.endDate}
                     loading={timelinesLoading}
                 />
+            </div>
 
+            {/* Full-bleed commit activity — edge to edge */}
+            <div className="mt-8 pb-8">
                 <CommitActivity
                     timelines={timelines || []}
                     startDate={dateRange.startDate}

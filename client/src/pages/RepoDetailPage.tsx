@@ -2,12 +2,7 @@ import React from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
-import {
-    useRepo,
-    useCommits,
-    usePulls,
-    useRepoContributorStats,
-} from "../hooks/useGitHub";
+import { useRepo, useCommits, usePulls, useRepoContributorStats } from "../hooks/useGitHub";
 import { useOwner } from "../hooks/useOwner";
 import { RepoDetailSkeleton } from "../components/RepoDetailSkeleton";
 import { RepoHeader } from "../components/RepoHeader";

@@ -52,8 +52,7 @@ export async function setConfig(config: ApiConfig): Promise<void> {
     const existing = configStore.get(key);
 
     const ownerChanged =
-        existing?.config.owner !== config.owner ||
-        existing?.config.ownerType !== config.ownerType;
+        existing?.config.owner !== config.owner || existing?.config.ownerType !== config.ownerType;
 
     configStore.set(key, {
         config,
