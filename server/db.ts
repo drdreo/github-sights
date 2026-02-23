@@ -27,9 +27,6 @@ const SCHEMA_DDL = `
     key TEXT PRIMARY KEY,
     data JSONB NOT NULL
   );
-
-  DROP TABLE IF EXISTS cached_commits;
-  DROP TABLE IF EXISTS commit_ranges;
 `;
 
 /**

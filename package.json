@@ -6,9 +6,9 @@
         "client"
     ],
     "scripts": {
-        "dev:client": "npm run dev -w client",
-        "dev:server": "cd server && deno task dev",
-        "build:client": "npm run build -w client",
+        "client:dev": "npm run dev -w client",
+        "client:build": "npm run build -w client",
+        "server:dev": "cd server && deno task dev",
         "fmt": "oxfmt .",
         "lint": "oxlint . --fix"
     },

@@ -5,6 +5,7 @@ import { loadConfig } from "./config.ts";
 import { initDb } from "./db.ts";
 import { config } from "./routes/config.ts";
 import { health } from "./routes/health.ts";
+import { contributors } from "./routes/contributors.ts";
 import { repos } from "./routes/repos.ts";
 import { stats } from "./routes/stats.ts";
 import { sync } from "./routes/sync.ts";
@@ -23,6 +24,7 @@ app.use("/*", cors({ origin: allowedOrigins }));
 // Mount route modules
 app.route("/", health);
 app.route("/", config);
+app.route("/", contributors);
 app.route("/", repos);
 app.route("/", stats);
 app.route("/", sync);

@@ -15,7 +15,7 @@
 //   All writes go to both memory and Postgres (write-through).
 //   Reads check memory first, fall back to Postgres (read-through).
 
-import type { Repository, Commit, PullRequest, Contributor } from "./types.ts";
+import type { Repository, Commit, PullRequest, Contributor, RepoContributorStats } from "./types.ts";
 import { query, isDbAvailable } from "./db.ts";
 
 // ── In-memory hot caches ────────────────────────────────────────────────────────
@@ -23,6 +23,7 @@ import { query, isDbAvailable } from "./db.ts";
 const repoStore = new Map<string, Repository[]>();
 const prStore = new Map<string, PullRequest[]>();
 const contributorStore = new Map<string, Contributor[]>();
+const contributorStatsStore = new Map<string, RepoContributorStats[]>();
 
 interface CommitBlobEntry {
     commits: Commit[];
@@ -339,6 +340,10 @@ class CommitCache {
 export const repoCache = new DataCache<Repository[]>(repoStore, "repos");
 export const prCache = new DataCache<PullRequest[]>(prStore, "prs");
 export const contributorCache = new DataCache<Contributor[]>(contributorStore, "contributors");
+export const contributorStatsCache = new DataCache<RepoContributorStats[]>(
+    contributorStatsStore,
+    "contributor-stats"
+);
 export const commitCache = new CommitCache(commitCacheStore);
 
 /** Clear all caches (memory + database). Called when config changes. */
@@ -346,6 +351,7 @@ export async function clearAllCaches(): Promise<void> {
     repoStore.clear();
     prStore.clear();
     contributorStore.clear();
+    contributorStatsStore.clear();
     commitCacheStore.clear();
 
     if (!isDbAvailable()) return;

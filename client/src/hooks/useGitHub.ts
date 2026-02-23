@@ -199,3 +199,11 @@ export function useContributors(owner: string, repo: string) {
         queryFn: () => api.getContributors(owner, repo)
     });
 }
+
+export function useContributorOverview(owner: string, since?: string, until?: string) {
+    return useQuery({
+        queryKey: ["contributor-overview", owner, since, until],
+        queryFn: () => api.getContributorOverview(owner, since, until),
+        enabled: !!owner
+    });
+}

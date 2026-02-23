@@ -93,6 +93,8 @@ export interface OverviewStats {
     totalPRs: number;
     openPRs: number;
     mergedPRs: number;
+    totalAdditions: number;
+    totalDeletions: number;
     uniqueContributors: number;
     mostActiveRepo: {
         name: string;
@@ -105,6 +107,17 @@ export interface OverviewStats {
     languageBreakdown: { language: string; count: number; color: string }[];
 }
 
+
+export interface ContributorOverview {
+    login: string;
+    avatar_url: string;
+    html_url: string;
+    totalCommits: number;
+    totalAdditions: number;
+    totalDeletions: number;
+    totalPRs: number;
+    repos: string[];
+}
 export interface ApiConfig {
     token: string;
     owner: string;

@@ -1,4 +1,4 @@
-import { ApiConfig, OverviewStats, Repository, Commit, PullRequest, Contributor } from "../types";
+import { ApiConfig, ContributorOverview, OverviewStats, Repository, Commit, PullRequest, Contributor } from "../types";
 
 interface BulkCommitEntry {
     repo: Repository;
@@ -87,6 +87,14 @@ export const api = {
 
     getContributors: (owner: string, repo: string) =>
         fetchApi<Contributor[]>(`/repos/${owner}/${repo}/contributors`),
+
+    getContributorOverview: (owner: string, since?: string, until?: string) => {
+        const params = new URLSearchParams();
+        if (since) params.append("since", since);
+        if (until) params.append("until", until);
+        const qs = params.toString();
+        return fetchApi<ContributorOverview[]>(`/contributors/${owner}${qs ? `?${qs}` : ""}`);
+    },
 
     getStats: (owner: string, since?: string, until?: string, cacheOnly?: boolean) => {
         const params = new URLSearchParams();

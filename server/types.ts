@@ -75,6 +75,8 @@ export interface OverviewStats {
     totalPRs: number;
     openPRs: number;
     mergedPRs: number;
+    totalAdditions: number;
+    totalDeletions: number;
     uniqueContributors: number;
     mostActiveRepo: { name: string; commits: number } | null;
     longestStreak: number;
@@ -82,6 +84,37 @@ export interface OverviewStats {
     avgCommitsPerDay: number;
     topContributors: Contributor[];
     languageBreakdown: { language: string; count: number; color: string }[];
+}
+
+/** Raw weekly stats from GitHub's /repos/{owner}/{repo}/stats/contributors endpoint. */
+export interface ContributorWeekStat {
+    w: number; // unix timestamp (start of week)
+    a: number; // additions
+    d: number; // deletions
+    c: number; // commits
+}
+
+/** Per-author stats from GitHub's stats/contributors endpoint. */
+export interface RepoContributorStats {
+    author: {
+        login: string;
+        id: number;
+        avatar_url: string;
+    };
+    total: number;
+    weeks: ContributorWeekStat[];
+}
+
+/** Aggregated contributor overview across all repos. */
+export interface ContributorOverview {
+    login: string;
+    avatar_url: string;
+    html_url: string;
+    totalCommits: number;
+    totalAdditions: number;
+    totalDeletions: number;
+    totalPRs: number;
+    repos: string[]; // repo names this contributor contributed to
 }
 
 export interface ApiConfig {

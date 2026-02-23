@@ -7,6 +7,7 @@ import { query, isDbAvailable } from "./db.ts";
 // ── Config Store (in-memory + Postgres) ─────────────────────────────────────────
 
 let storedConfig: ApiConfig | null = null;
+let cachedService: GitHubService | null = null;
 
 /** Load config from Postgres on startup. Call once after initDb(). */
 export async function loadConfig(): Promise<void> {
@@ -42,6 +43,7 @@ export async function setConfig(config: ApiConfig): Promise<void> {
         storedConfig?.owner !== config.owner || storedConfig?.ownerType !== config.ownerType;
 
     storedConfig = config;
+    cachedService = new GitHubService(config.token);
 
     // Persist to Postgres
     if (isDbAvailable()) {
@@ -62,6 +64,7 @@ export async function setConfig(config: ApiConfig): Promise<void> {
 
 export async function clearConfig(): Promise<void> {
     storedConfig = null;
+    cachedService = null;
 
     if (isDbAvailable()) {
         await query(`DELETE FROM config WHERE id = 1`);
@@ -73,8 +76,11 @@ export async function clearConfig(): Promise<void> {
 /** Returns the service + config or throws ApiError if not configured. */
 export function requireService(): { service: GitHubService; config: ApiConfig } {
     if (!storedConfig) throw notConfigured();
+    if (!cachedService) {
+        cachedService = new GitHubService(storedConfig.token);
+    }
     return {
-        service: new GitHubService(storedConfig.token),
+        service: cachedService,
         config: storedConfig
     };
 }

@@ -334,6 +334,8 @@ export const mockOverviewStats: OverviewStats = {
     totalPRs: 145,
     openPRs: 12,
     mergedPRs: 128,
+    totalAdditions: 45230,
+    totalDeletions: 12890,
     uniqueContributors: 18,
     mostActiveRepo: {
         name: "react-dashboard",

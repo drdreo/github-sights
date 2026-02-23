@@ -1,7 +1,21 @@
 import { Octokit } from "octokit";
-import type { Repository, Commit, PullRequest, Contributor, OverviewStats } from "./types.ts";
+import type {
+    Repository,
+    Commit,
+    PullRequest,
+    Contributor,
+    OverviewStats,
+    RepoContributorStats,
+    ContributorOverview
+} from "./types.ts";
 import { githubApiError } from "./errors.ts";
-import { repoCache, prCache, contributorCache, commitCache } from "./cache.ts";
+import {
+    repoCache,
+    prCache,
+    contributorCache,
+    commitCache,
+    contributorStatsCache
+} from "./cache.ts";
 
 // ── Excluded Repos ──────────────────────────────────────────────────────────────
 // Comma-separated repo names to exclude from all results (case-insensitive).
@@ -432,6 +446,77 @@ export class GitHubService {
         }
     }
 
+
+    async getContributorStats(owner: string, repo: string): Promise<RepoContributorStats[]> {
+        const cacheKey = `${owner}/${repo}`;
+        const cached = await contributorStatsCache.get(cacheKey);
+        if (cached) {
+            console.log(
+                `[cache] contributor-stats hit: ${cacheKey} (${cached.length} authors)`
+            );
+            return cached;
+        }
+
+        const inflightKey = `contributor-stats:${cacheKey}`;
+        const existing = this.inflight.get(inflightKey);
+        if (existing) {
+            console.log(`[cache] contributor-stats inflight: ${cacheKey}`);
+            return existing as Promise<RepoContributorStats[]>;
+        }
+
+        const promise = this._fetchContributorStats(owner, repo, cacheKey);
+        this.inflight.set(inflightKey, promise);
+        try {
+            return await promise;
+        } finally {
+            this.inflight.delete(inflightKey);
+        }
+    }
+
+    private async _fetchContributorStats(
+        owner: string,
+        repo: string,
+        cacheKey: string
+    ): Promise<RepoContributorStats[]> {
+        const MAX_RETRIES = 3;
+        const RETRY_DELAY = 2000;
+
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                const response = await this.octokit.request(
+                    "GET /repos/{owner}/{repo}/stats/contributors",
+                    { owner, repo }
+                );
+
+                if (response.status === 202) {
+                    if (attempt < MAX_RETRIES) {
+                        console.log(
+                            `[github] contributor-stats 202 for ${cacheKey} — retry ${attempt + 1}/${MAX_RETRIES}`
+                        );
+                        await new Promise((r) => setTimeout(r, RETRY_DELAY));
+                        continue;
+                    }
+                    console.warn(
+                        `[github] contributor-stats 202 exhausted retries for ${cacheKey}`
+                    );
+                    return [];
+                }
+
+                const data = (response.data || []) as RepoContributorStats[];
+                await contributorStatsCache.set(cacheKey, data);
+                console.log(
+                    `[cache] contributor-stats miss: ${cacheKey} → fetched ${data.length} authors`
+                );
+                return data;
+            } catch (error) {
+                console.warn(`[github] contributor-stats failed for ${cacheKey}:`, error);
+                return [];
+            }
+        }
+
+        return [];
+    }
+
     private async _fetchContributors(
         owner: string,
         repo: string,
@@ -613,12 +698,40 @@ export class GitHubService {
             }))
             .sort((a, b) => b.count - a.count);
 
+        // Aggregate LOC from contributor stats (weekly breakdown)
+        const sinceTs = since ? Math.floor(new Date(since).getTime() / 1000) : 0;
+        const untilTs = until
+            ? Math.floor(new Date(until).getTime() / 1000)
+            : Math.floor(Date.now() / 1000);
+        let totalAdditions = 0;
+        let totalDeletions = 0;
+
+        // Fetch contributor stats for all repos (reuses cache from getContributorStats)
+        const contribStatsPromises = nonForkRepos.map((repo) =>
+            this.getContributorStats(repo.owner.login, repo.name)
+        );
+        const contribStatsResults = await Promise.allSettled(contribStatsPromises);
+
+        for (const result of contribStatsResults) {
+            if (result.status !== "fulfilled") continue;
+            for (const authorStats of result.value) {
+                for (const week of authorStats.weeks) {
+                    if (week.w >= sinceTs && week.w <= untilTs) {
+                        totalAdditions += week.a;
+                        totalDeletions += week.d;
+                    }
+                }
+            }
+        }
+
         return {
             totalRepos: repos.length, // includes forks for the full count
             totalCommits,
             totalPRs,
             openPRs,
             mergedPRs,
+            totalAdditions,
+            totalDeletions,
             uniqueContributors: contributorMap.size,
             mostActiveRepo,
             longestStreak,
@@ -627,6 +740,85 @@ export class GitHubService {
             topContributors,
             languageBreakdown
         };
+    }
+
+    async getContributorOverview(
+        owner: string,
+        type: "user" | "org",
+        since?: string,
+        until?: string
+    ): Promise<ContributorOverview[]> {
+        const allRepos = await this.listRepos(owner, type);
+        const nonForkRepos = allRepos.filter((r) => !r.fork);
+
+        // Parse date range for filtering weeks
+        const sinceTs = since ? Math.floor(new Date(since).getTime() / 1000) : 0;
+        const untilTs = until
+            ? Math.floor(new Date(until).getTime() / 1000)
+            : Math.floor(Date.now() / 1000);
+
+        // Fetch contributor stats for all repos (batched)
+        const CONCURRENCY = 5;
+        const allStats: Array<{ repo: string; stats: RepoContributorStats[] }> = [];
+
+        for (let i = 0; i < nonForkRepos.length; i += CONCURRENCY) {
+            const batch = nonForkRepos.slice(i, i + CONCURRENCY);
+            const results = await Promise.allSettled(
+                batch.map(async (repo) => {
+                    const stats = await this.getContributorStats(
+                        repo.owner.login,
+                        repo.name
+                    );
+                    return { repo: repo.name, stats };
+                })
+            );
+            for (const r of results) {
+                if (r.status === "fulfilled") {
+                    allStats.push(r.value);
+                }
+            }
+        }
+
+        // Aggregate per contributor
+        const contributorMap = new Map<string, ContributorOverview>();
+
+        for (const { repo, stats } of allStats) {
+            for (const authorStats of stats) {
+                if (!authorStats.author?.login) continue;
+
+                const login = authorStats.author.login;
+                let entry = contributorMap.get(login);
+                if (!entry) {
+                    entry = {
+                        login,
+                        avatar_url: authorStats.author.avatar_url,
+                        html_url: `https://github.com/${login}`,
+                        totalCommits: 0,
+                        totalAdditions: 0,
+                        totalDeletions: 0,
+                        totalPRs: 0,
+                        repos: []
+                    };
+                    contributorMap.set(login, entry);
+                }
+
+                entry.repos.push(repo);
+
+                // Sum weeks within the date range
+                for (const week of authorStats.weeks) {
+                    if (week.w >= sinceTs && week.w <= untilTs) {
+                        entry.totalCommits += week.c;
+                        entry.totalAdditions += week.a;
+                        entry.totalDeletions += week.d;
+                    }
+                }
+            }
+        }
+
+        // Sort by total commits descending
+        return Array.from(contributorMap.values())
+            .filter((c) => c.totalCommits > 0)
+            .sort((a, b) => b.totalCommits - a.totalCommits);
     }
 
     /**

@@ -1,14 +1,33 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { OverviewStats } from "../types";
 import { LoadingSkeleton } from "./LoadingSkeleton";
-import { Activity, Box, Flame, GitCommit, GitPullRequest, Users } from "lucide-react";
+import { Activity, Box, Code, Flame, GitCommit, GitPullRequest, Users } from "lucide-react";
+
+interface StatCardDef {
+    label: string;
+    value: string | number;
+    subtext: string;
+    icon: React.ElementType;
+    color: string;
+    bg: string;
+    href?: string;
+}
 
 interface StatCardsProps {
     stats?: OverviewStats;
     loading?: boolean;
 }
 
+function formatLoc(n: number): string {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+    return n.toLocaleString();
+}
+
 export function StatCards({ stats, loading }: StatCardsProps) {
+    const navigate = useNavigate();
+
     if (loading || !stats) {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -19,7 +38,9 @@ export function StatCards({ stats, loading }: StatCardsProps) {
         );
     }
 
-    const cards = [
+    const totalLoc = (stats.totalAdditions ?? 0) + (stats.totalDeletions ?? 0);
+
+    const cards: StatCardDef[] = [
         {
             label: "Total Commits",
             value: stats.totalCommits.toLocaleString(),
@@ -42,7 +63,16 @@ export function StatCards({ stats, loading }: StatCardsProps) {
             subtext: "Across all repos",
             icon: Users,
             color: "text-orange-400",
-            bg: "bg-orange-500/10"
+            bg: "bg-orange-500/10",
+            href: "/contributors"
+        },
+        {
+            label: "Lines Changed",
+            value: formatLoc(totalLoc),
+            subtext: `+${formatLoc(stats.totalAdditions ?? 0)} / -${formatLoc(stats.totalDeletions ?? 0)}`,
+            icon: Code,
+            color: "text-cyan-400",
+            bg: "bg-cyan-500/10"
         },
         {
             label: "Longest Streak",
@@ -75,7 +105,8 @@ export function StatCards({ stats, loading }: StatCardsProps) {
             {cards.map((card, i) => (
                 <div
                     key={i}
-                    className="bg-gray-900 rounded-xl border border-gray-800 p-6 flex items-start justify-between transition-all hover:shadow-lg hover:shadow-black/20 group"
+                    onClick={card.href ? () => navigate(card.href!) : undefined}
+                    className={`bg-gray-900 rounded-xl border border-gray-800 p-6 flex items-start justify-between transition-all hover:shadow-lg hover:shadow-black/20 group ${card.href ? "cursor-pointer hover:border-blue-500/30" : ""}`}
                 >
                     <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-gray-400 mb-1">{card.label}</p>
