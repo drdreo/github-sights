@@ -37,8 +37,8 @@ export default function DashboardPage() {
     const sortedRepos = useMemo(() => {
         if (!repos) return [];
         return [...repos].sort((a, b) => {
-            const aDate = a.pushed_at || a.updated_at;
-            const bDate = b.pushed_at || b.updated_at;
+            const aDate = a.updated_at;
+            const bDate = b.updated_at;
             const dateCompare = bDate.localeCompare(aDate);
             if (dateCompare !== 0) return dateCompare;
             return b.stargazers_count - a.stargazers_count;

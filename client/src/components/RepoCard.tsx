@@ -17,7 +17,6 @@ function IconTooltip({ children, label }: { children: React.ReactNode; label: st
                     side="top"
                 >
                     {label}
-                    <Tooltip.Arrow className="fill-gray-900/95" />
                 </Tooltip.Content>
             </Tooltip.Portal>
         </Tooltip.Root>
@@ -96,9 +95,13 @@ export function RepoCard({ repo, owner, totalCommits }: RepoCardProps) {
                             </IconTooltip>
                         )}
                     </div>
-                    <span className="text-xs text-gray-500">
-                        {repo.updated_at && format(new Date(repo.updated_at), "MMM d")}
-                    </span>
+                    {repo.updated_at && (
+                        <IconTooltip label="Last updated on">
+                            <span className="text-xs text-gray-500">
+                                {format(new Date(repo.updated_at), "MMM d")}
+                            </span>
+                        </IconTooltip>
+                    )}
                 </div>
             </Link>
             {repo.html_url && (
