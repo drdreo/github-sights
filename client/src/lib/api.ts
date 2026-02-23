@@ -52,8 +52,10 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
-    getConfig: () =>
-        fetchApi<{ configured: boolean; owner?: string; ownerType?: "user" | "org" }>("/config"),
+    getConfig: (owner: string) =>
+        fetchApi<{ configured: boolean; owner?: string; ownerType?: "user" | "org" }>(
+            `/config/${encodeURIComponent(owner)}`
+        ),
 
     setConfig: (config: ApiConfig) =>
         fetchApi<void>("/config", {
@@ -61,9 +63,8 @@ export const api = {
             body: JSON.stringify(config)
         }),
 
-    getRepos: (owner?: string) => {
-        const query = owner ? `?owner=${owner}` : "";
-        return fetchApi<Repository[]>(`/repos${query}`);
+    getRepos: (owner: string) => {
+        return fetchApi<Repository[]>(`/repos/${encodeURIComponent(owner)}`);
     },
 
     getRepo: (owner: string, repo: string) => fetchApi<Repository>(`/repos/${owner}/${repo}`),
@@ -118,16 +119,21 @@ export const api = {
     },
 
     /** Trigger background sync — fills commit gaps from last fetch to now. */
-    sync: (since?: string, until?: string) => {
+    sync: (owner: string, since?: string, until?: string) => {
         const params = new URLSearchParams();
         if (since) params.append("since", since);
         if (until) params.append("until", until);
         const qs = params.toString();
         return fetchApi<{ synced: number; repos: string[]; errors: string[] }>(
-            `/sync${qs ? `?${qs}` : ""}`,
+            `/sync/${encodeURIComponent(owner)}${qs ? `?${qs}` : ""}`,
             {
                 method: "POST"
             }
         );
-    }
+    },
+
+    deleteConfig: (owner: string) =>
+        fetchApi<{ configured: false }>(`/config/${encodeURIComponent(owner)}`, {
+            method: "DELETE"
+        })
 };

@@ -1,13 +1,13 @@
-import React, { useState } from "react";
-import { subDays } from "date-fns";
+import {subDays} from "date-fns";
+import React, {useState} from "react";
+import {CommitActivity} from "../components/CommitActivity";
+import {CommitTrends} from "../components/CommitTrends";
+import {DashboardHeader} from "../components/DashboardHeader";
+import {LanguageDistribution} from "../components/LanguageDistribution";
+import {StatCards} from "../components/StatCards";
 
-import { useConfig, useStats, useCommitTimelines, useSync } from "../hooks/useGitHub";
-import { StatCards } from "../components/StatCards";
-import { LoadingSkeleton } from "../components/LoadingSkeleton";
-import { DashboardHeader } from "../components/DashboardHeader";
-import { LanguageDistribution } from "../components/LanguageDistribution";
-import { CommitTrends } from "../components/CommitTrends";
-import { CommitActivity } from "../components/CommitActivity";
+import {useCommitTimelines, useStats, useSync} from "../hooks/useGitHub";
+import {useOwner} from "../hooks/useOwner";
 
 export default function DashboardPage() {
     const [dateRange, setDateRange] = useState({
@@ -15,8 +15,7 @@ export default function DashboardPage() {
         endDate: new Date()
     });
 
-    const { data: config, isLoading: configLoading } = useConfig();
-    const owner = config?.owner || "";
+    const owner = useOwner();
 
     const since = dateRange.startDate.toISOString();
     const until = dateRange.endDate.toISOString();
@@ -31,19 +30,6 @@ export default function DashboardPage() {
     // Background sync: fills commit gaps from last fetch → now, then refreshes queries
     const { isSyncing } = useSync(owner, since, until);
 
-    if (configLoading) {
-        return (
-            <div className="p-8 space-y-8 max-w-7xl mx-auto">
-                <LoadingSkeleton className="h-12 w-48" />
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {[...Array(4)].map((_, i) => (
-                        <LoadingSkeleton key={i} className="h-32 w-full rounded-xl" />
-                    ))}
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className="min-h-screen bg-gray-950 p-8">
             <div className="max-w-7xl mx-auto space-y-8">
@@ -55,7 +41,7 @@ export default function DashboardPage() {
                 />
 
                 <div className="grid grid-cols-1 gap-6">
-                    <StatCards stats={stats} loading={statsLoading} />
+                    <StatCards stats={stats} loading={statsLoading} owner={owner} />
                 </div>
 
                 <LanguageDistribution stats={stats} loading={statsLoading} />

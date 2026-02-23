@@ -10,14 +10,14 @@ const sync = new Hono();
 //   since — ISO date string (defaults to 30 days ago)
 //   until — ISO date string (defaults to now)
 
-sync.post("/api/sync", async (c) => {
+sync.post("/api/sync/:owner", async (c) => {
     try {
-        const { service, config } = requireService();
+        const { owner } = c.req.param();
+        const { service, config } = requireService(owner);
         const since =
             c.req.query("since") || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
         const until = c.req.query("until") || undefined;
-
-        const result = await service.syncCommits(config.owner, config.ownerType, since, until);
+        const result = await service.syncCommits(owner, config.ownerType, since, until);
 
         return c.json(result);
     } catch (error) {

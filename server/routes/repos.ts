@@ -6,10 +6,10 @@ const repos = new Hono();
 
 // ── GET /api/repos — List repositories ──────────────────────────────────────
 
-repos.get("/api/repos", async (c) => {
+repos.get("/api/repos/:owner", async (c) => {
     try {
-        const { service, config } = requireService();
-        const owner = c.req.query("owner") || config.owner;
+        const { owner } = c.req.param();
+        const { service, config } = requireService(owner);
         const data = await service.listRepos(owner, config.ownerType);
         return c.json(data);
     } catch (error) {
@@ -21,8 +21,8 @@ repos.get("/api/repos", async (c) => {
 
 repos.get("/api/repos/:owner/:repo", async (c) => {
     try {
-        const { service } = requireService();
         const { owner, repo } = c.req.param();
+        const { service } = requireService(owner);
         const data = await service.getRepo(owner, repo);
         return c.json(data);
     } catch (error) {
@@ -34,8 +34,8 @@ repos.get("/api/repos/:owner/:repo", async (c) => {
 
 repos.get("/api/commits/:owner", async (c) => {
     try {
-        const { service, config } = requireService();
         const { owner } = c.req.param();
+        const { service, config } = requireService(owner);
         const since = c.req.query("since") || undefined;
         const until = c.req.query("until") || undefined;
         const cacheOnly = c.req.query("cacheOnly") === "true";
@@ -52,8 +52,8 @@ repos.get("/api/commits/:owner", async (c) => {
 
 repos.get("/api/repos/:owner/:repo/commits", async (c) => {
     try {
-        const { service } = requireService();
         const { owner, repo } = c.req.param();
+        const { service } = requireService(owner);
         const since = c.req.query("since") || undefined;
         const until = c.req.query("until") || undefined;
         const cacheOnly = c.req.query("cacheOnly") === "true";
@@ -68,8 +68,8 @@ repos.get("/api/repos/:owner/:repo/commits", async (c) => {
 
 repos.get("/api/repos/:owner/:repo/pulls", async (c) => {
     try {
-        const { service } = requireService();
         const { owner, repo } = c.req.param();
+        const { service } = requireService(owner);
         const state = (c.req.query("state") as "all" | "open" | "closed") || "all";
         const data = await service.listPullRequests(owner, repo, state);
         return c.json(data);
@@ -82,8 +82,8 @@ repos.get("/api/repos/:owner/:repo/pulls", async (c) => {
 
 repos.get("/api/repos/:owner/:repo/contributors", async (c) => {
     try {
-        const { service } = requireService();
         const { owner, repo } = c.req.param();
+        const { service } = requireService(owner);
         const data = await service.listContributors(owner, repo);
         return c.json(data);
     } catch (error) {
@@ -95,8 +95,8 @@ repos.get("/api/repos/:owner/:repo/contributors", async (c) => {
 
 repos.get("/api/repos/:owner/:repo/contributor-stats", async (c) => {
     try {
-        const { service } = requireService();
         const { owner, repo } = c.req.param();
+        const { service } = requireService(owner);
         const stats = await service.getContributorStats(owner, repo);
 
         // Aggregate weekly data into per-contributor totals

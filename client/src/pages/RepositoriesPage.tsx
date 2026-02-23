@@ -2,12 +2,12 @@ import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
-import { useConfig, useRepos, useCommitTimelines } from "../hooks/useGitHub";
+import { useRepos, useCommitTimelines } from "../hooks/useGitHub";
+import { useOwner } from "../hooks/useOwner";
 import { RepoGrid } from "../components/RepoGrid";
 
 export default function RepositoriesPage() {
-    const { data: config } = useConfig();
-    const owner = config?.owner || "";
+    const owner = useOwner();
 
     const { data: repos, isLoading: reposLoading } = useRepos(owner);
     const { data: timelines } = useCommitTimelines(owner);
@@ -32,7 +32,7 @@ export default function RepositoriesPage() {
         <div className="min-h-screen bg-gray-950 p-8">
             <div className="max-w-7xl mx-auto space-y-8">
                 <Link
-                    to="/dashboard"
+                    to={`/${owner}/dashboard`}
                     className="inline-flex items-center text-gray-400 hover:text-gray-100 transition-colors gap-2 group"
                 >
                     <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />

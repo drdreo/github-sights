@@ -8,8 +8,8 @@ const stats = new Hono();
 
 stats.get("/api/stats/:owner", async (c) => {
     try {
-        const { service, config } = requireService();
         const { owner } = c.req.param();
+        const { service, config } = requireService(owner);
         const since = c.req.query("since") || undefined;
         const until = c.req.query("until") || undefined;
         const cacheOnly = c.req.query("cacheOnly") === "true";

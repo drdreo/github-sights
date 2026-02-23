@@ -5,10 +5,11 @@ import { badCredentials, tokenMissingScopes, validationError, errorResponse } fr
 
 const config = new Hono();
 
-// ── GET /api/config — Check current configuration status ────────────────────
+// ── GET /api/config/:owner — Check if a specific owner is configured ────────
 
-config.get("/api/config", (c) => {
-    const current = getConfig();
+config.get("/api/config/:owner", (c) => {
+    const { owner } = c.req.param();
+    const current = getConfig(owner);
     if (current) {
         return c.json({
             configured: true,
@@ -113,11 +114,12 @@ config.post("/api/config", async (c) => {
     }
 });
 
-// ── DELETE /api/config — Clear stored config ────────────────────────────────
+// ── DELETE /api/config/:owner — Clear stored config for an owner ────────────
 
-config.delete("/api/config", async (c) => {
-    await clearConfig();
-    console.log("[config] Configuration cleared");
+config.delete("/api/config/:owner", async (c) => {
+    const { owner } = c.req.param();
+    await clearConfig(owner);
+    console.log(`[config] Configuration cleared for ${owner}`);
     return c.json({ configured: false });
 });
 

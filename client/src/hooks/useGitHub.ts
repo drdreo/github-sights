@@ -4,12 +4,12 @@ import { api } from "../lib/api";
 import type { Commit, DailyCommitActivity, RepoCommitTimeline } from "../types";
 
 // ── Config ──────────────────────────────────────────────────────────────────────
-
-export function useConfig() {
+export function useOwnerConfig(owner: string) {
     return useQuery({
-        queryKey: ["config"],
-        queryFn: api.getConfig,
-        retry: false
+        queryKey: ["config", owner],
+        queryFn: () => api.getConfig(owner),
+        retry: false,
+        enabled: !!owner
     });
 }
 
@@ -25,7 +25,7 @@ export function useSetConfig() {
 
 // ── Repos ───────────────────────────────────────────────────────────────────────
 
-export function useRepos(owner?: string) {
+export function useRepos(owner: string) {
     return useQuery({
         queryKey: ["repos", owner],
         queryFn: () => api.getRepos(owner),
@@ -104,7 +104,7 @@ export function useSync(owner: string, since?: string, until?: string) {
     const syncedRef = useRef<string | null>(null);
 
     const syncMutation = useMutation({
-        mutationFn: () => api.sync(since, until),
+        mutationFn: () => api.sync(owner, since, until),
         onSuccess: (result) => {
             console.log(
                 `[sync] Done: ${result.synced} commits across ${result.repos.length} repos`

@@ -25,7 +25,7 @@ function formatLoc(n: number): string {
     return n.toLocaleString();
 }
 
-export function StatCards({ stats, loading }: StatCardsProps) {
+export function StatCards({ stats, loading, owner }: StatCardsProps) {
     const navigate = useNavigate();
 
     if (loading || !stats) {
@@ -64,7 +64,7 @@ export function StatCards({ stats, loading }: StatCardsProps) {
             icon: Users,
             color: "text-orange-400",
             bg: "bg-orange-500/10",
-            href: "/contributors"
+            href: `/${owner}/contributors`
         },
         {
             label: "Lines Changed",
@@ -89,7 +89,7 @@ export function StatCards({ stats, loading }: StatCardsProps) {
             icon: Box,
             color: "text-gray-400",
             bg: "bg-gray-800",
-            href: "/repositories"
+            href: `/${owner}/repositories`
         },
         {
             label: "Most Active Repo",

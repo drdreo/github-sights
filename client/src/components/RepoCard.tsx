@@ -34,7 +34,7 @@ export function RepoCard({ repo, owner, totalCommits }: RepoCardProps) {
         <div
             className={`group relative bg-gray-900 rounded-xl border border-gray-800 hover:shadow-lg hover:shadow-black/20 hover:border-blue-500/30 transition-all duration-200 flex flex-col h-full ${repo.fork ? "opacity-60" : ""}`}
         >
-            <Link to={`/repo/${owner}/${repo.name}`} className="flex flex-col flex-grow p-6">
+            <Link to={`/${owner}/repo/${repo.name}`} className="flex flex-col flex-grow p-6">
                 <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3 overflow-hidden">
                         <div

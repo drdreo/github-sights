@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { useConfig, useSetConfig } from "../hooks/useGitHub";
-import { useNavigate, Navigate } from "react-router-dom";
+import { useSetConfig } from "../hooks/useGitHub";
+import { useNavigate } from "react-router-dom";
 import { Key, Building2, User, ArrowRight, Loader2, Github, Shield } from "lucide-react";
+import { addRecentOwner } from "./LandingPage";
 
 export default function SetupPage() {
     const [token, setToken] = useState("");
@@ -9,14 +10,8 @@ export default function SetupPage() {
     const [ownerType, setOwnerType] = useState<"user" | "org">("org");
     const [error, setError] = useState<string | null>(null);
 
-    const { data: config, isLoading: configLoading } = useConfig();
     const setConfig = useSetConfig();
     const navigate = useNavigate();
-
-    // Already configured — skip setup
-    if (!configLoading && config?.configured) {
-        return <Navigate to="/dashboard" replace />;
-    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -33,7 +28,8 @@ export default function SetupPage() {
 
         try {
             await setConfig.mutateAsync({ token, owner, ownerType });
-            navigate("/dashboard");
+            addRecentOwner(owner);
+            navigate(`/${owner}/dashboard`);
         } catch (err) {
             console.error("Setup failed:", err);
             setError("Failed to save configuration. Please try again.");

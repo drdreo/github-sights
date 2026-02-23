@@ -8,13 +8,11 @@ let pool: InstanceType<typeof Pool>;
 
 const SCHEMA_DDL = `
   CREATE TABLE IF NOT EXISTS config (
-    id INTEGER PRIMARY KEY DEFAULT 1,
+    owner TEXT PRIMARY KEY,
     token TEXT NOT NULL,
-    owner TEXT NOT NULL,
     owner_type TEXT NOT NULL CHECK (owner_type IN ('user', 'org')),
     updated_at TIMESTAMPTZ DEFAULT NOW()
   );
-
   CREATE TABLE IF NOT EXISTS repo_commits (
     repo_key TEXT PRIMARY KEY,
     data JSONB NOT NULL,
@@ -22,11 +20,38 @@ const SCHEMA_DDL = `
     fetched_until DATE,
     last_fetched_at TIMESTAMPTZ DEFAULT NOW()
   );
-
   CREATE TABLE IF NOT EXISTS data_cache (
     key TEXT PRIMARY KEY,
     data JSONB NOT NULL
   );
+`;
+
+const MIGRATION_DDL = `
+  DO $$
+  BEGIN
+    -- Migrate old id-based config table to owner-based
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'config' AND column_name = 'id'
+    ) THEN
+      -- Create new table
+      CREATE TABLE IF NOT EXISTS config_new (
+        owner TEXT PRIMARY KEY,
+        token TEXT NOT NULL,
+        owner_type TEXT NOT NULL CHECK (owner_type IN ('user', 'org')),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      -- Migrate existing data
+      INSERT INTO config_new (owner, token, owner_type, updated_at)
+      SELECT owner, token, owner_type, updated_at FROM config
+      ON CONFLICT (owner) DO NOTHING;
+      -- Swap tables
+      DROP TABLE config;
+      ALTER TABLE config_new RENAME TO config;
+      RAISE NOTICE 'Migrated config table from id-based to owner-based';
+    END IF;
+  END
+  $$;
 `;
 
 /**
@@ -54,6 +79,7 @@ export async function initDb(): Promise<void> {
     });
 
     try {
+        await pool.query(MIGRATION_DDL);
         await pool.query(SCHEMA_DDL);
         console.log("[db] Connected and schema verified");
     } catch (err) {

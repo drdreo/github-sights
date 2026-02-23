@@ -13,7 +13,8 @@ import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { TimeRangeSelector } from "../components/TimeRangeSelector";
-import { useConfig, useContributorOverview } from "../hooks/useGitHub";
+import { useContributorOverview } from "../hooks/useGitHub";
+import { useOwner } from "../hooks/useOwner";
 import { ContributorOverview } from "../types";
 
 function formatLoc(n: number): string {
@@ -43,8 +44,7 @@ export default function ContributorsPage() {
     });
     const [sorting, setSorting] = useState<SortingState>([]);
 
-    const { data: config } = useConfig();
-    const owner = config?.owner || "";
+    const owner = useOwner();
 
     // Convert dates to ISO strings for the API
     const since = dateRange.startDate.toISOString();
@@ -159,7 +159,7 @@ export default function ContributorsPage() {
             <div className="max-w-7xl mx-auto space-y-8">
                 {/* Back Link */}
                 <Link
-                    to="/dashboard"
+                    to={`/${owner}/dashboard`}
                     className="inline-flex items-center text-gray-400 hover:text-gray-100 transition-colors gap-2 group"
                 >
                     <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />

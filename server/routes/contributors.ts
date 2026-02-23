@@ -6,8 +6,8 @@ const contributors = new Hono();
 
 contributors.get("/api/contributors/:owner", async (c) => {
     try {
-        const { service, config } = requireService();
         const { owner } = c.req.param();
+        const { service, config } = requireService(owner);
         const since = c.req.query("since") || undefined;
         const until = c.req.query("until") || undefined;
         const data = await service.getContributorOverview(owner, config.ownerType, since, until);
