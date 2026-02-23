@@ -1,15 +1,38 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
-import { ExternalLink, GitBranch, GitFork, Star } from "lucide-react";
+import { ExternalLink, GitBranch, GitCommit, GitFork, Star } from "lucide-react";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import type { Repository } from "../types";
+import { getLanguageColor } from "../lib/languageColors";
+
+function IconTooltip({ children, label }: { children: React.ReactNode; label: string }) {
+    return (
+        <Tooltip.Root>
+            <Tooltip.Trigger asChild>
+                {children}
+            </Tooltip.Trigger>
+            <Tooltip.Portal>
+                <Tooltip.Content
+                    className="z-50 bg-gray-900/95 backdrop-blur text-white text-xs rounded-lg px-2.5 py-1.5 shadow-xl border border-gray-800"
+                    sideOffset={5}
+                    side="top"
+                >
+                    {label}
+                    <Tooltip.Arrow className="fill-gray-900/95" />
+                </Tooltip.Content>
+            </Tooltip.Portal>
+        </Tooltip.Root>
+    );
+}
 
 interface RepoCardProps {
     repo: Repository;
     owner: string;
+    totalCommits?: number;
 }
 
-export function RepoCard({ repo, owner }: RepoCardProps) {
+export function RepoCard({ repo, owner, totalCommits }: RepoCardProps) {
     return (
         <div className={`group relative bg-gray-900 rounded-xl border border-gray-800 hover:shadow-lg hover:shadow-black/20 hover:border-blue-500/30 transition-all duration-200 flex flex-col h-full ${repo.fork ? "opacity-60" : ""}`}>
             <Link
@@ -45,19 +68,33 @@ export function RepoCard({ repo, owner }: RepoCardProps) {
                 <div className="flex items-center justify-between text-sm text-gray-400 pt-4 border-t border-gray-800 mt-auto">
                     <div className="flex items-center gap-4">
                         {repo.language && (
-                            <div className="flex items-center gap-1.5">
-                                <span className="w-2.5 h-2.5 rounded-full bg-blue-400" />
-                                <span>{repo.language}</span>
-                            </div>
+                            <IconTooltip label="Primary language">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getLanguageColor(repo.language) }} />
+                                    <span>{repo.language}</span>
+                                </div>
+                            </IconTooltip>
                         )}
-                        <div className="flex items-center gap-1">
-                            <Star className="w-4 h-4" />
-                            <span>{repo.stargazers_count}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <GitBranch className="w-4 h-4" />
-                            <span>{repo.forks_count}</span>
-                        </div>
+                        <IconTooltip label="Stars">
+                            <div className="flex items-center gap-1">
+                                <Star className="w-4 h-4" />
+                                <span>{repo.stargazers_count}</span>
+                            </div>
+                        </IconTooltip>
+                        <IconTooltip label="Forks">
+                            <div className="flex items-center gap-1">
+                                <GitFork className="w-4 h-4" />
+                                <span>{repo.forks_count}</span>
+                            </div>
+                        </IconTooltip>
+                        {totalCommits != null && totalCommits > 0 && (
+                            <IconTooltip label="Total commits">
+                                <div className="flex items-center gap-1">
+                                    <GitCommit className="w-4 h-4" />
+                                    <span>{totalCommits}</span>
+                                </div>
+                            </IconTooltip>
+                        )}
                     </div>
                     <span className="text-xs text-gray-500">
                         {repo.updated_at && format(new Date(repo.updated_at), "MMM d")}

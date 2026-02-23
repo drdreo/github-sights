@@ -2,6 +2,7 @@ import React from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Star, GitBranch, ExternalLink, Clock, AlertCircle } from "lucide-react";
 import type { Repository } from "../types";
+import { getLanguageColor } from "../lib/languageColors";
 
 interface RepoHeaderProps {
     repository: Repository;
@@ -44,7 +45,7 @@ export function RepoHeader({ repository }: RepoHeaderProps) {
                 <div className="flex flex-wrap items-center gap-6 mt-8 text-sm">
                     {repository.language && (
                         <div className="flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50" />
+                            <span className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: getLanguageColor(repository.language), boxShadow: `0 1px 2px ${getLanguageColor(repository.language)}80` }} />
                             <span className="font-medium text-gray-300">{repository.language}</span>
                         </div>
                     )}

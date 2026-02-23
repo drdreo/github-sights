@@ -44,6 +44,10 @@ export default function DashboardPage() {
             return b.stargazers_count - a.stargazers_count;
         });
     }, [repos]);
+    const commitCounts = useMemo(() => {
+        if (!timelines) return new Map<string, number>();
+        return new Map(timelines.map((t) => [t.repo.name, t.totalCommits]));
+    }, [timelines]);
 
     if (configLoading) {
         return (
@@ -88,7 +92,7 @@ export default function DashboardPage() {
                     loading={timelinesLoading}
                 />
 
-                <RepoGrid repos={sortedRepos} owner={owner} loading={reposLoading} />
+                <RepoGrid repos={sortedRepos} owner={owner} loading={reposLoading} commitCounts={commitCounts} />
             </div>
         </div>
     );

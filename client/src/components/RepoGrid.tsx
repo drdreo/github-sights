@@ -7,9 +7,10 @@ interface RepoGridProps {
     repos: Repository[];
     owner: string;
     loading: boolean;
+    commitCounts?: Map<string, number>;
 }
 
-export function RepoGrid({ repos, owner, loading }: RepoGridProps) {
+export function RepoGrid({ repos, owner, loading, commitCounts }: RepoGridProps) {
     return (
         <div>
             <h2 className="text-xl font-semibold text-gray-100 mb-6 flex items-center gap-2">
@@ -28,7 +29,7 @@ export function RepoGrid({ repos, owner, loading }: RepoGridProps) {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {repos.map((repo) => (
-                        <RepoCard key={repo.id} repo={repo} owner={owner} />
+                        <RepoCard key={repo.id} repo={repo} owner={owner} totalCommits={commitCounts?.get(repo.name)} />
                     ))}
                 </div>
             )}

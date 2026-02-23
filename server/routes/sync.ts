@@ -6,10 +6,6 @@ const sync = new Hono();
 
 // ── POST /api/sync — Trigger background gap-filling ────────────────────────
 //
-// The frontend calls this after rendering cached data.
-// It fills commit gaps for all non-fork repos (last fetch → now)
-// and returns a summary when done.
-//
 // Query params:
 //   since — ISO date string (defaults to 30 days ago)
 //   until — ISO date string (defaults to now)

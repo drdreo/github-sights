@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import Layout from "./components/Layout";
 import SetupPage from "./pages/SetupPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -20,13 +21,15 @@ function RootRedirect() {
 
 export default function App() {
     return (
-        <Routes>
-            <Route path="/setup" element={<SetupPage />} />
-            <Route element={<Layout />}>
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/repo/:owner/:repo" element={<RepoDetailPage />} />
-            </Route>
-            <Route path="*" element={<RootRedirect />} />
-        </Routes>
+        <Tooltip.Provider delayDuration={200}>
+            <Routes>
+                <Route path="/setup" element={<SetupPage />} />
+                <Route element={<Layout />}>
+                    <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/repo/:owner/:repo" element={<RepoDetailPage />} />
+                </Route>
+                <Route path="*" element={<RootRedirect />} />
+            </Routes>
+        </Tooltip.Provider>
     );
 }

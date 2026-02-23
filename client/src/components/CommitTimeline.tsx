@@ -70,8 +70,7 @@ export function CommitTimeline({ timelines, startDate, endDate, loading }: Commi
     }
 
     return (
-        <Tooltip.Provider delayDuration={100}>
-            <div
+        <div
                 ref={containerRef}
                 className="w-full min-h-[400px] max-h-[80vh] bg-gray-900 rounded-xl border border-gray-800 overflow-auto select-none custom-scrollbar"
             >
@@ -128,7 +127,6 @@ export function CommitTimeline({ timelines, startDate, endDate, loading }: Commi
                     </div>
                 </div>
             </div>
-        </Tooltip.Provider>
     );
 }
 
