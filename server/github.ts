@@ -574,7 +574,7 @@ export class GitHubService {
             totalCommits += commits.length;
             if (commits.length > maxCommits) {
                 maxCommits = commits.length;
-                mostActiveRepo = { name: repo.full_name, commits: commits.length };
+                mostActiveRepo = { name: repo.name, commits: commits.length };
             }
 
             for (const commit of commits) {

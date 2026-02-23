@@ -77,7 +77,7 @@ export function StatCards({ stats, loading }: StatCardsProps) {
                     key={i}
                     className="bg-gray-900 rounded-xl border border-gray-800 p-6 flex items-start justify-between transition-all hover:shadow-lg hover:shadow-black/20 group"
                 >
-                    <div>
+                    <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-gray-400 mb-1">{card.label}</p>
                         <h3 className="text-2xl font-bold text-gray-100 tracking-tight group-hover:text-blue-400 transition-colors">
                             {card.value}
@@ -86,7 +86,7 @@ export function StatCards({ stats, loading }: StatCardsProps) {
                             <p className="text-xs text-gray-500 mt-2 font-medium">{card.subtext}</p>
                         )}
                     </div>
-                    <div className={`p-3 rounded-lg ${card.bg} ${card.color}`}>
+                    <div className={`p-3 rounded-lg shrink-0 ml-3 ${card.bg} ${card.color}`}>
                         <card.icon className="w-6 h-6" />
                     </div>
                 </div>

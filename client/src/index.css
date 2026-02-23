@@ -28,6 +28,10 @@
     --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
+html {
+    color-scheme: dark;
+}
+
 /* Smooth scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
     height: 6px;

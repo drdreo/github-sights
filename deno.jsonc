@@ -1,0 +1,6 @@
+{
+  "deploy": {
+    "org": "drdreo",
+    "app": "github-sights"
+  }
+}
