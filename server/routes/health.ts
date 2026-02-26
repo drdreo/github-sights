@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { commitCache } from "../cache.ts";
+import { commitCache } from "../cache/index.ts";
 
 const health = new Hono();
 

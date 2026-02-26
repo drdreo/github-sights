@@ -1,35 +1,11 @@
-// ── Persistent Cache (Postgres-backed) ──────────────────────────────────────────
+// ── CommitCache (range-based, blob-per-repo) ────────────────────────────────
 //
-// Stores fetched GitHub data permanently to avoid redundant API calls.
-// Data is static — it doesn't expire. Cleared only on config change.
-//
-// Strategy:
-//   Commits      — One JSONB blob per repo with range metadata.
-//                  We know what date span we've covered, and only fetch the gaps.
-//   Repos        — Permanent cache (owner-scoped).
-//   PRs          — Permanent cache (repo-scoped).
-//   Contributors — Permanent cache (repo-scoped).
-//
-// Architecture:
-//   In-memory Maps serve as a hot cache for fast reads.
-//   All writes go to both memory and Postgres (write-through).
-//   Reads check memory first, fall back to Postgres (read-through).
+// Stores commits as one JSONB blob per repo with range metadata.
+// Knows what date span has been covered and only fetches the gaps.
+// Uses its own `repo_commits` table (not the generic `data_cache`).
 
-import type {
-    Repository,
-    Commit,
-    PullRequest,
-    Contributor,
-    RepoContributorStats
-} from "./types.ts";
-import { query, isDbAvailable } from "./db.ts";
-
-// ── In-memory hot caches ────────────────────────────────────────────────────────
-
-const repoStore = new Map<string, Repository[]>();
-const prStore = new Map<string, PullRequest[]>();
-const contributorStore = new Map<string, Contributor[]>();
-const contributorStatsStore = new Map<string, RepoContributorStats[]>();
+import type { Commit } from "../types.ts";
+import { query, isDbAvailable } from "../db.ts";
 
 interface CommitBlobEntry {
     commits: Commit[];
@@ -38,71 +14,6 @@ interface CommitBlobEntry {
     fetchedUntil: string | null;
     lastFetchedAt: number;
 }
-
-const commitCacheStore = new Map<string, CommitBlobEntry>();
-
-// ── Data Cache (permanent, no TTL) ──────────────────────────────────────────────
-
-class DataCache<T> {
-    constructor(
-        private store: Map<string, T>,
-        private prefix: string
-    ) {}
-
-    async get(key: string): Promise<T | null> {
-        // 1. Check memory
-        const entry = this.store.get(key);
-        if (entry !== undefined) return entry;
-
-        // 2. Fallback to Postgres
-        if (!isDbAvailable()) return null;
-
-        const dbKey = `${this.prefix}:${key}`;
-        const rows = await query<{ data: T }>(`SELECT data FROM data_cache WHERE key = $1`, [
-            dbKey
-        ]);
-
-        if (rows.length === 0) return null;
-
-        // Populate memory from Postgres hit
-        const data = rows[0].data;
-        this.store.set(key, data);
-        return data;
-    }
-
-    async set(key: string, data: T): Promise<void> {
-        // Write to memory
-        this.store.set(key, data);
-
-        // Write to Postgres
-        if (!isDbAvailable()) return;
-
-        const dbKey = `${this.prefix}:${key}`;
-        await query(
-            `INSERT INTO data_cache (key, data)
-       VALUES ($1, $2)
-       ON CONFLICT (key) DO UPDATE SET data = $2`,
-            [dbKey, JSON.stringify(data)]
-        );
-    }
-
-    async invalidate(key: string): Promise<void> {
-        this.store.delete(key);
-
-        if (!isDbAvailable()) return;
-        const dbKey = `${this.prefix}:${key}`;
-        await query(`DELETE FROM data_cache WHERE key = $1`, [dbKey]);
-    }
-
-    async clear(): Promise<void> {
-        this.store.clear();
-
-        if (!isDbAvailable()) return;
-        await query(`DELETE FROM data_cache WHERE key LIKE $1`, [`${this.prefix}:%`]);
-    }
-}
-
-// ── Commit Range Cache (blob-per-repo) ──────────────────────────────────────────
 
 /** How long before we consider "today" data stale and re-fetch the tail. */
 const TAIL_STALE_MS = 10 * 60 * 1000; // 10 minutes
@@ -130,8 +41,8 @@ function endOfDay(dateStr: string): string {
     return `${dateStr}T23:59:59Z`;
 }
 
-class CommitCache {
-    constructor(private store: Map<string, CommitBlobEntry>) {}
+export class CommitCache {
+    private store = new Map<string, CommitBlobEntry>();
 
     private key(owner: string, repo: string): string {
         return `${owner}/${repo}`;
@@ -339,31 +250,4 @@ class CommitCache {
             return true;
         });
     }
-}
-
-// ── Singleton Instances ─────────────────────────────────────────────────────────
-
-export const repoCache = new DataCache<Repository[]>(repoStore, "repos");
-export const prCache = new DataCache<PullRequest[]>(prStore, "prs");
-export const contributorCache = new DataCache<Contributor[]>(contributorStore, "contributors");
-export const contributorStatsCache = new DataCache<RepoContributorStats[]>(
-    contributorStatsStore,
-    "contributor-stats"
-);
-export const commitCache = new CommitCache(commitCacheStore);
-
-/** Clear all caches (memory + database). Called when config changes. */
-export async function clearAllCaches(): Promise<void> {
-    repoStore.clear();
-    prStore.clear();
-    contributorStore.clear();
-    contributorStatsStore.clear();
-    commitCacheStore.clear();
-
-    if (!isDbAvailable()) return;
-
-    await query(`DELETE FROM data_cache`);
-    await query(`DELETE FROM repo_commits`);
-
-    console.log("[cache] All caches cleared (memory + database)");
 }

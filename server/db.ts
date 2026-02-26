@@ -22,7 +22,8 @@ const SCHEMA_DDL = `
   );
   CREATE TABLE IF NOT EXISTS data_cache (
     key TEXT PRIMARY KEY,
-    data JSONB NOT NULL
+    data JSONB NOT NULL,
+    fetched_at TIMESTAMPTZ DEFAULT NOW()
   );
 `;
 
@@ -49,6 +50,19 @@ const MIGRATION_DDL = `
       DROP TABLE config;
       ALTER TABLE config_new RENAME TO config;
       RAISE NOTICE 'Migrated config table from id-based to owner-based';
+    END IF;
+  END
+  $$;
+
+  -- Add fetched_at column to data_cache if it doesn't exist
+  DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'data_cache' AND column_name = 'fetched_at'
+    ) THEN
+      ALTER TABLE data_cache ADD COLUMN fetched_at TIMESTAMPTZ DEFAULT NOW();
+      RAISE NOTICE 'Added fetched_at column to data_cache';
     END IF;
   END
   $$;

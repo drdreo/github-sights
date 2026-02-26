@@ -10,8 +10,8 @@ contributors.get("/api/contributors/:owner", async (c) => {
         const { service, config } = requireService(owner);
         const since = c.req.query("since") || undefined;
         const until = c.req.query("until") || undefined;
-        const data = await service.getContributorOverview(owner, config.ownerType, since, until);
-        return c.json(data);
+        const { data, fetchedAt } = await service.getContributorOverview(owner, config.ownerType, since, until);
+        return c.json({ data, fetchedAt });
     } catch (error) {
         return errorResponse(c, error);
     }

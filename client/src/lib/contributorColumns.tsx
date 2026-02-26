@@ -72,7 +72,8 @@ export function getContributorColumns<T extends RepoContributorStat>(): ColumnDe
             cell: (info) => {
                 const value = info.getValue();
                 const prefix = value >= 0 ? "+" : "";
-                const color = value > 0 ? "text-blue-400" : value < 0 ? "text-yellow-400" : "text-gray-400";
+                const color =
+                    value > 0 ? "text-blue-400" : value < 0 ? "text-yellow-400" : "text-gray-400";
                 return <span className={color}>{`${prefix}${formatLoc(value)}`}</span>;
             },
             sortingFn: "basic",

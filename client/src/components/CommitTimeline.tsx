@@ -1,8 +1,8 @@
 import * as Tooltip from "@radix-ui/react-tooltip";
-import {addDays, differenceInDays, format, isSameDay, isToday} from "date-fns";
-import {ExternalLink, GitCommit} from "lucide-react";
-import React, {useEffect, useMemo, useRef} from "react";
-import {Commit, RepoCommitTimeline} from "../types";
+import { addDays, differenceInDays, format, isSameDay, isToday } from "date-fns";
+import { ExternalLink, GitCommit } from "lucide-react";
+import React, { useEffect, useMemo, useRef } from "react";
+import { Commit, RepoCommitTimeline } from "../types";
 
 interface CommitTimelineProps {
     timelines: RepoCommitTimeline[];

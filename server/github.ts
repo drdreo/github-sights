@@ -15,7 +15,13 @@ import {
     contributorCache,
     commitCache,
     contributorStatsCache
-} from "./cache.ts";
+} from "./cache/index.ts";
+
+/** Wraps a service result with cache freshness metadata for API responses. */
+export interface WithFetchedAt<T> {
+    data: T;
+    fetchedAt: number;
+}
 
 // ── Excluded Repos ──────────────────────────────────────────────────────────────
 // Comma-separated repo names to exclude from all results (case-insensitive).
@@ -128,13 +134,21 @@ export class GitHubService {
         return { login: response.data.login, scopes };
     }
 
-    async listRepos(owner: string, type: "user" | "org"): Promise<Repository[]> {
+    async listRepos(owner: string, type: "user" | "org"): Promise<WithFetchedAt<Repository[]>> {
         const cacheKey = `${type}:${owner}`;
-        const cached = await repoCache.get(cacheKey);
+        const cached = await repoCache.getWithAge(cacheKey);
         if (cached) {
-            console.log(`[cache] repos hit: ${cacheKey} (${cached.length} repos)`);
+            if (cached.stale) {
+                console.log(
+                    `[cache] repos stale: ${cacheKey} — serving cached, refreshing in background`
+                );
+                this._refreshRepos(owner, type, cacheKey);
+            } else {
+                console.log(`[cache] repos hit: ${cacheKey} (${cached.data.length} repos)`);
+            }
             // Remove blacklisted repos
-            return cached.filter((r) => !excludedRepos.has(r.name.toLowerCase()));
+            const data = cached.data.filter((r) => !excludedRepos.has(r.name.toLowerCase()));
+            return { data, fetchedAt: cached.fetchedAt };
         }
 
         // Deduplicate concurrent requests for the same owner
@@ -142,13 +156,14 @@ export class GitHubService {
         const existing = this.inflight.get(inflightKey);
         if (existing) {
             console.log(`[cache] repos inflight: ${cacheKey} — waiting for existing request`);
-            return existing as Promise<Repository[]>;
+            return existing as Promise<WithFetchedAt<Repository[]>>;
         }
 
         const promise = this._fetchRepos(owner, type, cacheKey);
         this.inflight.set(inflightKey, promise);
         try {
-            return await promise;
+            const data = await promise;
+            return { data, fetchedAt: Date.now() };
         } finally {
             this.inflight.delete(inflightKey);
         }
@@ -304,10 +319,17 @@ export class GitHubService {
         state: "all" | "open" | "closed" = "all"
     ): Promise<PullRequest[]> {
         const cacheKey = `${owner}/${repo}:${state}`;
-        const cached = await prCache.get(cacheKey);
+        const cached = await prCache.getWithAge(cacheKey);
         if (cached) {
-            console.log(`[cache] PRs hit: ${cacheKey} (${cached.length})`);
-            return cached;
+            if (cached.stale) {
+                console.log(
+                    `[cache] PRs stale: ${cacheKey} — serving cached, refreshing in background`
+                );
+                this._refreshPullRequests(owner, repo, state, cacheKey);
+            } else {
+                console.log(`[cache] PRs hit: ${cacheKey} (${cached.data.length})`);
+            }
+            return cached.data;
         }
 
         // Deduplicate concurrent requests
@@ -424,10 +446,17 @@ export class GitHubService {
 
     async listContributors(owner: string, repo: string): Promise<Contributor[]> {
         const cacheKey = `${owner}/${repo}`;
-        const cached = await contributorCache.get(cacheKey);
+        const cached = await contributorCache.getWithAge(cacheKey);
         if (cached) {
-            console.log(`[cache] contributors hit: ${cacheKey} (${cached.length})`);
-            return cached;
+            if (cached.stale) {
+                console.log(
+                    `[cache] contributors stale: ${cacheKey} — serving cached, refreshing in background`
+                );
+                this._refreshContributors(owner, repo, cacheKey);
+            } else {
+                console.log(`[cache] contributors hit: ${cacheKey} (${cached.data.length})`);
+            }
+            return cached.data;
         }
 
         // Deduplicate concurrent requests
@@ -451,10 +480,19 @@ export class GitHubService {
 
     async getContributorStats(owner: string, repo: string): Promise<RepoContributorStats[]> {
         const cacheKey = `${owner}/${repo}`;
-        const cached = await contributorStatsCache.get(cacheKey);
+        const cached = await contributorStatsCache.getWithAge(cacheKey);
         if (cached) {
-            console.log(`[cache] contributor-stats hit: ${cacheKey} (${cached.length} authors)`);
-            return cached;
+            if (cached.stale) {
+                console.log(
+                    `[cache] contributor-stats stale: ${cacheKey} — serving cached, refreshing in background`
+                );
+                this._refreshContributorStats(owner, repo, cacheKey);
+            } else {
+                console.log(
+                    `[cache] contributor-stats hit: ${cacheKey} (${cached.data.length} authors)`
+                );
+            }
+            return cached.data;
         }
 
         const inflightKey = `contributor-stats:${cacheKey}`;
@@ -548,6 +586,53 @@ export class GitHubService {
         }
     }
 
+    // ── Background refresh methods (fire-and-forget, stale-while-revalidate) ──
+
+    /** Background re-fetch for contributors. Errors are logged but not thrown. */
+    private _refreshContributors(owner: string, repo: string, cacheKey: string): void {
+        const inflightKey = `contributors:${cacheKey}`;
+        if (this.inflight.has(inflightKey)) return;
+
+        this._fetchContributors(owner, repo, cacheKey).catch((err) => {
+            console.warn(`[refresh] contributors failed for ${cacheKey}:`, err.message);
+        });
+    }
+
+    /** Background re-fetch for contributor stats. Errors are logged but not thrown. */
+    private _refreshContributorStats(owner: string, repo: string, cacheKey: string): void {
+        const inflightKey = `contributor-stats:${cacheKey}`;
+        if (this.inflight.has(inflightKey)) return;
+
+        this._fetchContributorStats(owner, repo, cacheKey).catch((err) => {
+            console.warn(`[refresh] contributor-stats failed for ${cacheKey}:`, err.message);
+        });
+    }
+
+    /** Background re-fetch for repos. Errors are logged but not thrown. */
+    private _refreshRepos(owner: string, type: "user" | "org", cacheKey: string): void {
+        const inflightKey = `repos:${cacheKey}`;
+        if (this.inflight.has(inflightKey)) return;
+
+        this._fetchRepos(owner, type, cacheKey).catch((err) => {
+            console.warn(`[refresh] repos failed for ${cacheKey}:`, err.message);
+        });
+    }
+
+    /** Background re-fetch for PRs. Errors are logged but not thrown. */
+    private _refreshPullRequests(
+        owner: string,
+        repo: string,
+        state: "all" | "open" | "closed",
+        cacheKey: string
+    ): void {
+        const inflightKey = `prs:${cacheKey}`;
+        if (this.inflight.has(inflightKey)) return;
+
+        this._fetchPullRequests(owner, repo, state, cacheKey).catch((err) => {
+            console.warn(`[refresh] PRs failed for ${cacheKey}:`, err.message);
+        });
+    }
+
     /**
      * Uses the GitHub Search API to get aggregate PR counts for an owner.
      * 3 API calls total regardless of repo count — much cheaper than per-repo pagination.
@@ -612,7 +697,7 @@ export class GitHubService {
         until?: string,
         options?: { cacheOnly?: boolean }
     ): Promise<OverviewStats> {
-        const allRepos = await this.listRepos(owner, type);
+        const { data: allRepos } = await this.listRepos(owner, type);
 
         // Sort by most recently pushed first — most useful data comes first
         const repos = [...allRepos].sort((a, b) => {
@@ -753,8 +838,8 @@ export class GitHubService {
         type: "user" | "org",
         since?: string,
         until?: string
-    ): Promise<ContributorOverview[]> {
-        const allRepos = await this.listRepos(owner, type);
+    ): Promise<WithFetchedAt<ContributorOverview[]>> {
+        const { data: allRepos, fetchedAt } = await this.listRepos(owner, type);
         const nonForkRepos = allRepos.filter((r) => !r.fork);
 
         // Parse date range for filtering weeks
@@ -819,9 +904,10 @@ export class GitHubService {
         }
 
         // Sort by total commits descending
-        return Array.from(contributorMap.values())
+        const overview = Array.from(contributorMap.values())
             .filter((c) => c.totalCommits > 0)
             .sort((a, b) => b.totalCommits - a.totalCommits);
+        return { data: overview, fetchedAt };
     }
 
     /**
@@ -836,7 +922,7 @@ export class GitHubService {
         until?: string,
         options?: { cacheOnly?: boolean }
     ): Promise<Array<{ repo: Repository; commits: Commit[] }>> {
-        const allRepos = await this.listRepos(owner, type);
+        const { data: allRepos } = await this.listRepos(owner, type);
         const nonForkRepos = allRepos.filter((r) => !r.fork);
         const cacheOnly = options?.cacheOnly ?? false;
 
@@ -880,7 +966,7 @@ export class GitHubService {
         since?: string,
         until?: string
     ): Promise<{ synced: number; repos: string[]; errors: string[] }> {
-        const allRepos = await this.listRepos(owner, type);
+        const { data: allRepos } = await this.listRepos(owner, type);
         const nonForkRepos = allRepos.filter((r) => !r.fork);
 
         const CONCURRENCY = 3;

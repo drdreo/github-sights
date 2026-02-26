@@ -10,8 +10,8 @@ repos.get("/api/repos/:owner", async (c) => {
     try {
         const { owner } = c.req.param();
         const { service, config } = requireService(owner);
-        const data = await service.listRepos(owner, config.ownerType);
-        return c.json(data);
+        const { data, fetchedAt } = await service.listRepos(owner, config.ownerType);
+        return c.json({ data, fetchedAt });
     } catch (error) {
         return errorResponse(c, error);
     }

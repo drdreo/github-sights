@@ -29,6 +29,7 @@ export function useRepos(owner: string) {
     return useQuery({
         queryKey: ["repos", owner],
         queryFn: () => api.getRepos(owner),
+
         enabled: !!owner
     });
 }
@@ -204,6 +205,7 @@ export function useContributorOverview(owner: string, since?: string, until?: st
     return useQuery({
         queryKey: ["contributor-overview", owner, since, until],
         queryFn: () => api.getContributorOverview(owner, since, until),
+
         enabled: !!owner
     });
 }

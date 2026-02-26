@@ -8,6 +8,11 @@ import {
     Contributor,
     RepoContributorStat
 } from "../types";
+export interface CachedResponse<T> {
+    data: T;
+    fetchedAt: number;
+}
+
 
 interface BulkCommitEntry {
     repo: Repository;
@@ -64,8 +69,9 @@ export const api = {
         }),
 
     getRepos: (owner: string) => {
-        return fetchApi<Repository[]>(`/repos/${encodeURIComponent(owner)}`);
+        return fetchApi<CachedResponse<Repository[]>>(`/repos/${encodeURIComponent(owner)}`);
     },
+
 
     getRepo: (owner: string, repo: string) => fetchApi<Repository>(`/repos/${owner}/${repo}`),
 
@@ -106,8 +112,9 @@ export const api = {
         if (since) params.append("since", since);
         if (until) params.append("until", until);
         const qs = params.toString();
-        return fetchApi<ContributorOverview[]>(`/contributors/${owner}${qs ? `?${qs}` : ""}`);
+        return fetchApi<CachedResponse<ContributorOverview[]>>(`/contributors/${owner}${qs ? `?${qs}` : ""}`);
     },
+
 
     getStats: (owner: string, since?: string, until?: string, cacheOnly?: boolean) => {
         const params = new URLSearchParams();

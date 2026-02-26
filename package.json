@@ -2,9 +2,6 @@
     "name": "github-sights",
     "version": "1.0.0",
     "private": true,
-    "workspaces": [
-        "client"
-    ],
     "scripts": {
         "client:dev": "npm run dev -w client",
         "client:build": "npm run build -w client",

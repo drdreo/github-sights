@@ -5,12 +5,17 @@ import { ArrowLeft } from "lucide-react";
 import { useRepos, useCommitTimelines } from "../hooks/useGitHub";
 import { useOwner } from "../hooks/useOwner";
 import { RepoGrid } from "../components/RepoGrid";
+import { FetchedAtBadge } from "../components/FetchedAtBadge";
+
 
 export default function RepositoriesPage() {
     const owner = useOwner();
 
-    const { data: repos, isLoading: reposLoading } = useRepos(owner);
+    const { data: reposResponse, isLoading: reposLoading } = useRepos(owner);
+    const repos = reposResponse?.data;
+    const fetchedAt = reposResponse?.fetchedAt;
     const { data: timelines } = useCommitTimelines(owner);
+
 
     const sortedRepos = useMemo(() => {
         if (!repos) return [];
@@ -43,7 +48,9 @@ export default function RepositoriesPage() {
                     <h1 className="text-3xl font-bold text-gray-100 tracking-tight flex items-center gap-2">
                         {owner}
                         <span className="text-gray-500 font-normal text-xl">/ Repositories</span>
+                        {fetchedAt && <FetchedAtBadge fetchedAt={fetchedAt} />}
                     </h1>
+
                 </div>
 
                 <RepoGrid

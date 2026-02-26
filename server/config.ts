@@ -1,7 +1,7 @@
 import type { ApiConfig } from "./types.ts";
 import { GitHubService } from "./github.ts";
 import { notConfigured } from "./errors.ts";
-import { clearAllCaches } from "./cache.ts";
+import { clearAllCaches } from "./cache/index.ts";
 import { query, isDbAvailable } from "./db.ts";
 
 // ── Config Store (in-memory + Postgres) ─────────────────────────────

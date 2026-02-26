@@ -1,15 +1,17 @@
-import {type ColumnDef, createColumnHelper} from "@tanstack/react-table";
-import {subDays} from "date-fns";
-import {ArrowLeft} from "lucide-react";
-import React, {useState} from "react";
-import {Link} from "react-router-dom";
-import {DataTable} from "../components/DataTable";
-import {LoadingSkeleton} from "../components/LoadingSkeleton";
-import {TimeRangeSelector} from "../components/TimeRangeSelector";
-import {useContributorOverview} from "../hooks/useGitHub";
-import {useOwner} from "../hooks/useOwner";
-import {getContributorColumns} from "../lib/contributorColumns";
-import type {ContributorOverview} from "../types";
+import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
+import { subDays } from "date-fns";
+import { ArrowLeft } from "lucide-react";
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
+import { DataTable } from "../components/DataTable";
+import { LoadingSkeleton } from "../components/LoadingSkeleton";
+import { TimeRangeSelector } from "../components/TimeRangeSelector";
+import { FetchedAtBadge } from "../components/FetchedAtBadge";
+
+import { useContributorOverview } from "../hooks/useGitHub";
+import { useOwner } from "../hooks/useOwner";
+import { getContributorColumns } from "../lib/contributorColumns";
+import type { ContributorOverview } from "../types";
 
 const columnHelper = createColumnHelper<ContributorOverview>();
 
@@ -66,7 +68,10 @@ export default function ContributorsPage() {
     const since = dateRange.startDate.toISOString();
     const until = dateRange.endDate.toISOString();
 
-    const { data: contributors, isLoading } = useContributorOverview(owner, since, until);
+    const { data: contributorsResponse, isLoading } = useContributorOverview(owner, since, until);
+    const contributors = contributorsResponse?.data;
+    const fetchedAt = contributorsResponse?.fetchedAt;
+
 
     return (
         <div className="min-h-screen bg-gray-950 p-8">
@@ -88,7 +93,9 @@ export default function ContributorsPage() {
                             <span className="text-gray-500 font-normal text-xl">
                                 / Contributors
                             </span>
+                            {fetchedAt && <FetchedAtBadge fetchedAt={fetchedAt} />}
                         </h1>
+
                     </div>
                     <TimeRangeSelector
                         startDate={dateRange.startDate}
