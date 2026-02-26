@@ -241,13 +241,17 @@ export class CommitCache {
     }
 
     private filterByRange(entry: CommitBlobEntry, since?: string, until?: string): Commit[] {
-        if (!since && !until) return entry.commits;
+        const filtered = (!since && !until)
+            ? entry.commits
+            : entry.commits.filter((c) => {
+                  const date = c.author.date;
+                  if (since && date < since) return false;
+                  if (until && date > until) return false;
+                  return true;
+              });
 
-        return entry.commits.filter((c) => {
-            const date = c.author.date;
-            if (since && date < since) return false;
-            if (until && date > until) return false;
-            return true;
-        });
+        // Always return newest-first — merge() appends in insertion order,
+        // so we must sort to guarantee chronological output.
+        return filtered.sort((a, b) => b.author.date.localeCompare(a.author.date));
     }
 }

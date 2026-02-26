@@ -389,6 +389,9 @@ export class GitHubService {
 
             await this._enrichPRsWithFileStats(owner, repo, mapped);
 
+            // Sort newest-first for consistent display order
+            mapped.sort((a, b) => b.created_at.localeCompare(a.created_at));
+
             await prCache.set(cacheKey, mapped);
             console.log(`[cache] PRs miss: ${cacheKey} → fetched ${mapped.length}`);
             return mapped;
