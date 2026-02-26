@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { Github, BarChart3, Settings, Users, FolderGit2 } from "lucide-react";
 import { useOwner } from "../hooks/useOwner";
@@ -91,7 +92,15 @@ export default function Layout() {
             </header>
 
             <main className="animate-in fade-in duration-500 slide-in-from-bottom-2">
-                <Outlet />
+                <Suspense
+                    fallback={
+                        <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+                            <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-700 border-t-blue-500" />
+                        </div>
+                    }
+                >
+                    <Outlet />
+                </Suspense>
             </main>
         </div>
     );
