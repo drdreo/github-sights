@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { cors } from "jsr:@hono/hono@^4/cors";
 
+import { initPool } from "./db/pool.ts";
+import { runMigrations } from "./db/schema.ts";
 import { loadConfig } from "./config.ts";
-import { initDb } from "./db.ts";
 import { config } from "./routes/config.ts";
 import { health } from "./routes/health.ts";
 import { contributors } from "./routes/contributors.ts";
@@ -33,8 +34,11 @@ app.route("/", sync);
 
 const port = parseInt(Deno.env.get("PORT") || "3001", 10);
 
-// Initialize database and load persisted config before serving
-await initDb();
+// Initialize database, run migrations, and load persisted config before serving
+const dbReady = await initPool();
+if (dbReady) {
+    await runMigrations();
+}
 await loadConfig();
 
 Deno.serve({ port }, app.fetch);

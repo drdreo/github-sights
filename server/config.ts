@@ -1,38 +1,36 @@
+// ── Config Store (in-memory + Postgres) ─────────────────────────────────────────
+//
+// Manages owner configurations backed by the new owner_config table.
+// Maintains an in-memory Map for fast lookups, backed by Postgres for persistence.
+// Replaces the old config.ts that depended on GitHubService and the old db.ts.
+
 import type { ApiConfig } from "./types.ts";
-import { GitHubService } from "./github.ts";
+import {
+    getConfig as dbGetConfig,
+    getAllConfigs,
+    upsertConfig as dbUpsertConfig,
+    deleteConfig as dbDeleteConfig,
+} from "./db/queries/config.ts";
+import { isPoolAvailable } from "./db/pool.ts";
 import { notConfigured } from "./errors.ts";
-import { clearAllCaches } from "./cache/index.ts";
-import { query, isDbAvailable } from "./db.ts";
 
-// ── Config Store (in-memory + Postgres) ─────────────────────────────
+// ── In-memory cache ─────────────────────────────────────────────────────────────
 
-interface OwnerEntry {
-    config: ApiConfig;
-    service: GitHubService;
-}
+const configStore = new Map<string, ApiConfig>();
 
-const configStore = new Map<string, OwnerEntry>();
-
-/** Load all configs from Postgres on startup. Call once after initDb(). */
+/** Load all configs from Postgres on startup. Call once after initPool + runMigrations. */
 export async function loadConfig(): Promise<void> {
-    if (!isDbAvailable()) return;
+    if (!isPoolAvailable()) return;
 
-    const rows = await query<{
-        token: string;
-        owner: string;
-        owner_type: "user" | "org";
-    }>("SELECT token, owner, owner_type FROM config");
+    const rows = await getAllConfigs();
 
     for (const row of rows) {
         const config: ApiConfig = {
             token: row.token,
             owner: row.owner,
-            ownerType: row.owner_type
+            ownerType: row.owner_type,
         };
-        configStore.set(row.owner.toLowerCase(), {
-            config,
-            service: new GitHubService(config.token)
-        });
+        configStore.set(row.owner.toLowerCase(), config);
         console.log(`[config] Loaded from database: ${config.ownerType}:${config.owner}`);
     }
 
@@ -43,55 +41,37 @@ export async function loadConfig(): Promise<void> {
     }
 }
 
+/** Get config for a specific owner (in-memory lookup). */
 export function getConfig(owner: string): ApiConfig | null {
-    return configStore.get(owner.toLowerCase())?.config ?? null;
+    return configStore.get(owner.toLowerCase()) ?? null;
 }
 
+/** Store/update config for an owner (in-memory + Postgres). */
 export async function setConfig(config: ApiConfig): Promise<void> {
     const key = config.owner.toLowerCase();
-    const existing = configStore.get(key);
+    configStore.set(key, config);
 
-    const ownerChanged =
-        existing?.config.owner !== config.owner || existing?.config.ownerType !== config.ownerType;
-
-    configStore.set(key, {
-        config,
-        service: new GitHubService(config.token)
-    });
-
-    // Persist to Postgres
-    if (isDbAvailable()) {
-        await query(
-            `INSERT INTO config (owner, token, owner_type, updated_at)
-       VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (owner) DO UPDATE SET
-         token = $2, owner_type = $3, updated_at = NOW()`,
-            [config.owner, config.token, config.ownerType]
-        );
-    }
-
-    // Clear cached data when switching owner type
-    if (ownerChanged && existing) {
-        await clearAllCaches();
+    // Persist to Postgres via new owner_config table
+    if (isPoolAvailable()) {
+        await dbUpsertConfig(config.owner, config.token, config.ownerType);
     }
 }
 
+/** Delete config for an owner (in-memory + Postgres). */
 export async function clearConfig(owner: string): Promise<void> {
     configStore.delete(owner.toLowerCase());
 
-    if (isDbAvailable()) {
-        await query(`DELETE FROM config WHERE LOWER(owner) = LOWER($1)`, [owner]);
+    if (isPoolAvailable()) {
+        await dbDeleteConfig(owner);
     }
-
-    await clearAllCaches();
 }
 
-/** Returns the service + config for a specific owner, or throws ApiError if not configured. */
-export function requireService(owner: string): { service: GitHubService; config: ApiConfig } {
-    const entry = configStore.get(owner.toLowerCase());
-    if (!entry) throw notConfigured();
-    return {
-        service: entry.service,
-        config: entry.config
-    };
+/**
+ * Returns the config for a specific owner, or throws ApiError if not configured.
+ * Route handlers use this to get the token and owner type for DB/API calls.
+ */
+export function requireConfig(owner: string): ApiConfig {
+    const config = getConfig(owner);
+    if (!config) throw notConfigured();
+    return config;
 }

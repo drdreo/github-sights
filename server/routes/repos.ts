@@ -1,6 +1,11 @@
 import { Hono } from "hono";
-import { requireService } from "../config.ts";
-import { errorResponse } from "../errors.ts";
+import { requireConfig } from "../config.ts";
+import { errorResponse, notFound } from "../errors.ts";
+import { getReposByOwner, getRepoByName, getOwner } from "../db/queries/identity.ts";
+import { getCommitsByOwner, getCommitsByRepo, getPrsByRepo, getContributorStatsByRepo } from "../db/queries/events.ts";
+import { getContributorSnapshotsByRepo } from "../db/queries/snapshots.ts";
+import { mapRepoRow, mapCommitRow, mapPrRow, mapContribSnapshotToContributor } from "../mappers.ts";
+import type { RepositoryMetaRow } from "../db/index.ts";
 
 const repos = new Hono();
 
@@ -9,9 +14,17 @@ const repos = new Hono();
 repos.get("/api/repos/:owner", async (c) => {
     try {
         const { owner } = c.req.param();
-        const { service, config } = requireService(owner);
-        const { data, fetchedAt } = await service.listRepos(owner, config.ownerType);
-        return c.json({ data, fetchedAt });
+        requireConfig(owner);
+
+        const ownerRow = await getOwner(owner);
+        const ownerInfo = ownerRow
+            ? { login: ownerRow.login, avatar_url: ownerRow.avatar_url ?? "", html_url: ownerRow.html_url ?? `https://github.com/${ownerRow.login}` }
+            : undefined;
+
+        const rows = await getReposByOwner(owner);
+        const data = rows.map((r) => mapRepoRow(r, ownerInfo));
+
+        return c.json({ data, fetchedAt: ownerRow?.last_synced_at ?? new Date().toISOString() });
     } catch (error) {
         return errorResponse(c, error);
     }
@@ -22,9 +35,17 @@ repos.get("/api/repos/:owner", async (c) => {
 repos.get("/api/repos/:owner/:repo", async (c) => {
     try {
         const { owner, repo } = c.req.param();
-        const { service } = requireService(owner);
-        const data = await service.getRepo(owner, repo);
-        return c.json(data);
+        requireConfig(owner);
+
+        const repoRow = await getRepoByName(owner, repo);
+        if (!repoRow) throw notFound("Repository", `${owner}/${repo}`);
+
+        const ownerRow = await getOwner(owner);
+        const ownerInfo = ownerRow
+            ? { login: ownerRow.login, avatar_url: ownerRow.avatar_url ?? "", html_url: ownerRow.html_url ?? `https://github.com/${ownerRow.login}` }
+            : undefined;
+
+        return c.json(mapRepoRow(repoRow, ownerInfo));
     } catch (error) {
         return errorResponse(c, error);
     }
@@ -35,13 +56,45 @@ repos.get("/api/repos/:owner/:repo", async (c) => {
 repos.get("/api/commits/:owner", async (c) => {
     try {
         const { owner } = c.req.param();
-        const { service, config } = requireService(owner);
+        requireConfig(owner);
+
         const since = c.req.query("since") || undefined;
         const until = c.req.query("until") || undefined;
-        const cacheOnly = c.req.query("cacheOnly") === "true";
-        const data = await service.listAllCommits(owner, config.ownerType, since, until, {
-            cacheOnly
-        });
+
+        // Get all repos for this owner (needed to group commits and provide Repository objects)
+        const ownerRow = await getOwner(owner);
+        const ownerInfo = ownerRow
+            ? { login: ownerRow.login, avatar_url: ownerRow.avatar_url ?? "", html_url: ownerRow.html_url ?? `https://github.com/${ownerRow.login}` }
+            : undefined;
+
+        const repoRows = await getReposByOwner(owner);
+        const repoById = new Map<number, RepositoryMetaRow>();
+        for (const r of repoRows) {
+            repoById.set(r.id, r);
+        }
+
+        // Get all commits across all repos
+        const commitRows = await getCommitsByOwner(owner, { since, until });
+
+        // Group commits by repo_id
+        const commitsByRepoId = new Map<number, typeof commitRows>();
+        for (const commit of commitRows) {
+            let group = commitsByRepoId.get(commit.repo_id);
+            if (!group) {
+                group = [];
+                commitsByRepoId.set(commit.repo_id, group);
+            }
+            group.push(commit);
+        }
+
+        // Build response: Array<{ repo: Repository, commits: Commit[] }>
+        const data = repoRows
+            .filter((r) => commitsByRepoId.has(r.id))
+            .map((r) => ({
+                repo: mapRepoRow(r, ownerInfo),
+                commits: (commitsByRepoId.get(r.id) ?? []).map((c) => mapCommitRow(c, r.name)),
+            }));
+
         return c.json(data);
     } catch (error) {
         return errorResponse(c, error);
@@ -53,11 +106,16 @@ repos.get("/api/commits/:owner", async (c) => {
 repos.get("/api/repos/:owner/:repo/commits", async (c) => {
     try {
         const { owner, repo } = c.req.param();
-        const { service } = requireService(owner);
+        requireConfig(owner);
+
+        const repoRow = await getRepoByName(owner, repo);
+        if (!repoRow) throw notFound("Repository", `${owner}/${repo}`);
+
         const since = c.req.query("since") || undefined;
         const until = c.req.query("until") || undefined;
-        const cacheOnly = c.req.query("cacheOnly") === "true";
-        const data = await service.listCommits(owner, repo, { since, until, cacheOnly });
+
+        const rows = await getCommitsByRepo(repoRow.id, { since, until });
+        const data = rows.map((r) => mapCommitRow(r, repo));
         return c.json(data);
     } catch (error) {
         return errorResponse(c, error);
@@ -69,9 +127,14 @@ repos.get("/api/repos/:owner/:repo/commits", async (c) => {
 repos.get("/api/repos/:owner/:repo/pulls", async (c) => {
     try {
         const { owner, repo } = c.req.param();
-        const { service } = requireService(owner);
+        requireConfig(owner);
+
+        const repoRow = await getRepoByName(owner, repo);
+        if (!repoRow) throw notFound("Repository", `${owner}/${repo}`);
+
         const state = (c.req.query("state") as "all" | "open" | "closed") || "all";
-        const data = await service.listPullRequests(owner, repo, state);
+        const rows = await getPrsByRepo(repoRow.id, { state });
+        const data = rows.map(mapPrRow);
         return c.json(data);
     } catch (error) {
         return errorResponse(c, error);
@@ -83,8 +146,10 @@ repos.get("/api/repos/:owner/:repo/pulls", async (c) => {
 repos.get("/api/repos/:owner/:repo/contributors", async (c) => {
     try {
         const { owner, repo } = c.req.param();
-        const { service } = requireService(owner);
-        const data = await service.listContributors(owner, repo);
+        requireConfig(owner);
+
+        const rows = await getContributorSnapshotsByRepo(owner, repo);
+        const data = rows.map(mapContribSnapshotToContributor);
         return c.json(data);
     } catch (error) {
         return errorResponse(c, error);
@@ -96,31 +161,24 @@ repos.get("/api/repos/:owner/:repo/contributors", async (c) => {
 repos.get("/api/repos/:owner/:repo/contributor-stats", async (c) => {
     try {
         const { owner, repo } = c.req.param();
-        const { service } = requireService(owner);
-        const stats = await service.getContributorStats(owner, repo);
+        requireConfig(owner);
 
-        // Aggregate weekly data into per-contributor totals
+        const repoRow = await getRepoByName(owner, repo);
+        if (!repoRow) throw notFound("Repository", `${owner}/${repo}`);
+
+        const stats = await getContributorStatsByRepo(repoRow.id);
+
+        // Map to the expected shape with contributor profile info
         const aggregated = stats
-            .filter((s) => s.author?.login)
-            .map((s) => {
-                let totalCommits = 0;
-                let totalAdditions = 0;
-                let totalDeletions = 0;
-                for (const week of s.weeks) {
-                    totalCommits += week.c;
-                    totalAdditions += week.a;
-                    totalDeletions += week.d;
-                }
-                return {
-                    login: s.author.login,
-                    avatar_url: s.author.avatar_url,
-                    html_url: `https://github.com/${s.author.login}`,
-                    totalCommits,
-                    totalAdditions,
-                    totalDeletions
-                };
-            })
-            .filter((c) => c.totalCommits > 0)
+            .filter((s) => s.commits > 0)
+            .map((s) => ({
+                login: s.login,
+                avatar_url: "",
+                html_url: `https://github.com/${s.login}`,
+                totalCommits: s.commits,
+                totalAdditions: s.additions,
+                totalDeletions: s.deletions,
+            }))
             .sort((a, b) => b.totalCommits - a.totalCommits);
 
         return c.json(aggregated);

@@ -1,10 +1,11 @@
 import { Hono } from "hono";
-import { requireService } from "../config.ts";
+import { requireConfig } from "../config.ts";
 import { errorResponse } from "../errors.ts";
+import { syncOwner } from "../scraper/index.ts";
 
 const sync = new Hono();
 
-// ── POST /api/sync — Trigger background gap-filling ────────────────────────
+// ── POST /api/sync — Trigger full sync pipeline ────────────────────────────
 //
 // Query params:
 //   since — ISO date string (defaults to 30 days ago)
@@ -13,13 +14,19 @@ const sync = new Hono();
 sync.post("/api/sync/:owner", async (c) => {
     try {
         const { owner } = c.req.param();
-        const { service, config } = requireService(owner);
+        const config = requireConfig(owner);
         const since =
             c.req.query("since") || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
         const until = c.req.query("until") || undefined;
-        const result = await service.syncCommits(owner, config.ownerType, since, until);
 
-        return c.json(result);
+        const result = await syncOwner(owner, config.token, config.ownerType, { since, until });
+
+        // Return only the client-expected shape (strip aggregation + durationMs)
+        return c.json({
+            synced: result.synced,
+            repos: result.repos,
+            errors: result.errors,
+        });
     } catch (error) {
         return errorResponse(c, error);
     }
