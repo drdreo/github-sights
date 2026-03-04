@@ -52,6 +52,17 @@ export interface OwnerConfigRow {
 
 // ── Layer 2: Events ──────────────────────────────────────────────────────────────
 
+/** CommitEventRow with avatar_url from LEFT JOIN contributor_profile. */
+export interface CommitEventWithAvatarRow extends CommitEventRow {
+    author_avatar_url: string | null;
+    committer_avatar_url: string | null;
+}
+
+/** PrEventRow with avatar_url from LEFT JOIN contributor_profile. */
+export interface PrEventWithAvatarRow extends PrEventRow {
+    author_avatar_url: string | null;
+}
+
 export interface CommitEventRow {
     sha: string;
     repo_id: number;
@@ -124,8 +135,8 @@ export interface OwnerSnapshotRow {
     total_prs: number;
     open_prs: number;
     merged_prs: number;
-    total_additions: string;
-    total_deletions: string;
+    total_additions: number;
+    total_deletions: number;
     unique_contributors: number;
     most_active_repo_name: string | null;
     most_active_repo_commits: number;

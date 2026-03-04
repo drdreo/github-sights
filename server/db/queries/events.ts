@@ -3,7 +3,7 @@
 // Batch insert and query operations for commit_event, pr_event, and workflow_event.
 
 import { query, execute, transaction } from "../pool.ts";
-import type { CommitEventRow, PrEventRow, WorkflowEventRow } from "../types.ts";
+import type { CommitEventRow, CommitEventWithAvatarRow, PrEventRow, PrEventWithAvatarRow, WorkflowEventRow } from "../types.ts";
 
 const BATCH_SIZE = 500;
 
@@ -11,7 +11,7 @@ const BATCH_SIZE = 500;
  * Build a multi-row VALUES clause with positional parameters.
  * Returns { text: '($1,$2,...),($3,$4,...)', params: [...flatValues] }
  */
-function buildMultiRowValues<T>(
+export function buildMultiRowValues<T>(
     rows: T[],
     extractor: (row: T) => unknown[]
 ): { text: string; params: unknown[] } {
@@ -66,39 +66,44 @@ export async function insertCommits(commits: InsertCommitInput[]): Promise<numbe
     return inserted;
 }
 
-/** Get commits for a repo within a date range. */
+/** Get commits for a repo within a date range, with avatar URLs from contributor_profile. */
 export async function getCommitsByRepo(
     repoId: number,
     options?: { since?: string; until?: string }
-): Promise<CommitEventRow[]> {
-    const conditions = ["repo_id = $1"];
+): Promise<CommitEventWithAvatarRow[]> {
+    const conditions = ["ce.repo_id = $1"];
     const params: unknown[] = [repoId];
     let idx = 2;
 
     if (options?.since) {
-        conditions.push(`committed_at >= $${idx}`);
+        conditions.push(`ce.committed_at >= $${idx}`);
         params.push(options.since);
         idx++;
     }
     if (options?.until) {
-        conditions.push(`committed_at <= $${idx}`);
+        conditions.push(`ce.committed_at <= $${idx}`);
         params.push(options.until);
         idx++;
     }
 
-    return query<CommitEventRow>(
-        `SELECT * FROM commit_event
+    return query<CommitEventWithAvatarRow>(
+        `SELECT ce.*,
+                cp_a.avatar_url AS author_avatar_url,
+                cp_c.avatar_url AS committer_avatar_url
+         FROM commit_event ce
+         LEFT JOIN contributor_profile cp_a ON cp_a.login = ce.author_login
+         LEFT JOIN contributor_profile cp_c ON cp_c.login = ce.committer_login
          WHERE ${conditions.join(" AND ")}
-         ORDER BY committed_at DESC`,
+         ORDER BY ce.committed_at DESC`,
         params
     );
 }
 
-/** Get all commits for an owner (across all repos) within a date range. */
+/** Get all commits for an owner (across all repos) within a date range, with avatar URLs. */
 export async function getCommitsByOwner(
     ownerLogin: string,
     options?: { since?: string; until?: string }
-): Promise<CommitEventRow[]> {
+): Promise<CommitEventWithAvatarRow[]> {
     const conditions = [
         "ce.repo_id = rm.id",
         "rm.owner_login = $1",
@@ -117,8 +122,14 @@ export async function getCommitsByOwner(
         idx++;
     }
 
-    return query<CommitEventRow>(
-        `SELECT ce.* FROM commit_event ce, repository_meta rm
+    return query<CommitEventWithAvatarRow>(
+        `SELECT ce.*,
+                cp_a.avatar_url AS author_avatar_url,
+                cp_c.avatar_url AS committer_avatar_url
+         FROM commit_event ce
+         JOIN repository_meta rm ON ce.repo_id = rm.id
+         LEFT JOIN contributor_profile cp_a ON cp_a.login = ce.author_login
+         LEFT JOIN contributor_profile cp_c ON cp_c.login = ce.committer_login
          WHERE ${conditions.join(" AND ")}
          ORDER BY ce.committed_at DESC`,
         params
@@ -185,23 +196,26 @@ export async function upsertPrs(prs: InsertPrInput[]): Promise<number> {
     return upserted;
 }
 
-/** Get PRs for a repo, optionally filtered by state. */
+/** Get PRs for a repo, optionally filtered by state, with avatar URLs from contributor_profile. */
 export async function getPrsByRepo(
     repoId: number,
     options?: { state?: "open" | "closed" | "all" }
-): Promise<PrEventRow[]> {
-    const conditions = ["repo_id = $1"];
+): Promise<PrEventWithAvatarRow[]> {
+    const conditions = ["pe.repo_id = $1"];
     const params: unknown[] = [repoId];
 
     if (options?.state && options.state !== "all") {
-        conditions.push("state = $2");
+        conditions.push("pe.state = $2");
         params.push(options.state);
     }
 
-    return query<PrEventRow>(
-        `SELECT * FROM pr_event
+    return query<PrEventWithAvatarRow>(
+        `SELECT pe.*,
+                cp.avatar_url AS author_avatar_url
+         FROM pr_event pe
+         LEFT JOIN contributor_profile cp ON cp.login = pe.author_login
          WHERE ${conditions.join(" AND ")}
-         ORDER BY created_at DESC`,
+         ORDER BY pe.created_at DESC`,
         params
     );
 }

@@ -9,6 +9,7 @@
         "preview": "vite preview"
     },
     "dependencies": {
+        "@github-sights/shared": "workspace:*",
         "@radix-ui/react-collapsible": "^1.1.3",
         "@radix-ui/react-tooltip": "^1.1.8",
         "@tanstack/react-query": "^5.66.8",

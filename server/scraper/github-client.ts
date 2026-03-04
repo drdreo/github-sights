@@ -213,6 +213,104 @@ export function createOctokit(token: string): Octokit {
     return octokit;
 }
 
+// ── GraphQL Queries ──────────────────────────────────────────────────────────────
+
+const COMMITS_GRAPHQL_QUERY = `
+query ($owner: String!, $repo: String!, $since: GitTimestamp, $until: GitTimestamp, $after: String) {
+    repository(owner: $owner, name: $repo) {
+        defaultBranchRef {
+            target {
+                ... on Commit {
+                    history(first: 100, since: $since, until: $until, after: $after) {
+                        pageInfo {
+                            hasNextPage
+                            endCursor
+                        }
+                        nodes {
+                            oid
+                            message
+                            additions
+                            deletions
+                            changedFilesIfAvailable
+                            url
+                            author {
+                                name
+                                email
+                                date
+                                user {
+                                    login
+                                    avatarUrl
+                                }
+                            }
+                            committer {
+                                name
+                                email
+                                date
+                                user {
+                                    login
+                                    avatarUrl
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    rateLimit {
+        remaining
+        limit
+        resetAt
+    }
+}`;
+
+const PRS_GRAPHQL_QUERY = `
+query ($owner: String!, $repo: String!, $states: [PullRequestState!], $after: String) {
+    repository(owner: $owner, name: $repo) {
+        pullRequests(first: 100, states: $states, orderBy: {field: CREATED_AT, direction: DESC}, after: $after) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            nodes {
+                id: databaseId
+                number
+                title
+                state
+                url
+                createdAt
+                updatedAt
+                closedAt
+                mergedAt
+                isDraft
+                additions
+                deletions
+                changedFiles
+                baseRefName
+                headRefName
+                author {
+                    login
+                    avatarUrl
+                    url
+                }
+            }
+        }
+    }
+    rateLimit {
+        remaining
+        limit
+        resetAt
+    }
+}`;
+
+// deno-lint-ignore no-explicit-any
+function logGraphQLRateLimit(response: any): void {
+    const rl = response?.rateLimit;
+    if (rl && rl.remaining <= 200) {
+        console.warn(`[graphql-rate-limit] ${rl.remaining}/${rl.limit} remaining — resets at ${rl.resetAt}`);
+    }
+}
+
 // ── API Calls ────────────────────────────────────────────────────────────────────
 
 /** Verify a token by calling /user. Returns the authenticated user's login. */
@@ -281,7 +379,10 @@ export async function fetchRepos(
     }
 }
 
-/** Fetch commits for a single repo, optionally filtered by date range. */
+/**
+ * Fetch commits for a single repo via GraphQL API.
+ * Unlike REST, GraphQL returns additions/deletions per commit, fixing LOC=0.
+ */
 export async function fetchCommits(
     octokit: Octokit,
     owner: string,
@@ -289,156 +390,135 @@ export async function fetchCommits(
     options?: { since?: string; until?: string }
 ): Promise<GitHubCommit[]> {
     try {
-        // deno-lint-ignore no-explicit-any
-        const params: any = { owner, repo, per_page: 100 };
-        if (options?.since) params.since = options.since;
-        if (options?.until) params.until = options.until;
-
-        // Guard rate limit before expensive pagination
         await guardRateLimit(octokit);
 
-        const raw = await octokit.paginate(
-            octokit.rest.repos.listCommits,
-            params
+        const allCommits: GitHubCommit[] = [];
+        let cursor: string | null = null;
+        let hasNextPage = true;
+
+        while (hasNextPage) {
+            // deno-lint-ignore no-explicit-any
+            const response: any = await octokit.graphql(COMMITS_GRAPHQL_QUERY, {
+                owner,
+                repo,
+                since: options?.since || null,
+                until: options?.until || null,
+                after: cursor,
+            });
+
+            logGraphQLRateLimit(response);
+
+            const history = response.repository?.defaultBranchRef?.target?.history;
+            if (!history) break; // Empty repo or no default branch
+
+            // deno-lint-ignore no-explicit-any
+            for (const node of history.nodes) {
+                allCommits.push({
+                    sha: node.oid,
+                    message: node.message,
+                    html_url: node.url,
+                    committed_at: node.committer?.date || node.author?.date || new Date().toISOString(),
+                    author_login: node.author?.user?.login ?? null,
+                    author_name: node.author?.name || "Unknown",
+                    author_email: node.author?.email || "",
+                    author_avatar_url: node.author?.user?.avatarUrl ?? null,
+                    committer_login: node.committer?.user?.login ?? null,
+                    additions: node.additions ?? 0,
+                    deletions: node.deletions ?? 0,
+                });
+            }
+
+            hasNextPage = history.pageInfo.hasNextPage;
+            cursor = history.pageInfo.endCursor;
+        }
+
+        console.log(
+            `[github] GET commits for ${owner}/${repo} → ${allCommits.length} commits (via GraphQL)` +
+            (options?.since ? ` (since ${options.since.split("T")[0]})` : "")
         );
 
-        console.log(`[github] GET commits for ${owner}/${repo} → ${raw.length} commits${options?.since ? ` (since ${options.since.split('T')[0]})` : ''}`);
-
-        // deno-lint-ignore no-explicit-any
-        return raw.map((c: any) => ({
-            sha: c.sha,
-            message: c.commit.message,
-            html_url: c.html_url,
-            committed_at: c.commit.committer?.date || c.commit.author?.date || new Date().toISOString(),
-            author_login: c.author?.login ?? null,
-            author_name: c.commit.author?.name || "Unknown",
-            author_email: c.commit.author?.email || "",
-            author_avatar_url: c.author?.avatar_url ?? null,
-            committer_login: c.committer?.login ?? null,
-            // NOTE: GitHub's list commits endpoint does NOT return stats (additions/deletions).
-            // These will always be 0. LOC is sourced from merged PR stats instead.
-            // Per-commit enrichment via GET /repos/{owner}/{repo}/commits/{sha} is possible
-            // but costs 1 API call per commit — deferred until spare budget is available.
-            additions: c.stats?.additions ?? 0,
-            deletions: c.stats?.deletions ?? 0,
-        }));
+        return allCommits;
     } catch (error) {
         throw githubApiError(`list commits for ${owner}/${repo}`, error);
     }
 }
 
 /**
- * Fetch pull requests for a repo.
- * Supports optional `since` for early-stop: when provided, stops paginating
- * once it hits PRs last updated before that date (sorted by updated desc).
+ * Fetch pull requests for a repo via GraphQL API.
+ * Returns additions/deletions/changedFiles inline per PR, eliminating
+ * the N+1 REST enrichment pattern.
  */
 export async function fetchPullRequests(
     octokit: Octokit,
     owner: string,
     repo: string,
     state: "all" | "open" | "closed" = "all",
-    options?: { since?: string }
+    _options?: { since?: string }
 ): Promise<GitHubPR[]> {
     try {
-        // Guard rate limit before expensive pagination
         await guardRateLimit(octokit);
 
-        // Manual pagination with early-stop support.
-        // When `since` is provided and state is "closed", we sort by updated desc
-        // and stop once we hit PRs older than the cutoff — merged/closed PRs don't change.
+        // Map state to GraphQL PullRequestState enum values
+        const stateMap: Record<string, string[]> = {
+            all: ["OPEN", "CLOSED", "MERGED"],
+            open: ["OPEN"],
+            closed: ["CLOSED", "MERGED"],
+        };
+        const states = stateMap[state];
+
         const allPulls: GitHubPR[] = [];
-        let page = 1;
-        let stopped = false;
-        const sinceDate = options?.since ? new Date(options.since) : null;
+        let cursor: string | null = null;
+        let hasNextPage = true;
 
-        const MAX_PAGES = 50; // Safety cap: 50 pages × 100 = 5000 PRs max
-
-        while (page <= MAX_PAGES) {
+        while (hasNextPage) {
             await guardRateLimit(octokit);
 
-            const { data } = await octokit.rest.pulls.list({
+            // deno-lint-ignore no-explicit-any
+            const response: any = await octokit.graphql(PRS_GRAPHQL_QUERY, {
                 owner,
                 repo,
-                state,
-                sort: "updated",
-                direction: "desc",
-                per_page: 100,
-                page,
+                states,
+                after: cursor,
             });
 
-            if (data.length === 0) break;
+            logGraphQLRateLimit(response);
+
+            const pullRequests = response.repository?.pullRequests;
+            if (!pullRequests) break;
 
             // deno-lint-ignore no-explicit-any
-            for (const pr of data as any[]) {
-                // Early-stop: if this PR was last updated before our high-water mark,
-                // we've seen everything that changed since then.
-                if (sinceDate && new Date(pr.updated_at) < sinceDate) {
-                    stopped = true;
-                    break;
-                }
+            for (const node of pullRequests.nodes) {
+                // GraphQL state is OPEN, CLOSED, or MERGED — normalize to "open" | "closed"
+                const prState: "open" | "closed" = node.state === "OPEN" ? "open" : "closed";
 
                 allPulls.push({
-                    id: pr.id,
-                    number: pr.number,
-                    title: pr.title,
-                    state: pr.state as "open" | "closed",
-                    html_url: pr.html_url,
-                    is_draft: pr.draft ?? false,
-                    author_login: pr.user?.login ?? null,
-                    author_avatar_url: pr.user?.avatar_url ?? null,
-                    base_ref: pr.base.ref,
-                    head_ref: pr.head.ref,
-                    additions: pr.additions ?? 0,
-                    deletions: pr.deletions ?? 0,
-                    changed_files: pr.changed_files ?? 0,
-                    created_at: pr.created_at,
-                    closed_at: pr.closed_at,
-                    merged_at: pr.merged_at,
-                    updated_at: pr.updated_at,
+                    id: node.id,
+                    number: node.number,
+                    title: node.title,
+                    state: prState,
+                    html_url: node.url,
+                    is_draft: node.isDraft ?? false,
+                    author_login: node.author?.login ?? null,
+                    author_avatar_url: node.author?.avatarUrl ?? null,
+                    base_ref: node.baseRefName,
+                    head_ref: node.headRefName,
+                    additions: node.additions ?? 0,
+                    deletions: node.deletions ?? 0,
+                    changed_files: node.changedFiles ?? 0,
+                    created_at: node.createdAt,
+                    closed_at: node.closedAt || null,
+                    merged_at: node.mergedAt || null,
+                    updated_at: node.updatedAt,
                 });
             }
 
-            if (stopped || data.length < 100) break;
-            page++;
-        }
-
-        if (page > MAX_PAGES) {
-            console.warn(`[github] Hit max page cap (${MAX_PAGES}) for pulls ${owner}/${repo} — some PRs may be missing`);
+            hasNextPage = pullRequests.pageInfo.hasNextPage;
+            cursor = pullRequests.pageInfo.endCursor;
         }
 
         console.log(
-            `[github] GET pulls for ${owner}/${repo} (state=${state}) → ${allPulls.length} PRs` +
-            (stopped ? ` (incremental, stopped at high-water mark)` : ``)
+            `[github] GET pulls for ${owner}/${repo} (state=${state}) → ${allPulls.length} PRs (via GraphQL)`
         );
-
-        // Enrich PRs that are missing file stats
-        const CONCURRENCY = 3;
-        const toEnrich = allPulls.filter((pr) => pr.additions === 0 && pr.deletions === 0);
-        if (toEnrich.length > 0) console.log(`[github] Enriching ${toEnrich.length}/${allPulls.length} PRs with file stats for ${owner}/${repo}`);
-        for (let i = 0; i < toEnrich.length; i += CONCURRENCY) {
-            // Guard rate limit before each enrichment batch
-            await guardRateLimit(octokit);
-
-            const batch = toEnrich.slice(i, i + CONCURRENCY);
-            const results = await Promise.allSettled(
-                batch.map(async (pr) => {
-                    const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
-                        owner,
-                        repo,
-                        pull_number: pr.number,
-                        per_page: 100,
-                    });
-                    pr.additions = files.reduce((sum, f) => sum + (f.additions ?? 0), 0);
-                    pr.deletions = files.reduce((sum, f) => sum + (f.deletions ?? 0), 0);
-                    pr.changed_files = files.length;
-                })
-            );
-            for (const r of results) {
-                if (r.status === "rejected") {
-                    console.warn(`[github] Failed to enrich PR in ${owner}/${repo}: ${r.reason}`);
-                }
-            }
-        }
 
         return allPulls;
     } catch (error) {

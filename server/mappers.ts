@@ -6,8 +6,8 @@
 
 import type {
     RepositoryMetaRow,
-    CommitEventRow,
-    PrEventRow,
+    CommitEventWithAvatarRow,
+    PrEventWithAvatarRow,
     ContributorSnapshotRow,
     OwnerSnapshotRow,
 } from "./db/index.ts";
@@ -59,24 +59,22 @@ export function mapRepoRow(
 
 // ── Commit ──────────────────────────────────────────────────────────────────────
 
-/** Map a commit_event row to the client's Commit shape. */
-export function mapCommitRow(row: CommitEventRow, repoName?: string, avatars?: Map<string, string>): Commit {
-    const avatarUrl = row.author_login ? avatars?.get(row.author_login) : undefined;
+/** Map a commit_event row (with JOINed avatar) to the client's Commit shape. */
+export function mapCommitRow(row: CommitEventWithAvatarRow, repoName?: string): Commit {
     const author: CommitAuthor = {
         name: row.author_login ?? "Unknown",
         email: "",
         date: row.committed_at.toISOString(),
         login: row.author_login ?? undefined,
-        avatar_url: avatarUrl,
+        avatar_url: row.author_avatar_url ?? undefined,
     };
 
-    const committerAvatar = row.committer_login ? avatars?.get(row.committer_login) : undefined;
     const committer: CommitAuthor = {
         name: row.committer_login ?? row.author_login ?? "Unknown",
         email: "",
         date: row.committed_at.toISOString(),
         login: row.committer_login ?? undefined,
-        avatar_url: committerAvatar,
+        avatar_url: row.committer_avatar_url ?? undefined,
     };
 
     return {
@@ -85,22 +83,20 @@ export function mapCommitRow(row: CommitEventRow, repoName?: string, avatars?: M
         author,
         committer,
         html_url: row.html_url ?? "",
-        // NOTE: commit-level LOC (additions/deletions) is always 0 because GitHub's
-        // list commits API doesn't include stats. LOC is sourced from merged PRs instead.
-        // Kept undefined so the client knows no data is available (stats field is optional).
-        // Per-commit enrichment via individual commit API calls may be added in the future.
+        stats: (row.additions || row.deletions)
+            ? { additions: row.additions, deletions: row.deletions, total: row.additions + row.deletions }
+            : undefined,
         ...(repoName ? { repo_name: repoName } : {}),
     };
 }
 
 // ── Pull Request ────────────────────────────────────────────────────────────────
 
-/** Map a pr_event row to the client's PullRequest shape. */
-export function mapPrRow(row: PrEventRow, avatars?: Map<string, string>): PullRequest {
-    const avatarUrl = row.author_login ? avatars?.get(row.author_login) ?? "" : "";
+/** Map a pr_event row (with JOINed avatar) to the client's PullRequest shape. */
+export function mapPrRow(row: PrEventWithAvatarRow): PullRequest {
     const user: GitHubUser = {
         login: row.author_login ?? "unknown",
-        avatar_url: avatarUrl,
+        avatar_url: row.author_avatar_url ?? "",
         html_url: row.author_login ? `https://github.com/${row.author_login}` : "",
     };
 

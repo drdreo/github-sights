@@ -28,7 +28,9 @@ export type {
     OwnerConfigRow,
     // Events
     CommitEventRow,
+    CommitEventWithAvatarRow,
     PrEventRow,
+    PrEventWithAvatarRow,
     WorkflowEventRow,
     // Snapshots
     SnapshotContributor,
