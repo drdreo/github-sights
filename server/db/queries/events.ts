@@ -209,16 +209,18 @@ export async function getPrsByRepo(
 /** Get contributor stats for a repo (commits grouped by author). */
 export async function getContributorStatsByRepo(
     repoId: number
-): Promise<Array<{ login: string; commits: number; additions: number; deletions: number }>> {
-    return query<{ login: string; commits: number; additions: number; deletions: number }>(
+): Promise<Array<{ login: string; avatar_url: string | null; commits: number; additions: number; deletions: number }>> {
+    return query<{ login: string; avatar_url: string | null; commits: number; additions: number; deletions: number }>(
         `SELECT
-            author_login AS login,
+            c.author_login AS login,
+            cp.avatar_url,
             COUNT(*)::INTEGER AS commits,
-            COALESCE(SUM(additions), 0)::INTEGER AS additions,
-            COALESCE(SUM(deletions), 0)::INTEGER AS deletions
-         FROM commit_event
-         WHERE repo_id = $1 AND author_login IS NOT NULL
-         GROUP BY author_login
+            COALESCE(SUM(c.additions), 0)::INTEGER AS additions,
+            COALESCE(SUM(c.deletions), 0)::INTEGER AS deletions
+         FROM commit_event c
+         LEFT JOIN contributor_profile cp ON cp.login = c.author_login
+         WHERE c.repo_id = $1 AND c.author_login IS NOT NULL
+         GROUP BY c.author_login, cp.avatar_url
          ORDER BY commits DESC`,
         [repoId]
     );

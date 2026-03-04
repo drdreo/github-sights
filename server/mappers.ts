@@ -60,19 +60,23 @@ export function mapRepoRow(
 // ── Commit ──────────────────────────────────────────────────────────────────────
 
 /** Map a commit_event row to the client's Commit shape. */
-export function mapCommitRow(row: CommitEventRow, repoName?: string): Commit {
+export function mapCommitRow(row: CommitEventRow, repoName?: string, avatars?: Map<string, string>): Commit {
+    const avatarUrl = row.author_login ? avatars?.get(row.author_login) : undefined;
     const author: CommitAuthor = {
         name: row.author_login ?? "Unknown",
         email: "",
         date: row.committed_at,
         login: row.author_login ?? undefined,
+        avatar_url: avatarUrl,
     };
 
+    const committerAvatar = row.committer_login ? avatars?.get(row.committer_login) : undefined;
     const committer: CommitAuthor = {
         name: row.committer_login ?? row.author_login ?? "Unknown",
         email: "",
         date: row.committed_at,
         login: row.committer_login ?? undefined,
+        avatar_url: committerAvatar,
     };
 
     return {
@@ -81,11 +85,10 @@ export function mapCommitRow(row: CommitEventRow, repoName?: string): Commit {
         author,
         committer,
         html_url: row.html_url ?? "",
-        stats: {
-            additions: row.additions,
-            deletions: row.deletions,
-            total: row.additions + row.deletions,
-        },
+        // NOTE: commit-level LOC (additions/deletions) is always 0 because GitHub's
+        // list commits API doesn't include stats. LOC is sourced from merged PRs instead.
+        // Kept undefined so the client knows no data is available (stats field is optional).
+        // Per-commit enrichment via individual commit API calls may be added in the future.
         ...(repoName ? { repo_name: repoName } : {}),
     };
 }
@@ -93,10 +96,11 @@ export function mapCommitRow(row: CommitEventRow, repoName?: string): Commit {
 // ── Pull Request ────────────────────────────────────────────────────────────────
 
 /** Map a pr_event row to the client's PullRequest shape. */
-export function mapPrRow(row: PrEventRow): PullRequest {
+export function mapPrRow(row: PrEventRow, avatars?: Map<string, string>): PullRequest {
+    const avatarUrl = row.author_login ? avatars?.get(row.author_login) ?? "" : "";
     const user: GitHubUser = {
         login: row.author_login ?? "unknown",
-        avatar_url: "",
+        avatar_url: avatarUrl,
         html_url: row.author_login ? `https://github.com/${row.author_login}` : "",
     };
 

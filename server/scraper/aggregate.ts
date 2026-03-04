@@ -2,13 +2,13 @@
 //
 // Rebuilds snapshot tables from raw event data.
 // Idempotent: can be re-run at any time to rebuild all snapshots.
-// Pipeline order:
-//   1. daily_activity   (GROUP BY date from commit_event + pr_event)
-//   2. repo_snapshot    (COUNT/SUM per repo from events)
-//   3. contributor_snapshot (SUM across repos per contributor)
-//   4. owner_snapshot   (aggregate from repo_snapshots + streaks from daily_activity)
 //
-// Steps 2-4 can run after step 1 completes.
+// Two entry points:
+//   aggregateRepo()  — per-repo: repo_snapshot only (daily_activity is not consumed per-repo)
+//                      Called progressively during sync, right after a repo is ingested.
+//   aggregateOwner() — owner-wide: owner-level daily_activity, contributor_snapshot,
+//                      owner_snapshot. Runs once after all repos are ingested.
+//                      Also rebuilds all repo snapshots if they haven't been built yet.
 
 import { query } from "../db/pool.ts";
 import {
@@ -30,7 +30,7 @@ import {
     type UpsertContributorSnapshotInput,
 } from "../db/queries/snapshots.ts";
 import {
-    clearDailyActivity,
+    clearRepoDailyActivity,
     upsertDailyActivity,
     type UpsertDailyActivityInput,
 } from "../db/queries/activity.ts";
@@ -53,26 +53,64 @@ export interface AggregateResult {
     ownerSnapshotUpdated: boolean;
 }
 
-// ── Main Pipeline ────────────────────────────────────────────────────────────────
+// ── Per-Repo Aggregation (progressive) ──────────────────────────────────────────
+
+/**
+ * Aggregate a single repo: rebuild its repo_snapshot.
+ * Called right after a repo's commits and PRs are ingested so the repo detail
+ * page has data immediately — no need to wait for the full owner sync.
+ *
+ * NOTE: Per-repo daily_activity is NOT built here because no frontend consumer
+ * uses it. Owner-level daily_activity is rebuilt in aggregateOwner().
+ */
+export async function aggregateRepo(
+    ownerLogin: string,
+    repo: RepositoryMetaRow
+): Promise<void> {
+    const commits = await getCommitsByRepo(repo.id);
+    const prs = await getPrsByRepo(repo.id);
+
+    await buildAndUpsertRepoSnapshot(ownerLogin, repo, commits, prs);
+
+    console.log(`[aggregate] ${ownerLogin}/${repo.name}: repo snapshot built (${commits.length} commits, ${prs.length} PRs)`);
+}
+
+// ── Full Owner Aggregation ──────────────────────────────────────────────────────
 
 /**
  * Full aggregation pipeline for an owner.
  * Rebuilds all snapshot tables from raw events.
+ *
+ * If repos were already aggregated progressively via aggregateRepo(), the
+ * repo snapshots are rebuilt anyway (idempotent, ensures consistency).
  */
 export async function aggregateOwner(ownerLogin: string): Promise<AggregateResult> {
     const repos = await getReposByOwner(ownerLogin);
     const nonForkRepos = repos.filter((r) => !r.is_fork);
 
-    console.log(`[aggregate] ${ownerLogin}: starting aggregation for ${nonForkRepos.length} repos`);
+    console.log(`[aggregate] ${ownerLogin}: starting full aggregation for ${nonForkRepos.length} repos`);
 
-    // Step 1: Rebuild daily_activity
-    const dailyActivityRows = await rebuildDailyActivity(ownerLogin, nonForkRepos);
-    console.log(`[aggregate] ${ownerLogin}: rebuilt ${dailyActivityRows} daily activity rows`);
+    // Step 1: Rebuild per-repo daily_activity + repo snapshots
+    let dailyActivityRows = 0;
+    for (const repo of nonForkRepos) {
+        const commits = await getCommitsByRepo(repo.id);
+        const prs = await getPrsByRepo(repo.id);
 
-    // Steps 2-4 can run after daily_activity is ready
-    // Step 2: Rebuild repo_snapshot for each repo
-    const repoSnapshots = await rebuildRepoSnapshots(ownerLogin, nonForkRepos);
-    console.log(`[aggregate] ${ownerLogin}: rebuilt ${repoSnapshots} repo snapshots`);
+        await clearRepoDailyActivity(repo.id);
+        const dailyRows = buildRepoDailyActivity(ownerLogin, repo.id, commits, prs);
+        if (dailyRows.length > 0) {
+            await upsertDailyActivity(dailyRows);
+            dailyActivityRows += dailyRows.length;
+        }
+
+        await buildAndUpsertRepoSnapshot(ownerLogin, repo, commits, prs);
+    }
+    console.log(`[aggregate] ${ownerLogin}: rebuilt ${nonForkRepos.length} repo snapshots + ${dailyActivityRows} repo daily activity rows`);
+
+    // Step 2: Rebuild owner-level daily_activity (aggregated across all repos)
+    const ownerDailyRows = await rebuildOwnerDailyActivity(ownerLogin, nonForkRepos);
+    dailyActivityRows += ownerDailyRows;
+    console.log(`[aggregate] ${ownerLogin}: rebuilt ${ownerDailyRows} owner-level daily activity rows`);
 
     // Step 3: Rebuild contributor_snapshot
     const contributorSnapshots = await rebuildContributorSnapshots(ownerLogin, nonForkRepos);
@@ -85,104 +123,160 @@ export async function aggregateOwner(ownerLogin: string): Promise<AggregateResul
     return {
         owner: ownerLogin,
         dailyActivityRows,
-        repoSnapshots,
+        repoSnapshots: nonForkRepos.length,
         contributorSnapshots,
         ownerSnapshotUpdated: true,
     };
 }
 
-// ── Step 1: Daily Activity ───────────────────────────────────────────────────────
+// ── Shared: Per-Repo Daily Activity Builder ─────────────────────────────────────
 
 /**
- * Rebuild daily_activity rows from raw commit_event and pr_event tables.
- * Clears existing rows for the owner before rebuilding.
+ * Build daily_activity rows for a single repo from its commits and PRs.
+ * Pure function — does not touch the database.
  */
-async function rebuildDailyActivity(
+function buildRepoDailyActivity(
     ownerLogin: string,
-    repos: RepositoryMetaRow[]
-): Promise<number> {
-    // Clear existing daily_activity for this owner
-    await clearDailyActivity(ownerLogin);
+    repoId: number,
+    commits: CommitEventRow[],
+    prs: PrEventRow[]
+): UpsertDailyActivityInput[] {
+    const dateMap = new Map<string, {
+        commits: number;
+        additions: number;
+        deletions: number;
+        prOpened: number;
+        prMerged: number;
+        prClosed: number;
+    }>();
 
-    let totalRows = 0;
-
-    for (const repo of repos) {
-        // Get all commits for this repo
-        const commits = await getCommitsByRepo(repo.id);
-        // Get all PRs for this repo
-        const prs = await getPrsByRepo(repo.id);
-
-        // Build per-date maps
-        const dateMap = new Map<string, {
-            commits: number;
-            additions: number;
-            deletions: number;
-            prOpened: number;
-            prMerged: number;
-            prClosed: number;
-        }>();
-
-        const ensureDate = (date: string) => {
-            if (!dateMap.has(date)) {
-                dateMap.set(date, {
-                    commits: 0, additions: 0, deletions: 0,
-                    prOpened: 0, prMerged: 0, prClosed: 0,
-                });
-            }
-            return dateMap.get(date)!;
-        };
-
-        // Aggregate commits by date
-        for (const c of commits) {
-            const date = c.committed_at.split("T")[0];
-            const entry = ensureDate(date);
-            entry.commits++;
-            entry.additions += c.additions;
-            entry.deletions += c.deletions;
+    const ensureDate = (date: string) => {
+        if (!dateMap.has(date)) {
+            dateMap.set(date, {
+                commits: 0, additions: 0, deletions: 0,
+                prOpened: 0, prMerged: 0, prClosed: 0,
+            });
         }
+        return dateMap.get(date)!;
+    };
 
-        // Aggregate PRs by date
-        for (const pr of prs) {
-            const createdDate = pr.created_at.split("T")[0];
-            ensureDate(createdDate).prOpened++;
+    // Aggregate commits by date (count only — LOC comes from PRs)
+    for (const c of commits) {
+        const date = c.committed_at.split("T")[0];
+        ensureDate(date).commits++;
+    }
 
-            if (pr.merged_at) {
-                const mergedDate = pr.merged_at.split("T")[0];
-                ensureDate(mergedDate).prMerged++;
-            } else if (pr.closed_at) {
-                const closedDate = pr.closed_at.split("T")[0];
-                ensureDate(closedDate).prClosed++;
-            }
-        }
+    // Aggregate PRs by date
+    for (const pr of prs) {
+        const createdDate = pr.created_at.split("T")[0];
+        ensureDate(createdDate).prOpened++;
 
-        // Convert to upsert inputs — per-repo rows
-        const repoRows: UpsertDailyActivityInput[] = Array.from(dateMap.entries()).map(
-            ([date, data]) => ({
-                owner_login: ownerLogin,
-                repo_id: repo.id,
-                contributor_login: null,
-                date,
-                commit_count: data.commits,
-                additions: data.additions,
-                deletions: data.deletions,
-                pr_opened: data.prOpened,
-                pr_merged: data.prMerged,
-                pr_closed: data.prClosed,
-                workflow_runs: 0,
-                workflow_failures: 0,
-            })
-        );
-
-        if (repoRows.length > 0) {
-            await upsertDailyActivity(repoRows);
-            totalRows += repoRows.length;
+        if (pr.merged_at) {
+            const mergedDate = pr.merged_at.split("T")[0];
+            const mergedEntry = ensureDate(mergedDate);
+            mergedEntry.prMerged++;
+            // LOC attributed to merge date (commit-level LOC is unavailable from GitHub list API)
+            mergedEntry.additions += pr.additions;
+            mergedEntry.deletions += pr.deletions;
+        } else if (pr.closed_at) {
+            const closedDate = pr.closed_at.split("T")[0];
+            ensureDate(closedDate).prClosed++;
         }
     }
 
-    // Build owner-level rows (aggregate across all repos per date)
+    return Array.from(dateMap.entries()).map(([date, data]) => ({
+        owner_login: ownerLogin,
+        repo_id: repoId,
+        contributor_login: null,
+        date,
+        commit_count: data.commits,
+        additions: data.additions,
+        deletions: data.deletions,
+        pr_opened: data.prOpened,
+        pr_merged: data.prMerged,
+        pr_closed: data.prClosed,
+        workflow_runs: 0,
+        workflow_failures: 0,
+    }));
+}
+
+// ── Shared: Repo Snapshot Builder ────────────────────────────────────────────────
+
+/**
+ * Build and upsert a repo_snapshot for a single repo.
+ */
+async function buildAndUpsertRepoSnapshot(
+    ownerLogin: string,
+    repo: RepositoryMetaRow,
+    commits: CommitEventRow[],
+    prs: PrEventRow[]
+): Promise<void> {
+    const contribStats = await getContributorStatsByRepo(repo.id);
+
+    // LOC sourced from merged PRs (GitHub list API doesn't return commit-level stats)
+    const mergedPrs = prs.filter((pr) => pr.merged_at !== null);
+    const openPrs = prs.filter((pr) => pr.state === "open").length;
+
+    const totalAdditions = mergedPrs.reduce((sum, pr) => sum + pr.additions, 0);
+    const totalDeletions = mergedPrs.reduce((sum, pr) => sum + pr.deletions, 0);
+
+    // Build top contributors for this repo
+    const topContributors: SnapshotContributor[] = contribStats
+        .slice(0, 10)
+        .map((cs) => ({
+            login: cs.login,
+            avatar_url: cs.avatar_url ?? "",
+            commits: cs.commits,
+            additions: cs.additions,
+            deletions: cs.deletions,
+        }));
+
+    const snap: UpsertRepoSnapshotInput = {
+        repo_id: repo.id,
+        owner_login: ownerLogin,
+        name: repo.name,
+        description: repo.description,
+        language: repo.language,
+        stargazers_count: repo.stargazers_count,
+        forks_count: repo.forks_count,
+        open_issues_count: repo.open_issues_count,
+        updated_at: repo.updated_at,
+        pushed_at: repo.pushed_at,
+        total_commits: commits.length,
+        total_prs: prs.length,
+        open_prs: openPrs,
+        merged_prs: mergedPrs.length,
+        total_additions: totalAdditions,
+        total_deletions: totalDeletions,
+        contributor_count: contribStats.length,
+        ci_success_rate: 0,          // Deferred: workflow ingestion not yet implemented
+        ci_avg_duration_seconds: 0,
+        last_ci_conclusion: null,
+        top_contributors: topContributors,
+    };
+
+    await upsertRepoSnapshot(snap);
+}
+
+// ── Owner-Level Daily Activity ──────────────────────────────────────────────────
+
+/**
+ * Rebuild owner-level daily_activity rows (repo_id IS NULL).
+ * Aggregates across all repos per date.
+ */
+async function rebuildOwnerDailyActivity(
+    ownerLogin: string,
+    repos: RepositoryMetaRow[]
+): Promise<number> {
+    // Clear existing owner-level rows (repo_id IS NULL)
+    await query(
+        "DELETE FROM daily_activity WHERE owner_login = $1 AND repo_id IS NULL",
+        [ownerLogin]
+    );
+
     const ownerDateMap = new Map<string, UpsertDailyActivityInput>();
 
-    // Query all commits for the owner in one go
+    // Query all commits for the owner in one go (count only — LOC comes from merged PRs)
     const allCommits = await getCommitsByOwner(ownerLogin);
     for (const c of allCommits) {
         const date = c.committed_at.split("T")[0];
@@ -197,10 +291,7 @@ async function rebuildDailyActivity(
                 workflow_runs: 0, workflow_failures: 0,
             });
         }
-        const entry = ownerDateMap.get(date)!;
-        entry.commit_count++;
-        entry.additions += c.additions;
-        entry.deletions += c.deletions;
+        ownerDateMap.get(date)!.commit_count++;
     }
 
     // Add PR data to owner-level rows
@@ -234,7 +325,11 @@ async function rebuildDailyActivity(
                         workflow_runs: 0, workflow_failures: 0,
                     });
                 }
-                ownerDateMap.get(mergedDate)!.pr_merged++;
+                const mergedEntry = ownerDateMap.get(mergedDate)!;
+                mergedEntry.pr_merged++;
+                // LOC attributed to merge date
+                mergedEntry.additions += pr.additions;
+                mergedEntry.deletions += pr.deletions;
             } else if (pr.closed_at) {
                 const closedDate = pr.closed_at.split("T")[0];
                 if (!ownerDateMap.has(closedDate)) {
@@ -256,87 +351,12 @@ async function rebuildDailyActivity(
     const ownerRows = Array.from(ownerDateMap.values());
     if (ownerRows.length > 0) {
         await upsertDailyActivity(ownerRows);
-        totalRows += ownerRows.length;
     }
 
-    return totalRows;
+    return ownerRows.length;
 }
 
-// ── Step 2: Repo Snapshots ───────────────────────────────────────────────────────
-
-/**
- * Rebuild repo_snapshot for each non-fork repo.
- * Aggregates commit/PR counts from event tables.
- */
-async function rebuildRepoSnapshots(
-    ownerLogin: string,
-    repos: RepositoryMetaRow[]
-): Promise<number> {
-    let count = 0;
-
-    for (const repo of repos) {
-        const commits = await getCommitsByRepo(repo.id);
-        const prs = await getPrsByRepo(repo.id);
-        const contribStats = await getContributorStatsByRepo(repo.id);
-
-        const openPrs = prs.filter((pr) => pr.state === "open").length;
-        const mergedPrs = prs.filter((pr) => pr.merged_at !== null).length;
-
-        const totalAdditions = commits.reduce((sum, c) => sum + c.additions, 0);
-        const totalDeletions = commits.reduce((sum, c) => sum + c.deletions, 0);
-
-        // Build top contributors for this repo
-        const topContributors: SnapshotContributor[] = contribStats
-            .slice(0, 10)
-            .map((cs) => ({
-                login: cs.login,
-                avatar_url: "", // Will be enriched from contributor_profile if needed
-                commits: cs.commits,
-                additions: cs.additions,
-                deletions: cs.deletions,
-            }));
-
-        // Enrich avatar URLs from the commit data
-        const avatarMap = new Map<string, string>();
-        for (const c of commits) {
-            if (c.author_login) {
-                // We don't have avatar_url in commit_event, but contributor_profile has it
-                // For now, leave empty — the route layer can join with contributor_profile
-            }
-        }
-
-        const snap: UpsertRepoSnapshotInput = {
-            repo_id: repo.id,
-            owner_login: ownerLogin,
-            name: repo.name,
-            description: repo.description,
-            language: repo.language,
-            stargazers_count: repo.stargazers_count,
-            forks_count: repo.forks_count,
-            open_issues_count: repo.open_issues_count,
-            updated_at: repo.updated_at,
-            pushed_at: repo.pushed_at,
-            total_commits: commits.length,
-            total_prs: prs.length,
-            open_prs: openPrs,
-            merged_prs: mergedPrs,
-            total_additions: totalAdditions,
-            total_deletions: totalDeletions,
-            contributor_count: contribStats.length,
-            ci_success_rate: 0,          // Deferred: workflow ingestion not yet implemented
-            ci_avg_duration_seconds: 0,
-            last_ci_conclusion: null,
-            top_contributors: topContributors,
-        };
-
-        await upsertRepoSnapshot(snap);
-        count++;
-    }
-
-    return count;
-}
-
-// ── Step 3: Contributor Snapshots ─────────────────────────────────────────────────
+// ── Contributor Snapshots ────────────────────────────────────────────────────────
 
 /**
  * Rebuild contributor_snapshot for all contributors across an owner's repos.
@@ -384,13 +404,11 @@ async function rebuildContributorSnapshots(
         const commits = await getCommitsByRepo(repo.id);
         const prs = await getPrsByRepo(repo.id);
 
-        // Process commits
+        // Process commits (count only — LOC comes from merged PRs)
         for (const c of commits) {
             if (!c.author_login) continue;
             const entry = ensureContrib(c.author_login);
             entry.totalCommits++;
-            entry.totalAdditions += c.additions;
-            entry.totalDeletions += c.deletions;
             entry.repos.add(repo.name);
             entry.commitDates.add(c.committed_at.split("T")[0]);
 
@@ -403,27 +421,33 @@ async function rebuildContributorSnapshots(
             }
         }
 
-        // Process PRs
+        // Process PRs (LOC attributed from merged PRs)
         for (const pr of prs) {
             if (!pr.author_login) continue;
             const entry = ensureContrib(pr.author_login);
             entry.totalPRs++;
-            if (pr.merged_at) entry.totalPRsMerged++;
+            if (pr.merged_at) {
+                entry.totalPRsMerged++;
+                entry.totalAdditions += pr.additions;
+                entry.totalDeletions += pr.deletions;
+            }
             entry.repos.add(repo.name);
         }
     }
 
     // Enrich avatar URLs from contributor_profile table
-    const profileRows = await query<{ login: string; avatar_url: string | null; html_url: string | null }>(
-        `SELECT login, avatar_url, html_url FROM contributor_profile
-         WHERE login = ANY($1)`,
-        [Array.from(contribMap.keys())]
-    );
-    for (const p of profileRows) {
-        const entry = contribMap.get(p.login);
-        if (entry) {
-            entry.avatar_url = p.avatar_url;
-            if (p.html_url) entry.html_url = p.html_url;
+    if (contribMap.size > 0) {
+        const profileRows = await query<{ login: string; avatar_url: string | null; html_url: string | null }>(
+            `SELECT login, avatar_url, html_url FROM contributor_profile
+             WHERE login = ANY($1)`,
+            [Array.from(contribMap.keys())]
+        );
+        for (const p of profileRows) {
+            const entry = contribMap.get(p.login);
+            if (entry) {
+                entry.avatar_url = p.avatar_url;
+                if (p.html_url) entry.html_url = p.html_url;
+            }
         }
     }
 
@@ -456,7 +480,7 @@ async function rebuildContributorSnapshots(
     return count;
 }
 
-// ── Step 4: Owner Snapshot ───────────────────────────────────────────────────────
+// ── Owner Snapshot ───────────────────────────────────────────────────────────────
 
 /**
  * Rebuild the owner_snapshot from repo_snapshots + streak calculation.

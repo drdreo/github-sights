@@ -314,6 +314,10 @@ export async function fetchCommits(
             author_email: c.commit.author?.email || "",
             author_avatar_url: c.author?.avatar_url ?? null,
             committer_login: c.committer?.login ?? null,
+            // NOTE: GitHub's list commits endpoint does NOT return stats (additions/deletions).
+            // These will always be 0. LOC is sourced from merged PR stats instead.
+            // Per-commit enrichment via GET /repos/{owner}/{repo}/commits/{sha} is possible
+            // but costs 1 API call per commit — deferred until spare budget is available.
             additions: c.stats?.additions ?? 0,
             deletions: c.stats?.deletions ?? 0,
         }));

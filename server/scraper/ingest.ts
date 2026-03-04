@@ -38,6 +38,8 @@ import {
     recordSyncError,
 } from "../db/queries/sync-state.ts";
 import { updateOwnerSyncedAt } from "../db/queries/identity.ts";
+import { aggregateRepo } from "./aggregate.ts";
+import type { RepositoryMetaRow } from "../db/types.ts";
 
 // ── Types ────────────────────────────────────────────────────────────────────────
 
@@ -115,9 +117,10 @@ export async function ingestRepos(
 
     await upsertRepos(repoInputs);
 
-    // Filter to non-fork repos for downstream ingestion
-    const activeRepos = ghRepos.filter((r) => !r.fork && !isRepoExcluded(r.name));
-
+    // Filter to non-fork repos for downstream ingestion, prioritize recently active repos
+    const activeRepos = ghRepos
+        .filter((r) => !r.fork && !isRepoExcluded(r.name))
+        .sort((a, b) => new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime());
     console.log(`[ingest] ${owner}: ${activeRepos.length}/${ghRepos.length} repos eligible (excluded forks + ignored)`);
 
     return { repos: activeRepos, repoCount: ghRepos.length };
@@ -258,7 +261,7 @@ export async function ingestOwner(
     octokit: Octokit,
     owner: string,
     ownerType: "user" | "org",
-    options?: { since?: string; until?: string }
+    options?: { since?: string; until?: string; skipAggregation?: boolean }
 ): Promise<IngestOwnerResult> {
     // Step 1: Ingest repos
     const { repos } = await ingestRepos(octokit, owner, ownerType);
@@ -276,7 +279,7 @@ export async function ingestOwner(
                     ingestCommitsForRepo(octokit, owner, repo, options),
                     ingestPRsForRepo(octokit, owner, repo),
                 ]);
-                return { name: repo.name, commits, prs };
+                return { name: repo.name, repoGh: repo, commits, prs };
             })
         );
 
@@ -284,7 +287,7 @@ export async function ingestOwner(
             const result = batchResults[j];
             const repo = batch[j];
             if (result.status === "fulfilled") {
-                results.push(result.value);
+                results.push({ name: result.value.name, commits: result.value.commits, prs: result.value.prs });
             } else {
                 const errMsg = `${repo.name}: ${String(result.reason)}`;
                 errors.push(errMsg);
@@ -296,8 +299,40 @@ export async function ingestOwner(
 
         const budget = getRateLimitState(octokit);
         console.log(`[ingest] ${owner}: batch ${Math.floor(i / CONCURRENCY) + 1}/${Math.ceil(repos.length / CONCURRENCY)} complete (API budget: ${budget.remaining}/${budget.limit})`);
-    }
 
+        // Run progressive per-repo aggregation so snapshots are available immediately
+        if (!options?.skipAggregation) {
+            for (let j = 0; j < batchResults.length; j++) {
+                const result = batchResults[j];
+                const repo = batch[j];
+                if (result.status === "fulfilled") {
+                    try {
+                        const repoMeta: RepositoryMetaRow = {
+                            id: repo.id,
+                            owner_login: owner,
+                            name: repo.name,
+                            full_name: repo.full_name,
+                            description: repo.description,
+                            html_url: repo.html_url,
+                            is_private: repo.private,
+                            is_fork: repo.fork,
+                            language: repo.language,
+                            default_branch: repo.default_branch,
+                            stargazers_count: repo.stargazers_count,
+                            forks_count: repo.forks_count,
+                            open_issues_count: repo.open_issues_count,
+                            created_at: repo.created_at,
+                            updated_at: repo.updated_at,
+                            pushed_at: repo.pushed_at,
+                        };
+                        await aggregateRepo(owner, repoMeta);
+                    } catch (err) {
+                        console.warn(`[ingest] ${owner}/${repo.name}: progressive aggregation failed (non-fatal):`, err);
+                    }
+                }
+            }
+        }
+    }
     // Update owner's last_synced_at timestamp
     await updateOwnerSyncedAt(owner);
 

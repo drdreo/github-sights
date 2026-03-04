@@ -205,3 +205,19 @@ export async function getContributor(login: string): Promise<ContributorProfileR
         [login]
     );
 }
+
+/** Batch-fetch avatar URLs for a set of logins. Returns a Map<login, avatar_url>. */
+export async function getAvatarsByLogins(logins: string[]): Promise<Map<string, string>> {
+    if (logins.length === 0) return new Map();
+
+    const rows = await query<{ login: string; avatar_url: string | null }>(
+        `SELECT login, avatar_url FROM contributor_profile WHERE login = ANY($1)`,
+        [logins]
+    );
+
+    const map = new Map<string, string>();
+    for (const r of rows) {
+        if (r.avatar_url) map.set(r.login, r.avatar_url);
+    }
+    return map;
+}

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { requireConfig } from "../config.ts";
 import { errorResponse, notFound } from "../errors.ts";
-import { getReposByOwner, getRepoByName, getOwner } from "../db/queries/identity.ts";
+import { getReposByOwner, getRepoByName, getOwner, getAvatarsByLogins } from "../db/queries/identity.ts";
 import { getCommitsByOwner, getCommitsByRepo, getPrsByRepo, getContributorStatsByRepo } from "../db/queries/events.ts";
 import { getContributorSnapshotsByRepo } from "../db/queries/snapshots.ts";
 import { mapRepoRow, mapCommitRow, mapPrRow, mapContribSnapshotToContributor } from "../mappers.ts";
@@ -87,12 +87,16 @@ repos.get("/api/commits/:owner", async (c) => {
             group.push(commit);
         }
 
+        // Batch-fetch avatars for all commit authors
+        const allLogins = [...new Set(commitRows.map((c) => c.author_login).filter(Boolean))] as string[];
+        const avatars = await getAvatarsByLogins(allLogins);
+
         // Build response: Array<{ repo: Repository, commits: Commit[] }>
         const data = repoRows
             .filter((r) => commitsByRepoId.has(r.id))
             .map((r) => ({
                 repo: mapRepoRow(r, ownerInfo),
-                commits: (commitsByRepoId.get(r.id) ?? []).map((c) => mapCommitRow(c, r.name)),
+                commits: (commitsByRepoId.get(r.id) ?? []).map((c) => mapCommitRow(c, r.name, avatars)),
             }));
 
         return c.json(data);
@@ -115,7 +119,9 @@ repos.get("/api/repos/:owner/:repo/commits", async (c) => {
         const until = c.req.query("until") || undefined;
 
         const rows = await getCommitsByRepo(repoRow.id, { since, until });
-        const data = rows.map((r) => mapCommitRow(r, repo));
+        const logins = [...new Set(rows.map((r) => r.author_login).filter(Boolean))] as string[];
+        const avatars = await getAvatarsByLogins(logins);
+        const data = rows.map((r) => mapCommitRow(r, repo, avatars));
         return c.json(data);
     } catch (error) {
         return errorResponse(c, error);
@@ -134,7 +140,9 @@ repos.get("/api/repos/:owner/:repo/pulls", async (c) => {
 
         const state = (c.req.query("state") as "all" | "open" | "closed") || "all";
         const rows = await getPrsByRepo(repoRow.id, { state });
-        const data = rows.map(mapPrRow);
+        const logins = [...new Set(rows.map((r) => r.author_login).filter(Boolean))] as string[];
+        const avatars = await getAvatarsByLogins(logins);
+        const data = rows.map((r) => mapPrRow(r, avatars));
         return c.json(data);
     } catch (error) {
         return errorResponse(c, error);
@@ -173,7 +181,7 @@ repos.get("/api/repos/:owner/:repo/contributor-stats", async (c) => {
             .filter((s) => s.commits > 0)
             .map((s) => ({
                 login: s.login,
-                avatar_url: "",
+                avatar_url: s.avatar_url ?? "",
                 html_url: `https://github.com/${s.login}`,
                 totalCommits: s.commits,
                 totalAdditions: s.additions,

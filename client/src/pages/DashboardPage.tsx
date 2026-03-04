@@ -8,6 +8,7 @@ import { StatCards } from "../components/StatCards";
 
 import { useCommitTimelines, useStats, useSync } from "../hooks/useGitHub";
 import { useOwner } from "../hooks/useOwner";
+import { useSearchParams } from "react-router-dom";
 
 export default function DashboardPage() {
     const [dateRange, setDateRange] = useState({
@@ -27,8 +28,12 @@ export default function DashboardPage() {
         until
     );
 
-    // Background sync: fills commit gaps from last fetch → now, then refreshes queries
-    const { isSyncing } = useSync(owner, since, until);
+    // Read initial sync range from URL (set by SetupPage on first-time redirect)
+    const [searchParams] = useSearchParams();
+    const syncSince = searchParams.get("syncSince") || undefined;
+
+    // Background sync: incremental from high-water mark → now, then refreshes queries
+    const { isSyncing } = useSync(owner, syncSince);
 
     return (
         <div className="min-h-screen bg-gray-950">

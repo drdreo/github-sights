@@ -7,18 +7,15 @@ const sync = new Hono();
 
 // ── POST /api/sync — Trigger full sync pipeline ────────────────────────────
 //
-// Query params:
-//   since — ISO date string (defaults to 30 days ago)
-//   until — ISO date string (defaults to now)
-
+// Query params (optional):
+//   since — ISO date string (only when explicitly provided, e.g. initial sync)
+//   until — ISO date string (only when explicitly provided)
 sync.post("/api/sync/:owner", async (c) => {
     try {
         const { owner } = c.req.param();
         const config = requireConfig(owner);
-        const since =
-            c.req.query("since") || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const since = c.req.query("since") || undefined;
         const until = c.req.query("until") || undefined;
-
         const result = await syncOwner(owner, config.token, config.ownerType, { since, until });
 
         // Return only the client-expected shape (strip aggregation + durationMs)

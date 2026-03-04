@@ -125,11 +125,11 @@ export const api = {
         return fetchApi<OverviewStats>(`/stats/${owner}${qs ? `?${qs}` : ""}`);
     },
 
-    /** Trigger background sync — fills commit gaps from last fetch to now. */
-    sync: (owner: string, since?: string, until?: string) => {
+    /** Trigger background sync — incremental from high-water mark to now.
+     *  Optionally pass `since` for initial/backfill syncs. */
+    sync: (owner: string, since?: string) => {
         const params = new URLSearchParams();
         if (since) params.append("since", since);
-        if (until) params.append("until", until);
         const qs = params.toString();
         return fetchApi<{ synced: number; repos: string[]; errors: string[] }>(
             `/sync/${encodeURIComponent(owner)}${qs ? `?${qs}` : ""}`,

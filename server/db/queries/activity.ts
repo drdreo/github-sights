@@ -188,3 +188,11 @@ export async function clearDailyActivity(ownerLogin: string): Promise<void> {
         [ownerLogin]
     );
 }
+
+/** Delete daily_activity for a specific repo (used before per-repo rebuild). */
+export async function clearRepoDailyActivity(repoId: number): Promise<void> {
+    await execute(
+        "DELETE FROM daily_activity WHERE repo_id = $1",
+        [repoId]
+    );
+}

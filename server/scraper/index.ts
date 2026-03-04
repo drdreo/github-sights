@@ -140,9 +140,12 @@ async function doSync(
     console.log(`[sync] Rate limit budget: ${initialBudget.remaining}/${initialBudget.limit} remaining (resets ${initialBudget.resetAt.toISOString()})`);
 
     // Step 1: Ingest from GitHub into event tables
+    // Per-repo aggregation happens inside ingestOwner() — each repo's snapshot
+    // is built immediately after its commits+PRs are ingested.
     const ingestResult = await ingestOwner(octokit, owner, ownerType, {
         since: options?.since,
         until: options?.until,
+        skipAggregation: options?.skipAggregation,
     });
 
     const totalSynced = ingestResult.repos.reduce(
@@ -199,5 +202,5 @@ export { createOctokit, verifyToken, isRepoExcluded, LANGUAGE_COLORS, guardRateL
 export type { GitHubRepo, GitHubCommit, GitHubPR, RateLimitState } from "./github-client.ts";
 export { ingestOwner, ingestRepos, ingestCommitsForRepo, ingestPRsForRepo } from "./ingest.ts";
 export type { IngestOwnerResult, IngestCommitsResult, IngestPRsResult } from "./ingest.ts";
-export { aggregateOwner } from "./aggregate.ts";
+export { aggregateOwner, aggregateRepo } from "./aggregate.ts";
 export type { AggregateResult } from "./aggregate.ts";

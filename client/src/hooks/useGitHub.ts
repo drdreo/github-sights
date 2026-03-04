@@ -89,26 +89,28 @@ export function useCommitTimelines(owner: string, since?: string, until?: string
     });
 }
 
-// ── Background Sync ─────────────────────────────────────────────────────────────
-
 /**
- * Cache-first background sync hook.
+ * Background sync hook — triggers a single incremental sync per owner.
  *
- * After the dashboard renders cached data, this hook fires POST /api/sync
- * to fill commit gaps (last fetch → now). When sync completes, it invalidates
- * the stats + timelines queries so they refetch from the now-fresh DB.
+ * Fires POST /api/sync/:owner to fill event tables from the high-water mark
+ * to now. When complete, invalidates stats + timelines queries so they refetch
+ * from the now-fresh DB.
  *
- * Only syncs once per owner+range combination to avoid redundant calls.
+ * Optionally accepts `since` (ISO date string) for initial syncs to control
+ * how far back to crawl. Only used once per owner session.
+ *
+ * Date filtering is handled by the read queries (useStats, useCommitTimelines),
+ * NOT by the sync. Changing the date picker should never re-trigger a sync.
  */
-export function useSync(owner: string, since?: string, until?: string) {
+export function useSync(owner: string, since?: string) {
     const queryClient = useQueryClient();
     const syncedRef = useRef<string | null>(null);
 
     const syncMutation = useMutation({
-        mutationFn: () => api.sync(owner, since, until),
+        mutationFn: () => api.sync(owner, since),
         onSuccess: (result) => {
             console.log(
-                `[sync] Done: ${result.synced} commits across ${result.repos.length} repos`
+                `[sync] Done: ${result.synced} events across ${result.repos.length} repos`
             );
             if (result.errors.length > 0) {
                 console.warn(`[sync] Errors:`, result.errors);
@@ -125,14 +127,13 @@ export function useSync(owner: string, since?: string, until?: string) {
     useEffect(() => {
         if (!owner) return;
 
-        // Create a key for this specific sync request to avoid double-firing
-        const syncKey = `${owner}:${since}:${until}`;
-        if (syncedRef.current === syncKey) return;
+        // Only sync once per owner
+        if (syncedRef.current === owner) return;
         if (syncMutation.isPending) return;
 
-        syncedRef.current = syncKey;
+        syncedRef.current = owner;
         syncMutation.mutate();
-    }, [owner, since, until]);
+    }, [owner]);
 
     return {
         isSyncing: syncMutation.isPending,
