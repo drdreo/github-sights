@@ -126,10 +126,12 @@ export const api = {
     },
 
     /** Trigger background sync — incremental from high-water mark to now.
-     *  Optionally pass `since` for initial/backfill syncs. */
-    sync: (owner: string, since?: string) => {
+     *  Optionally pass `since` for initial/backfill syncs.
+     *  `mode` controls depth: "shallow" (repos+PRs only) or "deep" (default, includes commits). */
+    sync: (owner: string, since?: string, mode?: "shallow" | "deep") => {
         const params = new URLSearchParams();
         if (since) params.append("since", since);
+        if (mode) params.append("mode", mode);
         const qs = params.toString();
         return fetchApi<{ synced: number; repos: string[]; errors: string[] }>(
             `/sync/${encodeURIComponent(owner)}${qs ? `?${qs}` : ""}`,
@@ -138,7 +140,6 @@ export const api = {
             }
         );
     },
-
     deleteConfig: (owner: string) =>
         fetchApi<{ configured: false }>(`/config/${encodeURIComponent(owner)}`, {
             method: "DELETE"

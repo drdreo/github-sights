@@ -6,6 +6,7 @@ import { getCommitsByOwner, getCommitsByRepo, getPrsByRepo, getContributorStatsB
 import { getContributorSnapshotsByRepo } from "../db/queries/snapshots.ts";
 import { mapRepoRow, mapCommitRow, mapPrRow, mapContribSnapshotToContributor } from "../mappers.ts";
 import type { RepositoryMetaRow } from "../db/index.ts";
+import { syncRepo } from "../scraper/index.ts";
 
 const repos = new Hono();
 
@@ -35,7 +36,10 @@ repos.get("/api/repos/:owner", async (c) => {
 repos.get("/api/repos/:owner/:repo", async (c) => {
     try {
         const { owner, repo } = c.req.param();
-        requireConfig(owner);
+        const config = requireConfig(owner);
+
+        // Fire-and-forget: trigger deep sync (commits + PRs) for this repo
+        syncRepo(owner, repo, config.token, config.ownerType).catch(() => {});
 
         const repoRow = await getRepoByName(owner, repo);
         if (!repoRow) throw notFound("Repository", `${owner}/${repo}`);

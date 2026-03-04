@@ -58,6 +58,7 @@ export interface GitHubPR {
     created_at: string;
     closed_at: string | null;
     merged_at: string | null;
+    updated_at: string;
 }
 
 // ── Excluded Repos ───────────────────────────────────────────────────────────────
@@ -326,50 +327,94 @@ export async function fetchCommits(
     }
 }
 
-/** Fetch all pull requests for a repo. */
+/**
+ * Fetch pull requests for a repo.
+ * Supports optional `since` for early-stop: when provided, stops paginating
+ * once it hits PRs last updated before that date (sorted by updated desc).
+ */
 export async function fetchPullRequests(
     octokit: Octokit,
     owner: string,
     repo: string,
-    state: "all" | "open" | "closed" = "all"
+    state: "all" | "open" | "closed" = "all",
+    options?: { since?: string }
 ): Promise<GitHubPR[]> {
     try {
         // Guard rate limit before expensive pagination
         await guardRateLimit(octokit);
 
-        const pulls = await octokit.paginate(octokit.rest.pulls.list, {
-            owner,
-            repo,
-            state,
-            per_page: 100,
-        });
+        // Manual pagination with early-stop support.
+        // When `since` is provided and state is "closed", we sort by updated desc
+        // and stop once we hit PRs older than the cutoff — merged/closed PRs don't change.
+        const allPulls: GitHubPR[] = [];
+        let page = 1;
+        let stopped = false;
+        const sinceDate = options?.since ? new Date(options.since) : null;
 
-        console.log(`[github] GET pulls for ${owner}/${repo} (state=${state}) → ${pulls.length} PRs`);
+        const MAX_PAGES = 50; // Safety cap: 50 pages × 100 = 5000 PRs max
 
-        // deno-lint-ignore no-explicit-any
-        const mapped = pulls.map((pr: any) => ({
-            id: pr.id,
-            number: pr.number,
-            title: pr.title,
-            state: pr.state as "open" | "closed",
-            html_url: pr.html_url,
-            is_draft: pr.draft ?? false,
-            author_login: pr.user?.login ?? null,
-            author_avatar_url: pr.user?.avatar_url ?? null,
-            base_ref: pr.base.ref,
-            head_ref: pr.head.ref,
-            additions: pr.additions ?? 0,
-            deletions: pr.deletions ?? 0,
-            changed_files: pr.changed_files ?? 0,
-            created_at: pr.created_at,
-            closed_at: pr.closed_at,
-            merged_at: pr.merged_at,
-        }));
+        while (page <= MAX_PAGES) {
+            await guardRateLimit(octokit);
+
+            const { data } = await octokit.rest.pulls.list({
+                owner,
+                repo,
+                state,
+                sort: "updated",
+                direction: "desc",
+                per_page: 100,
+                page,
+            });
+
+            if (data.length === 0) break;
+
+            // deno-lint-ignore no-explicit-any
+            for (const pr of data as any[]) {
+                // Early-stop: if this PR was last updated before our high-water mark,
+                // we've seen everything that changed since then.
+                if (sinceDate && new Date(pr.updated_at) < sinceDate) {
+                    stopped = true;
+                    break;
+                }
+
+                allPulls.push({
+                    id: pr.id,
+                    number: pr.number,
+                    title: pr.title,
+                    state: pr.state as "open" | "closed",
+                    html_url: pr.html_url,
+                    is_draft: pr.draft ?? false,
+                    author_login: pr.user?.login ?? null,
+                    author_avatar_url: pr.user?.avatar_url ?? null,
+                    base_ref: pr.base.ref,
+                    head_ref: pr.head.ref,
+                    additions: pr.additions ?? 0,
+                    deletions: pr.deletions ?? 0,
+                    changed_files: pr.changed_files ?? 0,
+                    created_at: pr.created_at,
+                    closed_at: pr.closed_at,
+                    merged_at: pr.merged_at,
+                    updated_at: pr.updated_at,
+                });
+            }
+
+            if (stopped || data.length < 100) break;
+            page++;
+        }
+
+        if (page > MAX_PAGES) {
+            console.warn(`[github] Hit max page cap (${MAX_PAGES}) for pulls ${owner}/${repo} — some PRs may be missing`);
+        }
+
+        console.log(
+            `[github] GET pulls for ${owner}/${repo} (state=${state}) → ${allPulls.length} PRs` +
+            (stopped ? ` (incremental, stopped at high-water mark)` : ``)
+        );
 
         // Enrich PRs that are missing file stats
         const CONCURRENCY = 3;
-        const toEnrich = mapped.filter((pr) => pr.additions === 0 && pr.deletions === 0);
-        if (toEnrich.length > 0) console.log(`[github] Enriching ${toEnrich.length}/${mapped.length} PRs with file stats for ${owner}/${repo}`);
+        const toEnrich = allPulls.filter((pr) => pr.additions === 0 && pr.deletions === 0);
+        if (toEnrich.length > 0) console.log(`[github] Enriching ${toEnrich.length}/${allPulls.length} PRs with file stats for ${owner}/${repo}`);
         for (let i = 0; i < toEnrich.length; i += CONCURRENCY) {
             // Guard rate limit before each enrichment batch
             await guardRateLimit(octokit);
@@ -395,7 +440,7 @@ export async function fetchPullRequests(
             }
         }
 
-        return mapped;
+        return allPulls;
     } catch (error) {
         throw githubApiError(`list PRs for ${owner}/${repo}`, error);
     }

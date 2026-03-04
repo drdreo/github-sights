@@ -49,9 +49,9 @@ export function mapRepoRow(
         forks_count: row.forks_count,
         open_issues_count: row.open_issues_count,
         default_branch: row.default_branch ?? "main",
-        created_at: row.created_at ?? "",
-        updated_at: row.updated_at ?? "",
-        pushed_at: row.pushed_at ?? "",
+        created_at: row.created_at?.toISOString() ?? "",
+        updated_at: row.updated_at?.toISOString() ?? "",
+        pushed_at: row.pushed_at?.toISOString() ?? "",
         fork: row.is_fork,
         owner,
     };
@@ -65,7 +65,7 @@ export function mapCommitRow(row: CommitEventRow, repoName?: string, avatars?: M
     const author: CommitAuthor = {
         name: row.author_login ?? "Unknown",
         email: "",
-        date: row.committed_at,
+        date: row.committed_at.toISOString(),
         login: row.author_login ?? undefined,
         avatar_url: avatarUrl,
     };
@@ -74,7 +74,7 @@ export function mapCommitRow(row: CommitEventRow, repoName?: string, avatars?: M
     const committer: CommitAuthor = {
         name: row.committer_login ?? row.author_login ?? "Unknown",
         email: "",
-        date: row.committed_at,
+        date: row.committed_at.toISOString(),
         login: row.committer_login ?? undefined,
         avatar_url: committerAvatar,
     };
@@ -111,10 +111,10 @@ export function mapPrRow(row: PrEventRow, avatars?: Map<string, string>): PullRe
         state: row.state,
         html_url: row.html_url ?? "",
         user,
-        created_at: row.created_at,
-        updated_at: row.created_at, // pr_event doesn't track updated_at separately
-        closed_at: row.closed_at,
-        merged_at: row.merged_at,
+        created_at: row.created_at.toISOString(),
+        updated_at: row.created_at.toISOString(), // pr_event doesn't track updated_at separately
+        closed_at: row.closed_at?.toISOString() ?? null,
+        merged_at: row.merged_at?.toISOString() ?? null,
         draft: row.is_draft,
         additions: row.additions,
         deletions: row.deletions,

@@ -11,8 +11,8 @@ export interface OwnerRow {
     type: "user" | "org";
     avatar_url: string | null;
     html_url: string | null;
-    last_synced_at: string | null;
-    created_at: string;
+    last_synced_at: Date | null;
+    created_at: Date;
 }
 
 export interface RepositoryMetaRow {
@@ -29,9 +29,9 @@ export interface RepositoryMetaRow {
     stargazers_count: number;
     forks_count: number;
     open_issues_count: number;
-    created_at: string | null;
-    updated_at: string | null;
-    pushed_at: string | null;
+    created_at: Date | null;
+    updated_at: Date | null;
+    pushed_at: Date | null;
 }
 
 export interface ContributorProfileRow {
@@ -40,14 +40,14 @@ export interface ContributorProfileRow {
     html_url: string | null;
     name: string | null;
     email: string | null;
-    updated_at: string;
+    updated_at: Date;
 }
 
 export interface OwnerConfigRow {
     owner: string;
     token: string;
     owner_type: "user" | "org";
-    updated_at: string;
+    updated_at: Date;
 }
 
 // ── Layer 2: Events ──────────────────────────────────────────────────────────────
@@ -59,10 +59,10 @@ export interface CommitEventRow {
     committer_login: string | null;
     message: string | null;
     html_url: string | null;
-    committed_at: string;
+    committed_at: Date;
     additions: number;
     deletions: number;
-    ingested_at: string;
+    ingested_at: Date;
 }
 
 export interface PrEventRow {
@@ -79,10 +79,10 @@ export interface PrEventRow {
     additions: number;
     deletions: number;
     changed_files: number;
-    created_at: string;
-    closed_at: string | null;
-    merged_at: string | null;
-    ingested_at: string;
+    created_at: Date;
+    closed_at: Date | null;
+    merged_at: Date | null;
+    ingested_at: Date;
 }
 
 export interface WorkflowEventRow {
@@ -97,8 +97,8 @@ export interface WorkflowEventRow {
     head_branch: string | null;
     head_sha: string | null;
     duration_seconds: number | null;
-    created_at: string;
-    ingested_at: string;
+    created_at: Date;
+    ingested_at: Date;
 }
 
 // ── Layer 3: Snapshots ───────────────────────────────────────────────────────────
@@ -124,8 +124,8 @@ export interface OwnerSnapshotRow {
     total_prs: number;
     open_prs: number;
     merged_prs: number;
-    total_additions: number;
-    total_deletions: number;
+    total_additions: string;
+    total_deletions: string;
     unique_contributors: number;
     most_active_repo_name: string | null;
     most_active_repo_commits: number;
@@ -137,7 +137,7 @@ export interface OwnerSnapshotRow {
     total_workflow_runs: number;
     workflow_success_rate: number;
     avg_workflow_duration: number;
-    computed_at: string;
+    computed_at: Date;
 }
 
 export interface RepoSnapshotRow {
@@ -149,8 +149,8 @@ export interface RepoSnapshotRow {
     stargazers_count: number;
     forks_count: number;
     open_issues_count: number;
-    updated_at: string | null;
-    pushed_at: string | null;
+    updated_at: Date | null;
+    pushed_at: Date | null;
     total_commits: number;
     total_prs: number;
     open_prs: number;
@@ -162,7 +162,7 @@ export interface RepoSnapshotRow {
     ci_avg_duration_seconds: number;
     last_ci_conclusion: string | null;
     top_contributors: SnapshotContributor[];
-    computed_at: string;
+    computed_at: Date;
 }
 
 export interface ContributorSnapshotRow {
@@ -179,10 +179,10 @@ export interface ContributorSnapshotRow {
     repo_count: number;
     workflow_runs_triggered: number;
     workflow_failure_rate: number;
-    first_commit_at: string | null;
-    last_commit_at: string | null;
+    first_commit_at: Date | null;
+    last_commit_at: Date | null;
     active_days: number;
-    computed_at: string;
+    computed_at: Date;
 }
 
 export interface DailyActivityRow {
@@ -198,14 +198,14 @@ export interface DailyActivityRow {
     pr_closed: number;
     workflow_runs: number;
     workflow_failures: number;
-    computed_at: string;
+    computed_at: Date;
 }
 
 export interface SyncStateRow {
     owner_login: string;
     repo_id: number;
     resource_type: "commits" | "pulls" | "workflows";
-    last_synced_at: string;
+    last_synced_at: Date;
     last_cursor: string | null;
     error_count: number;
     last_error: string | null;
@@ -215,5 +215,5 @@ export interface SyncStateRow {
 
 export interface SchemaMigrationRow {
     name: string;
-    applied_at: string;
+    applied_at: Date;
 }

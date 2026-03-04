@@ -7,10 +7,11 @@
 //   - Error isolation: per-repo failures don't abort the entire sync
 
 import type { Octokit } from "octokit";
-import { createOctokit, refreshRateLimit, getRateLimitState } from "./github-client.ts";
-import { ingestOwner, type IngestOwnerResult } from "./ingest.ts";
-import { aggregateOwner, type AggregateResult } from "./aggregate.ts";
-import { getOwner } from "../db/queries/identity.ts";
+import { createOctokit, refreshRateLimit, getRateLimitState, type GitHubRepo } from "./github-client.ts";
+import { ingestOwner, ingestCommitsForRepo, ingestPRsForRepo, type IngestOwnerResult } from "./ingest.ts";
+import { aggregateOwner, aggregateRepo, type AggregateResult } from "./aggregate.ts";
+import { getOwner, getRepoByName } from "../db/queries/identity.ts";
+import type { RepositoryMetaRow } from "../db/types.ts";
 
 // ── Types ────────────────────────────────────────────────────────────────────────
 
@@ -27,11 +28,22 @@ export interface SyncOptions {
     until?: string;
     /** Skip aggregation (useful for partial syncs). Defaults to false. */
     skipAggregation?: boolean;
+    /** Sync mode: "shallow" fetches repos + PRs only, "deep" (default) also fetches commits. */
+    mode?: "shallow" | "deep";
+}
+
+export interface SyncRepoResult {
+    repo: string;
+    commits: number;
+    prs: number;
+    errors: string[];
+    durationMs: number;
 }
 
 // ── Inflight Tracking ────────────────────────────────────────────────────────────
 
 const inflight = new Map<string, Promise<SyncResult>>();
+const inflightRepo = new Map<string, Promise<SyncRepoResult>>();
 
 // ── Staleness Config ─────────────────────────────────────────────────────────────
 
@@ -86,23 +98,23 @@ export async function ensureFresh(
     const ownerRow = await getOwner(owner);
 
     if (!ownerRow?.last_synced_at) {
-        // Never synced — trigger sync
-        console.log(`[sync] ${owner} has never been synced, triggering sync`);
+        // Never synced — trigger shallow sync (PRs only, no commits)
+        console.log(`[sync] ${owner} has never been synced, triggering shallow sync`);
         // Fire and forget — don't block the read request
-        syncOwner(owner, token, ownerType).catch((err) => {
+        syncOwner(owner, token, ownerType, { mode: "shallow" }).catch((err) => {
             console.error(`[sync] Background sync failed for ${owner}:`, err);
         });
         return true;
     }
 
-    const lastSync = new Date(ownerRow.last_synced_at).getTime();
+    const lastSync = ownerRow.last_synced_at.getTime();
     const age = Date.now() - lastSync;
 
     if (age > staleMs) {
         console.log(
-            `[sync] ${owner} data is ${Math.round(age / 60000)}min old (threshold: ${Math.round(staleMs / 60000)}min), triggering sync`
+            `[sync] ${owner} data is ${Math.round(age / 60000)}min old (threshold: ${Math.round(staleMs / 60000)}min), triggering shallow sync`
         );
-        syncOwner(owner, token, ownerType).catch((err) => {
+        syncOwner(owner, token, ownerType, { mode: "shallow" }).catch((err) => {
             console.error(`[sync] Background sync failed for ${owner}:`, err);
         });
         return true;
@@ -146,6 +158,7 @@ async function doSync(
         since: options?.since,
         until: options?.until,
         skipAggregation: options?.skipAggregation,
+        mode: options?.mode,
     });
 
     const totalSynced = ingestResult.repos.reduce(
@@ -196,7 +209,127 @@ async function doSync(
     };
 }
 
-// ── Re-exports (barrel) ──────────────────────────────────────────────────────────
+// ── Single-Repo Deep Sync ────────────────────────────────────────────────────────
+
+/**
+ * Deep-sync a single repo: fetch commits + PRs, then rebuild its snapshot.
+ * Used when a user navigates to a repo detail page.
+ * Concurrent calls for the same repo coalesce.
+ */
+export async function syncRepo(
+    owner: string,
+    repoName: string,
+    token: string,
+    ownerType: "user" | "org"
+): Promise<SyncRepoResult> {
+    const key = `${owner}/${repoName}`.toLowerCase();
+
+    const existing = inflightRepo.get(key);
+    if (existing) {
+        console.log(`[sync] Coalescing duplicate repo sync for ${key}`);
+        return existing;
+    }
+
+    const promise = doSyncRepo(owner, repoName, token, ownerType);
+    inflightRepo.set(key, promise);
+    try {
+        return await promise;
+    } finally {
+        inflightRepo.delete(key);
+    }
+}
+
+async function doSyncRepo(
+    owner: string,
+    repoName: string,
+    token: string,
+    ownerType: "user" | "org"
+): Promise<SyncRepoResult> {
+    const start = Date.now();
+    console.log(`[sync] Starting deep sync for ${owner}/${repoName}`);
+
+    const octokit = createOctokit(token);
+    const initialBudget = await refreshRateLimit(octokit);
+    console.log(`[sync] Rate limit budget: ${initialBudget.remaining}/${initialBudget.limit} remaining`);
+
+    // Look up the repo in DB to get its GitHub ID
+    const repoRow = await getRepoByName(owner, repoName);
+    if (!repoRow) {
+        throw new Error(`Repository ${owner}/${repoName} not found in database. Run an owner sync first.`);
+    }
+
+    // Build the GitHubRepo shape needed by ingest functions
+    const ghRepo: GitHubRepo = {
+        id: repoRow.id,
+        name: repoRow.name,
+        full_name: repoRow.full_name,
+        description: repoRow.description,
+        html_url: repoRow.html_url ?? `https://github.com/${owner}/${repoName}`,
+        private: repoRow.is_private,
+        fork: repoRow.is_fork,
+        language: repoRow.language,
+        default_branch: repoRow.default_branch ?? "main",
+        stargazers_count: repoRow.stargazers_count,
+        forks_count: repoRow.forks_count,
+        open_issues_count: repoRow.open_issues_count,
+        created_at: repoRow.created_at?.toISOString() ?? new Date().toISOString(),
+        updated_at: repoRow.updated_at?.toISOString() ?? new Date().toISOString(),
+        pushed_at: repoRow.pushed_at?.toISOString() ?? new Date().toISOString(),
+        owner: {
+            login: owner,
+            avatar_url: "",
+            html_url: `https://github.com/${owner}`,
+        },
+    };
+
+    const errors: string[] = [];
+    let commitCount = 0;
+    let prCount = 0;
+
+    try {
+        const [commits, prs] = await Promise.all([
+            ingestCommitsForRepo(octokit, owner, ghRepo),
+            ingestPRsForRepo(octokit, owner, ghRepo),
+        ]);
+        commitCount = commits.inserted;
+        prCount = prs.upserted;
+    } catch (err) {
+        errors.push(String(err));
+        console.warn(`[sync] Failed repo sync for ${owner}/${repoName}:`, err);
+    }
+
+    // Rebuild repo snapshot
+    try {
+        const repoMeta: RepositoryMetaRow = {
+            id: repoRow.id,
+            owner_login: owner,
+            name: repoRow.name,
+            full_name: repoRow.full_name,
+            description: repoRow.description,
+            html_url: repoRow.html_url,
+            is_private: repoRow.is_private,
+            is_fork: repoRow.is_fork,
+            language: repoRow.language,
+            default_branch: repoRow.default_branch,
+            stargazers_count: repoRow.stargazers_count,
+            forks_count: repoRow.forks_count,
+            open_issues_count: repoRow.open_issues_count,
+            created_at: repoRow.created_at,
+            updated_at: repoRow.updated_at,
+            pushed_at: repoRow.pushed_at,
+        };
+        await aggregateRepo(owner, repoMeta);
+    } catch (err) {
+        console.warn(`[sync] Aggregation failed for ${owner}/${repoName} (non-fatal):`, err);
+    }
+
+    const durationMs = Date.now() - start;
+    console.log(`[sync] Completed repo sync for ${owner}/${repoName} in ${durationMs}ms (${commitCount} commits, ${prCount} PRs)`);
+
+    return { repo: repoName, commits: commitCount, prs: prCount, errors, durationMs };
+}
+
+// ── Re-exports (barrel) ────────────────────────────────────────────────────────────
 
 export { createOctokit, verifyToken, isRepoExcluded, LANGUAGE_COLORS, guardRateLimit, refreshRateLimit, getRateLimitState } from "./github-client.ts";
 export type { GitHubRepo, GitHubCommit, GitHubPR, RateLimitState } from "./github-client.ts";

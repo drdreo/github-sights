@@ -90,11 +90,13 @@ export function useCommitTimelines(owner: string, since?: string, until?: string
 }
 
 /**
- * Background sync hook — triggers a single incremental sync per owner.
+ * Background sync hook — triggers a single incremental SHALLOW sync per owner.
  *
- * Fires POST /api/sync/:owner to fill event tables from the high-water mark
- * to now. When complete, invalidates stats + timelines queries so they refetch
- * from the now-fresh DB.
+ * Fires POST /api/sync/:owner?mode=shallow to fill event tables with repos + PRs
+     * (no commits) from the high-water mark to now. When complete, invalidates stats +
+     * timelines queries so they refetch from the now-fresh DB.
+     *
+     * Commits are fetched on-demand server-side when a user views a repo detail page.
  *
  * Optionally accepts `since` (ISO date string) for initial syncs to control
  * how far back to crawl. Only used once per owner session.
@@ -107,7 +109,7 @@ export function useSync(owner: string, since?: string) {
     const syncedRef = useRef<string | null>(null);
 
     const syncMutation = useMutation({
-        mutationFn: () => api.sync(owner, since),
+        mutationFn: () => api.sync(owner, since, "shallow"),
         onSuccess: (result) => {
             console.log(
                 `[sync] Done: ${result.synced} events across ${result.repos.length} repos`

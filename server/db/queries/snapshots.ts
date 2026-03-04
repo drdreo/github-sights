@@ -85,8 +85,8 @@ export interface UpsertRepoSnapshotInput {
     stargazers_count: number;
     forks_count: number;
     open_issues_count: number;
-    updated_at: string | null;
-    pushed_at: string | null;
+    updated_at: Date | string | null;
+    pushed_at: Date | string | null;
     total_commits: number;
     total_prs: number;
     open_prs: number;
@@ -171,8 +171,8 @@ export interface UpsertContributorSnapshotInput {
     repo_count: number;
     workflow_runs_triggered: number;
     workflow_failure_rate: number;
-    first_commit_at: string | null;
-    last_commit_at: string | null;
+    first_commit_at: Date | string | null;
+    last_commit_at: Date | string | null;
     active_days: number;
 }
 

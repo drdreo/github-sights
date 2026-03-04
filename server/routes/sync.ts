@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { requireConfig } from "../config.ts";
 import { errorResponse } from "../errors.ts";
-import { syncOwner } from "../scraper/index.ts";
+import { syncOwner, syncRepo } from "../scraper/index.ts";
 
 const sync = new Hono();
 
@@ -16,12 +16,34 @@ sync.post("/api/sync/:owner", async (c) => {
         const config = requireConfig(owner);
         const since = c.req.query("since") || undefined;
         const until = c.req.query("until") || undefined;
-        const result = await syncOwner(owner, config.token, config.ownerType, { since, until });
+        const mode = (c.req.query("mode") as "shallow" | "deep" | undefined) || undefined;
+        const result = await syncOwner(owner, config.token, config.ownerType, { since, until, mode });
 
         // Return only the client-expected shape (strip aggregation + durationMs)
         return c.json({
             synced: result.synced,
             repos: result.repos,
+            errors: result.errors,
+        });
+    } catch (error) {
+        return errorResponse(c, error);
+    }
+});
+
+// ── POST /api/sync/:owner/:repo — Deep-sync a single repo ───────────────────
+//
+// Fetches commits + PRs for a specific repo and rebuilds its snapshot.
+// Used by repo detail pages to trigger on-demand deep sync.
+sync.post("/api/sync/:owner/:repo", async (c) => {
+    try {
+        const { owner, repo } = c.req.param();
+        const config = requireConfig(owner);
+        const result = await syncRepo(owner, repo, config.token, config.ownerType);
+
+        return c.json({
+            repo: result.repo,
+            commits: result.commits,
+            prs: result.prs,
             errors: result.errors,
         });
     } catch (error) {

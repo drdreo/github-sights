@@ -43,6 +43,13 @@ import type {
     PrEventRow,
 } from "../db/types.ts";
 
+// ── Helpers ──────────────────────────────────────────────────────────────────────
+
+/** Extract YYYY-MM-DD date string from a Date object. */
+function toDateString(d: Date): string {
+    return d.toISOString().split("T")[0];
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────────
 
 export interface AggregateResult {
@@ -162,24 +169,24 @@ function buildRepoDailyActivity(
 
     // Aggregate commits by date (count only — LOC comes from PRs)
     for (const c of commits) {
-        const date = c.committed_at.split("T")[0];
+        const date = toDateString(c.committed_at);
         ensureDate(date).commits++;
     }
 
     // Aggregate PRs by date
     for (const pr of prs) {
-        const createdDate = pr.created_at.split("T")[0];
+        const createdDate = toDateString(pr.created_at);
         ensureDate(createdDate).prOpened++;
 
         if (pr.merged_at) {
-            const mergedDate = pr.merged_at.split("T")[0];
+            const mergedDate = toDateString(pr.merged_at);
             const mergedEntry = ensureDate(mergedDate);
             mergedEntry.prMerged++;
             // LOC attributed to merge date (commit-level LOC is unavailable from GitHub list API)
             mergedEntry.additions += pr.additions;
             mergedEntry.deletions += pr.deletions;
         } else if (pr.closed_at) {
-            const closedDate = pr.closed_at.split("T")[0];
+            const closedDate = toDateString(pr.closed_at);
             ensureDate(closedDate).prClosed++;
         }
     }
@@ -279,7 +286,7 @@ async function rebuildOwnerDailyActivity(
     // Query all commits for the owner in one go (count only — LOC comes from merged PRs)
     const allCommits = await getCommitsByOwner(ownerLogin);
     for (const c of allCommits) {
-        const date = c.committed_at.split("T")[0];
+        const date = toDateString(c.committed_at);
         if (!ownerDateMap.has(date)) {
             ownerDateMap.set(date, {
                 owner_login: ownerLogin,
@@ -298,7 +305,7 @@ async function rebuildOwnerDailyActivity(
     for (const repo of repos) {
         const prs = await getPrsByRepo(repo.id);
         for (const pr of prs) {
-            const createdDate = pr.created_at.split("T")[0];
+            const createdDate = toDateString(pr.created_at);
             if (!ownerDateMap.has(createdDate)) {
                 ownerDateMap.set(createdDate, {
                     owner_login: ownerLogin,
@@ -313,7 +320,7 @@ async function rebuildOwnerDailyActivity(
             ownerDateMap.get(createdDate)!.pr_opened++;
 
             if (pr.merged_at) {
-                const mergedDate = pr.merged_at.split("T")[0];
+                const mergedDate = toDateString(pr.merged_at);
                 if (!ownerDateMap.has(mergedDate)) {
                     ownerDateMap.set(mergedDate, {
                         owner_login: ownerLogin,
@@ -331,7 +338,7 @@ async function rebuildOwnerDailyActivity(
                 mergedEntry.additions += pr.additions;
                 mergedEntry.deletions += pr.deletions;
             } else if (pr.closed_at) {
-                const closedDate = pr.closed_at.split("T")[0];
+                const closedDate = toDateString(pr.closed_at);
                 if (!ownerDateMap.has(closedDate)) {
                     ownerDateMap.set(closedDate, {
                         owner_login: ownerLogin,
@@ -377,8 +384,8 @@ async function rebuildContributorSnapshots(
         totalPRsMerged: number;
         repos: Set<string>;
         commitDates: Set<string>;
-        firstCommitAt: string | null;
-        lastCommitAt: string | null;
+        firstCommitAt: Date | null;
+        lastCommitAt: Date | null;
     }>();
 
     const ensureContrib = (login: string) => {
@@ -410,7 +417,7 @@ async function rebuildContributorSnapshots(
             const entry = ensureContrib(c.author_login);
             entry.totalCommits++;
             entry.repos.add(repo.name);
-            entry.commitDates.add(c.committed_at.split("T")[0]);
+            entry.commitDates.add(toDateString(c.committed_at));
 
             // Track first/last commit
             if (!entry.firstCommitAt || c.committed_at < entry.firstCommitAt) {
@@ -622,7 +629,7 @@ function calculateStreaks(commits: CommitEventRow[]): {
     // Count commits per date
     const dateCounts = new Map<string, number>();
     for (const commit of commits) {
-        const date = commit.committed_at.split("T")[0];
+        const date = toDateString(commit.committed_at);
         dateCounts.set(date, (dateCounts.get(date) ?? 0) + 1);
     }
 
