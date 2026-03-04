@@ -181,6 +181,86 @@ export async function aggregateOwnerActivity(
     ).then((rows) => rows[0] ?? null);
 }
 
+// ── Contributor Activity Aggregation ─────────────────────────────────────────────
+
+export interface ContributorActivityRow {
+    login: string;
+    avatar_url: string | null;
+    html_url: string | null;
+    total_commits: number;
+    total_additions: number;
+    total_deletions: number;
+    total_prs: number;
+    repos: string[];
+}
+
+/**
+ * Aggregate contributor stats from commit_event + pr_event for a date range.
+ * Used when the contributors page has a date filter applied.
+ */
+export async function aggregateContributorActivity(
+    owner: string,
+    since: string,
+    until: string
+): Promise<ContributorActivityRow[]> {
+    return query<ContributorActivityRow>(
+        `WITH commit_stats AS (
+            SELECT
+                ce.author_login AS login,
+                COUNT(*)::INTEGER AS total_commits,
+                COALESCE(SUM(ce.additions), 0)::BIGINT AS total_additions,
+                COALESCE(SUM(ce.deletions), 0)::BIGINT AS total_deletions,
+                ARRAY_AGG(DISTINCT rm.name) AS commit_repos
+            FROM commit_event ce
+            JOIN repository_meta rm ON rm.id = ce.repo_id
+            WHERE rm.owner_login = $1
+              AND ce.committed_at >= $2::TIMESTAMPTZ
+              AND ce.committed_at < ($3::TIMESTAMPTZ + INTERVAL '1 day')
+              AND ce.author_login IS NOT NULL
+            GROUP BY ce.author_login
+        ),
+        pr_stats AS (
+            SELECT
+                pe.author_login AS login,
+                COUNT(*)::INTEGER AS total_prs,
+                ARRAY_AGG(DISTINCT rm.name) AS pr_repos
+            FROM pr_event pe
+            JOIN repository_meta rm ON rm.id = pe.repo_id
+            WHERE rm.owner_login = $1
+              AND pe.created_at >= $2::TIMESTAMPTZ
+              AND pe.created_at < ($3::TIMESTAMPTZ + INTERVAL '1 day')
+              AND pe.author_login IS NOT NULL
+            GROUP BY pe.author_login
+        ),
+        combined AS (
+            SELECT COALESCE(c.login, p.login) AS login,
+                   COALESCE(c.total_commits, 0) AS total_commits,
+                   COALESCE(c.total_additions, 0) AS total_additions,
+                   COALESCE(c.total_deletions, 0) AS total_deletions,
+                   COALESCE(p.total_prs, 0) AS total_prs,
+                   c.commit_repos,
+                   p.pr_repos
+            FROM commit_stats c
+            FULL OUTER JOIN pr_stats p ON c.login = p.login
+        )
+        SELECT
+            combined.login,
+            cp.avatar_url,
+            cp.html_url,
+            combined.total_commits,
+            combined.total_additions,
+            combined.total_deletions,
+            combined.total_prs,
+            (SELECT ARRAY_AGG(DISTINCT r) FROM UNNEST(
+                COALESCE(combined.commit_repos, '{}') || COALESCE(combined.pr_repos, '{}')
+            ) AS r) AS repos
+        FROM combined
+        LEFT JOIN contributor_profile cp ON cp.login = combined.login
+        ORDER BY combined.total_commits DESC, combined.total_prs DESC`,
+        [owner, since, until]
+    );
+}
+
 /** Delete all daily_activity for an owner (used before full rebuild). */
 export async function clearDailyActivity(ownerLogin: string): Promise<void> {
     await execute(

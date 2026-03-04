@@ -1,5 +1,4 @@
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
-import { subDays } from "date-fns";
 import { ArrowLeft } from "lucide-react";
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
@@ -58,16 +57,19 @@ const columns: ColumnDef<ContributorOverview, any>[] = [
 ];
 
 export default function ContributorsPage() {
-    const [dateRange, setDateRange] = useState({
-        startDate: subDays(new Date(), 30),
-        endDate: new Date()
+    const [dateRange, setDateRange] = useState<{
+        startDate: Date | null;
+        endDate: Date | null;
+    }>({
+        startDate: null,
+        endDate: null
     });
 
     const owner = useOwner();
 
-    // Convert dates to ISO strings for the API
-    const since = dateRange.startDate.toISOString();
-    const until = dateRange.endDate.toISOString();
+    // Convert dates to ISO strings for the API (null = all time)
+    const since = dateRange.startDate?.toISOString() ?? undefined;
+    const until = dateRange.endDate?.toISOString() ?? undefined;
 
     const { data: contributorsResponse, isLoading } = useContributorOverview(owner, since, until);
     const contributors = contributorsResponse?.data;
@@ -102,6 +104,7 @@ export default function ContributorsPage() {
                         startDate={dateRange.startDate}
                         endDate={dateRange.endDate}
                         onChange={setDateRange}
+                        showAllTime
                     />
                 </div>
 

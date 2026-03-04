@@ -43,6 +43,38 @@ const getRepoColor = (repoName: string): string => {
     return LINE_COLORS[index];
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const CustomTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    const data = payload[0]?.payload;
+    return (
+        <div
+            style={{
+                backgroundColor: "rgba(17, 24, 39, 0.95)",
+                border: "1px solid #1f2937",
+                borderRadius: "0.5rem",
+                padding: "0.5rem 0.75rem",
+                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                color: "#f3f4f6",
+                fontSize: "0.8rem"
+            }}
+        >
+            <p style={{ color: "#e5e7eb", marginBottom: "0.25rem" }}>{label}</p>
+            {payload.map((entry: any) => (
+                <p key={entry.dataKey} style={{ color: entry.color, padding: 0, margin: 0 }}>
+                    {entry.name}: {entry.value}
+                </p>
+            ))}
+            {(data?.additions > 0 || data?.deletions > 0) && (
+                <p style={{ marginTop: "0.25rem", fontFamily: "monospace", fontSize: "0.75rem" }}>
+                    <span style={{ color: "#4ade80" }}>+{data.additions}</span>{" "}
+                    <span style={{ color: "#f87171" }}>-{data.deletions}</span>
+                </p>
+            )}
+        </div>
+    );
+};
+
 export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
     timelines,
     startDate,
@@ -72,6 +104,8 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
             };
 
             let total = 0;
+            let additions = 0;
+            let deletions = 0;
             timelines.forEach((timeline) => {
                 // Find activity for this specific day
                 const dayActivity = timeline.daily.find((d) => d.date === dayStr);
@@ -80,6 +114,16 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
                 // Add to total
                 total += count;
 
+                // Sum LoC from individual commits
+                if (dayActivity) {
+                    for (const commit of dayActivity.commits) {
+                        if (commit.stats) {
+                            additions += commit.stats.additions;
+                            deletions += commit.stats.deletions;
+                        }
+                    }
+                }
+
                 // If it's a top repo, add individual property
                 if (topRepoNamesSet.has(timeline.repo.name)) {
                     point[timeline.repo.name] = count;
@@ -87,6 +131,8 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
             });
 
             point.total = total;
+            point.additions = additions;
+            point.deletions = deletions;
             return point;
         });
 
@@ -152,17 +198,8 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
                     allowDecimals={false}
                 />
                 <Tooltip
-                    contentStyle={{
-                        backgroundColor: "rgba(17, 24, 39, 0.95)",
-                        borderColor: "#1f2937",
-                        color: "#f3f4f6",
-                        borderRadius: "0.5rem",
-                        boxShadow:
-                            "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)"
-                    }}
-                    itemStyle={{ padding: 0 }}
+                    content={<CustomTooltip />}
                     cursor={{ stroke: "#6b7280", strokeWidth: 1, strokeDasharray: "4 4" }}
-                    labelStyle={{ color: "#e5e7eb", marginBottom: "0.25rem" }}
                 />
                 <Legend
                     verticalAlign="bottom"
