@@ -33,12 +33,7 @@ sync.post("/api/sync/:owner", async (c) => {
         const ONE_HOUR = 60 * 60 * 1000;
         const triggered = await ensureFresh(owner, config.token, config.ownerType, ONE_HOUR);
 
-        return c.json({
-            synced: 0,
-            repos: [] as string[],
-            errors: [] as string[],
-            backgroundSync: triggered,
-        });
+        return c.json({ triggered });
     } catch (error) {
         return errorResponse(c, error);
     }

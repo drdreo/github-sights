@@ -135,17 +135,15 @@ export const api = {
         return fetchApi<OverviewStats>(`/stats/${owner}${qs ? `?${qs}` : ""}`);
     },
 
-    /** Trigger background sync — incremental from high-water mark to now.
-     *  Optionally pass `since` for initial/backfill syncs. */
+    /** Trigger sync — ensures data freshness (debounced to hourly).
+     *  Pass `since` for explicit backfill syncs. */
     sync: (owner: string, since?: string) => {
         const params = new URLSearchParams();
         if (since) params.append("since", since);
         const qs = params.toString();
-        return fetchApi<{ synced: number; repos: string[]; errors: string[]; backgroundSync?: boolean }>(
+        return fetchApi<{ triggered?: boolean; synced?: number; repos?: string[]; errors?: string[] }>(
             `/sync/${encodeURIComponent(owner)}${qs ? `?${qs}` : ""}`,
-            {
-                method: "POST"
-            }
+            { method: "POST" }
         );
     },
     getSyncProgress: (owner: string) =>
