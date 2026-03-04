@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
-import { useRepos, useCommitTimelines } from "../hooks/useGitHub";
+import { useRepos, useCommitTimelines, useRepoSnapshots } from "../hooks/useGitHub";
 import { useOwner } from "../hooks/useOwner";
 import { RepoGrid } from "../components/RepoGrid";
 import { FetchedAtBadge } from "../components/FetchedAtBadge";
@@ -16,6 +16,7 @@ export default function RepositoriesPage() {
     const repos = reposResponse?.data;
     const fetchedAt = reposResponse?.fetchedAt;
     const { data: timelines } = useCommitTimelines(owner);
+    const { data: snapshots } = useRepoSnapshots(owner);
 
 
     const sortedRepos = useMemo(() => {
@@ -33,6 +34,17 @@ export default function RepositoriesPage() {
         if (!timelines) return new Map<string, number>();
         return new Map(timelines.map((t) => [t.repo.name, t.totalCommits]));
     }, [timelines]);
+
+    const snapshotStats = useMemo(() => {
+        if (!snapshots) return new Map();
+        return new Map(snapshots.map((s) => [s.name, {
+            totalPRs: s.totalPRs,
+            openPRs: s.openPRs,
+            mergedPRs: s.mergedPRs,
+            totalAdditions: s.totalAdditions,
+            totalDeletions: s.totalDeletions,
+        }]));
+    }, [snapshots]);
 
     return (
         <div className="min-h-screen bg-gray-950 p-8">
@@ -59,6 +71,7 @@ export default function RepositoriesPage() {
                     owner={owner}
                     loading={reposLoading}
                     commitCounts={commitCounts}
+                    snapshotStats={snapshotStats}
                 />
             </div>
         </div>

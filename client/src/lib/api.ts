@@ -85,6 +85,11 @@ export const api = {
 
     getRepo: (owner: string, repo: string) => fetchApi<Repository>(`/repos/${owner}/${repo}`),
 
+    getRepoSnapshots: (owner: string) =>
+        fetchApi<{ name: string; totalPRs: number; openPRs: number; mergedPRs: number; totalAdditions: number; totalDeletions: number }[]>(
+            `/repo-snapshots/${encodeURIComponent(owner)}`
+        ),
+
     getCommits: (
         owner: string,
         repo: string,

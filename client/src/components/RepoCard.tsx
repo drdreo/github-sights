@@ -1,9 +1,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
-import { ExternalLink, GitBranch, GitCommit, GitFork, Star } from "lucide-react";
+import { Code, ExternalLink, GitBranch, GitCommit, GitFork, GitPullRequest, Star } from "lucide-react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import type { Repository } from "../types";
+import type { RepoSnapshotStats } from "./RepoGrid";
 import { getLanguageColor } from "../lib/languageColors";
 
 function IconTooltip({ children, label }: { children: React.ReactNode; label: string }) {
@@ -23,13 +24,20 @@ function IconTooltip({ children, label }: { children: React.ReactNode; label: st
     );
 }
 
+function formatCompact(n: number): string {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+    return n.toString();
+}
+
 interface RepoCardProps {
     repo: Repository;
     owner: string;
     totalCommits?: number;
+    snapshot?: RepoSnapshotStats;
 }
 
-export function RepoCard({ repo, owner, totalCommits }: RepoCardProps) {
+export function RepoCard({ repo, owner, totalCommits, snapshot }: RepoCardProps) {
     return (
         <div
             className={`group relative bg-gray-900 rounded-xl border border-gray-800 hover:shadow-lg hover:shadow-black/20 hover:border-blue-500/30 transition-all duration-200 flex flex-col h-full ${repo.fork ? "opacity-60" : ""}`}
@@ -57,51 +65,66 @@ export function RepoCard({ repo, owner, totalCommits }: RepoCardProps) {
                     {repo.html_url && <div className="w-6 h-6 flex-shrink-0" />}
                 </div>
 
-                <p className="text-gray-400 text-sm mb-6 line-clamp-2 flex-grow">
-                    {repo.description || "No description provided"}
-                </p>
+                <div className="mb-4 flex-grow">
+                    <p className="text-gray-400 text-sm line-clamp-2">
+                        {repo.description || "No description provided"}
+                    </p>
+                    {repo.language && (
+                        <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-500">
+                            <span
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: getLanguageColor(repo.language) }}
+                            />
+                            <span>{repo.language}</span>
+                        </div>
+                    )}
+                </div>
 
-                <div className="flex items-center justify-between text-sm text-gray-400 pt-4 border-t border-gray-800 mt-auto">
-                    <div className="flex items-center gap-4">
-                        {repo.language && (
-                            <IconTooltip label="Primary language">
-                                <div className="flex items-center gap-1.5">
-                                    <span
-                                        className="w-2.5 h-2.5 rounded-full"
-                                        style={{ backgroundColor: getLanguageColor(repo.language) }}
-                                    />
-                                    <span>{repo.language}</span>
-                                </div>
-                            </IconTooltip>
-                        )}
-                        <IconTooltip label="Stars">
-                            <div className="flex items-center gap-1">
-                                <Star className="w-4 h-4" />
-                                <span>{repo.stargazers_count}</span>
-                            </div>
-                        </IconTooltip>
-                        <IconTooltip label="Forks">
-                            <div className="flex items-center gap-1">
-                                <GitFork className="w-4 h-4" />
-                                <span>{repo.forks_count}</span>
-                            </div>
-                        </IconTooltip>
-                        {totalCommits != null && totalCommits > 0 && (
-                            <IconTooltip label="Commits">
-                                <div className="flex items-center gap-1">
-                                    <GitCommit className="w-4 h-4" />
-                                    <span>{totalCommits}</span>
-                                </div>
-                            </IconTooltip>
-                        )}
-                    </div>
+                <div className="flex items-center text-xs text-gray-400 pt-3 border-t border-gray-800 mt-auto">
+                    {/* Repo stats */}
+                    <IconTooltip label="Stars">
+                        <div className="flex items-center gap-1">
+                            <Star className="w-3.5 h-3.5 text-gray-500" />
+                            <span>{formatCompact(repo.stargazers_count)}</span>
+                        </div>
+                    </IconTooltip>
+                    <span className="mx-1.5 text-gray-700">&middot;</span>
+                    <IconTooltip label="Forks">
+                        <div className="flex items-center gap-1">
+                            <GitFork className="w-3.5 h-3.5 text-gray-500" />
+                            <span>{formatCompact(repo.forks_count)}</span>
+                        </div>
+                    </IconTooltip>
+
+                    <span className="mx-2 h-3 w-px bg-gray-800" />
+
+                    {/* Activity stats */}
+                    <IconTooltip label="Pull Requests">
+                        <div className="flex items-center gap-1">
+                            <GitPullRequest className="w-3.5 h-3.5 text-gray-500" />
+                            <span>{formatCompact(snapshot?.totalPRs ?? 0)}</span>
+                        </div>
+                    </IconTooltip>
+                    <span className="mx-1.5 text-gray-700">&middot;</span>
+                    <IconTooltip label="Commits">
+                        <div className="flex items-center gap-1">
+                            <GitCommit className="w-3.5 h-3.5 text-gray-500" />
+                            <span>{formatCompact(totalCommits ?? 0)}</span>
+                        </div>
+                    </IconTooltip>
+                    <span className="mx-1.5 text-gray-700">&middot;</span>
+                    <IconTooltip label={snapshot ? `+${formatCompact(snapshot.totalAdditions)} / -${formatCompact(snapshot.totalDeletions)} lines` : "Lines changed"}>
+                        <div className="flex items-center gap-1">
+                            <Code className="w-3.5 h-3.5 text-gray-500" />
+                            <span>{formatCompact((snapshot?.totalAdditions ?? 0) + (snapshot?.totalDeletions ?? 0))}</span>
+                        </div>
+                    </IconTooltip>
+
                     {repo.updated_at && (
                         <IconTooltip
-                            label={
-                                "Last updated on " + format(new Date(repo.updated_at), "dd.MM.yyyy")
-                            }
+                            label={"Last updated on " + format(new Date(repo.updated_at), "dd.MM.yyyy")}
                         >
-                            <span className="text-xs text-gray-500">
+                            <span className="ml-auto text-gray-600">
                                 {format(new Date(repo.updated_at), "MMM d")}
                             </span>
                         </IconTooltip>

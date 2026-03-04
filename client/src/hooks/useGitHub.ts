@@ -34,6 +34,14 @@ export function useRepos(owner: string) {
     });
 }
 
+export function useRepoSnapshots(owner: string) {
+    return useQuery({
+        queryKey: ["repo-snapshots", owner],
+        queryFn: () => api.getRepoSnapshots(owner),
+        enabled: !!owner
+    });
+}
+
 export function useRepo(owner: string, repo: string) {
     return useQuery({
         queryKey: ["repo", owner, repo],
@@ -118,6 +126,7 @@ export function useSync(owner: string, since?: string) {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["stats", owner] });
             queryClient.invalidateQueries({ queryKey: ["timelines", owner] });
+            queryClient.invalidateQueries({ queryKey: ["repo-snapshots", owner] });
         },
         onError: (error) => {
             console.error("[sync] Failed:", error);
