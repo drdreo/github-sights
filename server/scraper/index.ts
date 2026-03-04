@@ -29,8 +29,6 @@ export interface SyncOptions {
     until?: string;
     /** Skip aggregation (useful for partial syncs). Defaults to false. */
     skipAggregation?: boolean;
-    /** Sync mode: "shallow" fetches repos + PRs only, "deep" (default) also fetches commits. */
-    mode?: "shallow" | "deep";
 }
 
 export interface SyncRepoResult {
@@ -99,10 +97,10 @@ export async function ensureFresh(
     const ownerRow = await getOwner(owner);
 
     if (!ownerRow?.last_synced_at) {
-        // Never synced — trigger shallow sync (PRs only, no commits)
-        console.log(`[sync] ${owner} has never been synced, triggering shallow sync`);
+        // Never synced — trigger background sync
+        console.log(`[sync] ${owner} has never been synced, triggering background sync`);
         // Fire and forget — don't block the read request
-        syncOwner(owner, token, ownerType, { mode: "shallow" }).catch((err) => {
+        syncOwner(owner, token, ownerType).catch((err) => {
             console.error(`[sync] Background sync failed for ${owner}:`, err);
         });
         return true;
@@ -113,9 +111,9 @@ export async function ensureFresh(
 
     if (age > staleMs) {
         console.log(
-            `[sync] ${owner} data is ${Math.round(age / 60000)}min old (threshold: ${Math.round(staleMs / 60000)}min), triggering shallow sync`
+            `[sync] ${owner} data is ${Math.round(age / 60000)}min old (threshold: ${Math.round(staleMs / 60000)}min), triggering background sync`
         );
-        syncOwner(owner, token, ownerType, { mode: "shallow" }).catch((err) => {
+        syncOwner(owner, token, ownerType).catch((err) => {
             console.error(`[sync] Background sync failed for ${owner}:`, err);
         });
         return true;
@@ -162,7 +160,6 @@ async function doSync(
         since: options?.since,
         until: options?.until,
         skipAggregation: options?.skipAggregation,
-        mode: options?.mode,
         onProgress: (update) => {
             updateProgress(owner, {
                 status: "syncing_repos",

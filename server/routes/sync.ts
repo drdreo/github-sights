@@ -3,7 +3,7 @@ import { clearConfig } from "../config.ts";
 import { requireConfig } from "../config.ts";
 import { errorResponse } from "../errors.ts";
 import { deleteOwnerData } from "../db/queries/identity.ts";
-import { syncOwner, syncRepo, getProgress } from "../scraper/index.ts";
+import { syncOwner, syncRepo, ensureFresh, getProgress } from "../scraper/index.ts";
 
 const sync = new Hono();
 
@@ -18,14 +18,26 @@ sync.post("/api/sync/:owner", async (c) => {
         const config = requireConfig(owner);
         const since = c.req.query("since") || undefined;
         const until = c.req.query("until") || undefined;
-        const mode = (c.req.query("mode") as "shallow" | "deep" | undefined) || undefined;
-        const result = await syncOwner(owner, config.token, config.ownerType, { since, until, mode });
 
-        // Return only the client-expected shape (strip aggregation + durationMs)
+        // Explicit backfill (since/until provided): always run full sync
+        if (since || until) {
+            const result = await syncOwner(owner, config.token, config.ownerType, { since, until });
+            return c.json({
+                synced: result.synced,
+                repos: result.repos,
+                errors: result.errors,
+            });
+        }
+
+        // Normal dashboard sync: debounce to once per hour
+        const ONE_HOUR = 60 * 60 * 1000;
+        const triggered = await ensureFresh(owner, config.token, config.ownerType, ONE_HOUR);
+
         return c.json({
-            synced: result.synced,
-            repos: result.repos,
-            errors: result.errors,
+            synced: 0,
+            repos: [] as string[],
+            errors: [] as string[],
+            backgroundSync: triggered,
         });
     } catch (error) {
         return errorResponse(c, error);

@@ -6,6 +6,19 @@
 
 import { Octokit } from "octokit";
 import { githubApiError } from "../errors.ts";
+
+/**
+ * Sanitize a date string into a valid GitHub GitTimestamp (ISO-8601 without milliseconds).
+ * Returns null if the input is falsy or unparseable.
+ */
+function toGitTimestamp(value: string | null | undefined): string | null {
+    if (!value) return null;
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return null;
+    // GitHub GitTimestamp rejects milliseconds — strip them
+    return d.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────────
 
 export interface GitHubRepo {
@@ -401,8 +414,8 @@ export async function fetchCommits(
             const response: any = await octokit.graphql(COMMITS_GRAPHQL_QUERY, {
                 owner,
                 repo,
-                since: options?.since || null,
-                until: options?.until || null,
+                since: toGitTimestamp(options?.since),
+                until: toGitTimestamp(options?.until),
                 after: cursor,
             });
 
@@ -453,7 +466,6 @@ export async function fetchPullRequests(
     owner: string,
     repo: string,
     state: "all" | "open" | "closed" = "all",
-    _options?: { since?: string }
 ): Promise<GitHubPR[]> {
     try {
         await guardRateLimit(octokit);

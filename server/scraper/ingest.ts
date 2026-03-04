@@ -197,13 +197,7 @@ export async function ingestCommitsForRepo(
 
 /**
  * Ingest PRs for a single repo.
- *
- * Strategy:
- *   - First sync (no high-water mark): fetch ALL PRs.
- *   - Incremental sync: fetch all OPEN PRs (they can always change) +
- *     recently CLOSED/MERGED PRs (updated since last sync). This ensures we
- *     never miss state changes on open PRs, while merged PRs (immutable) are
- *     only re-fetched if they were updated since the last sync.
+ * Fetches all PRs and upserts them (idempotent).
  */
 export async function ingestPRsForRepo(
     octokit: Octokit,
@@ -213,45 +207,17 @@ export async function ingestPRsForRepo(
     const repoId = repo.id;
     const repoName = repo.name;
 
-    // Read PR high-water mark to determine sync strategy
-    const syncState = await getSyncState(owner, repoId, "pulls");
-    const since = syncState?.last_synced_at?.toISOString() ?? undefined;
-
-    let ghPRs: GitHubPR[];
-
-    if (!since) {
-        // First sync: fetch everything
-        ghPRs = await fetchPullRequests(octokit, owner, repoName, "all");
-    } else {
-        // Incremental sync:
-        //   1. All open PRs (they can receive reviews, comments, status changes at any time)
-        //   2. Recently closed/merged PRs (updated since last sync — catches new merges)
-        const [openPRs, closedPRs] = await Promise.all([
-            fetchPullRequests(octokit, owner, repoName, "open"),
-            fetchPullRequests(octokit, owner, repoName, "closed", { since }),
-        ]);
-
-        // Deduplicate by PR id (shouldn't overlap between open/closed, but safety first)
-        const seen = new Set<number>();
-        ghPRs = [];
-        for (const pr of [...openPRs, ...closedPRs]) {
-            if (!seen.has(pr.id)) {
-                seen.add(pr.id);
-                ghPRs.push(pr);
-            }
-        }
-
-        console.log(`[ingest] ${owner}/${repoName}: incremental PR sync — ${openPRs.length} open + ${closedPRs.length} recently closed = ${ghPRs.length} total`);
-    }
+    // Fetch all PRs — the since filter was never actually applied to the GraphQL query,
+    // and PRs are upserted (idempotent), so fetching all is correct and uses one API call
+    // instead of two parallel calls that together fetch the same set.
+    const ghPRs = await fetchPullRequests(octokit, owner, repoName, "all");
 
     if (ghPRs.length === 0) {
         await advanceSyncState(owner, repoId, "pulls", new Date().toISOString());
         return { repoName, repoId, upserted: 0 };
     }
 
-    if (!since) {
-        console.log(`[ingest] ${owner}/${repoName}: fetched ${ghPRs.length} PRs (full history)`);
-    }
+    console.log(`[ingest] ${owner}/${repoName}: fetched ${ghPRs.length} PRs`);
 
     // Map to DB shape
     const prInputs: InsertPrInput[] = ghPRs.map((pr) => ({
@@ -287,21 +253,19 @@ export async function ingestPRsForRepo(
 // ── Full Owner Ingestion ─────────────────────────────────────────────────────────
 
 /**
- * Ingest all data for an owner: repos → commits + PRs per repo.
+ * Ingest all data for an owner: repos → PRs per repo.
  * Processes repos in batches with controlled concurrency.
- * In "shallow" mode, only repos + PRs are fetched (no commits).
- * In "deep" mode (default), commits + PRs are both fetched.
+ * Commits are fetched on-demand per repo via syncRepo().
  */
 export async function ingestOwner(
     octokit: Octokit,
     owner: string,
     ownerType: "user" | "org",
-    options?: { since?: string; until?: string; skipAggregation?: boolean; mode?: "shallow" | "deep"; onProgress?: (update: { syncedRepos: number; totalRepos: number; currentRepo: string; totalEvents: number }) => void }
+    options?: { since?: string; until?: string; skipAggregation?: boolean; onProgress?: (update: { syncedRepos: number; totalRepos: number; currentRepo: string; totalEvents: number }) => void }
 ): Promise<IngestOwnerResult> {
     // Step 1: Ingest repos
     const { repos } = await ingestRepos(octokit, owner, ownerType);
-    const mode = options?.mode ?? "deep";
-    console.log(`[ingest] ${owner}: starting ${mode} ingestion for ${repos.length} repos (concurrency=${CONCURRENCY})`);
+    console.log(`[ingest] ${owner}: starting ingestion for ${repos.length} repos (concurrency=${CONCURRENCY})`);
 
     const results: IngestOwnerResult["repos"] = [];
     const errors: string[] = [];
@@ -311,13 +275,6 @@ export async function ingestOwner(
         const batch = repos.slice(i, i + CONCURRENCY);
         const batchResults = await Promise.allSettled(
             batch.map(async (repo) => {
-                if (mode === "shallow") {
-                    // Shallow: PRs only (no commits)
-                    const prs = await ingestPRsForRepo(octokit, owner, repo);
-                    const commits: IngestCommitsResult = { repoName: repo.name, repoId: repo.id, inserted: 0, since: null, until: new Date().toISOString() };
-                    return { name: repo.name, repoGh: repo, commits, prs };
-                }
-                // Deep: commits + PRs in parallel
                 const [commits, prs] = await Promise.all([
                     ingestCommitsForRepo(octokit, owner, repo, options),
                     ingestPRsForRepo(octokit, owner, repo),
