@@ -1,5 +1,5 @@
 import React from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Trash2 } from "lucide-react";
 import { TimeRangeSelector } from "./TimeRangeSelector";
 import type { SyncProgressResponse } from "../lib/api";
 
@@ -14,6 +14,7 @@ interface DashboardHeaderProps {
     syncProgress?: SyncProgressResponse;
     dateRange: DateRange;
     onDateRangeChange: (range: DateRange) => void;
+    onDelete?: () => void;
 }
 
 function formatEvents(n: number): string {
@@ -61,7 +62,8 @@ export function DashboardHeader({
     isSyncing,
     syncProgress,
     dateRange,
-    onDateRangeChange
+    onDateRangeChange,
+    onDelete
 }: DashboardHeaderProps) {
     return (
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -77,11 +79,22 @@ export function DashboardHeader({
                     </div>
                 )}
             </div>
-            <TimeRangeSelector
-                startDate={dateRange.startDate}
-                endDate={dateRange.endDate}
-                onChange={onDateRangeChange}
-            />
+            <div className="flex items-center gap-3">
+                <TimeRangeSelector
+                    startDate={dateRange.startDate}
+                    endDate={dateRange.endDate}
+                    onChange={onDateRangeChange}
+                />
+                {onDelete && (
+                    <button
+                        onClick={onDelete}
+                        title="Delete all owner data"
+                        className="p-2 text-gray-500 hover:text-red-400 transition-colors rounded-lg hover:bg-gray-800"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </button>
+                )}
+            </div>
         </div>
     );
 }

@@ -156,5 +156,10 @@ export const api = {
     deleteConfig: (owner: string) =>
         fetchApi<{ configured: false }>(`/config/${encodeURIComponent(owner)}`, {
             method: "DELETE"
+        }),
+
+    deleteOwnerData: (owner: string) =>
+        fetchApi<{ deleted: boolean; owner: string }>(`/owner/${encodeURIComponent(owner)}`, {
+            method: "DELETE"
         })
 };

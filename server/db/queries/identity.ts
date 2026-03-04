@@ -221,6 +221,22 @@ export async function getContributor(login: string): Promise<ContributorProfileR
     );
 }
 
+/**
+ * Delete all data for an owner: contributor_snapshot, daily_activity (no FK cascade),
+ * then the owner row itself (cascades to repos, events, snapshots, sync_state, config).
+ * Returns true if the owner existed.
+ */
+export async function deleteOwnerData(owner: string): Promise<boolean> {
+    let deleted = false;
+    await transaction(async (client) => {
+        await client.query("DELETE FROM contributor_snapshot WHERE owner_login = $1", [owner]);
+        await client.query("DELETE FROM daily_activity WHERE owner_login = $1", [owner]);
+        const result = await client.query("DELETE FROM owner WHERE LOWER(login) = LOWER($1)", [owner]);
+        deleted = (result.rowCount ?? 0) > 0;
+    });
+    return deleted;
+}
+
 /** Batch-fetch avatar URLs for a set of logins. Returns a Map<login, avatar_url>. */
 export async function getAvatarsByLogins(logins: string[]): Promise<Map<string, string>> {
     if (logins.length === 0) return new Map();
