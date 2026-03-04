@@ -19,6 +19,16 @@ interface BulkCommitEntry {
     commits: Commit[];
 }
 
+export interface SyncProgressResponse {
+    active: boolean;
+    status?: "fetching_repos" | "syncing_repos" | "aggregating" | "complete" | "error";
+    totalRepos?: number;
+    syncedRepos?: number;
+    currentRepo?: string | null;
+    totalEvents?: number;
+    elapsedMs?: number;
+}
+
 const API_BASE = `${import.meta.env.VITE_API_BASE_URL ?? ""}/api`;
 
 class ApiError extends Error {
@@ -140,6 +150,9 @@ export const api = {
             }
         );
     },
+    getSyncProgress: (owner: string) =>
+        fetchApi<SyncProgressResponse>(`/sync/progress/${encodeURIComponent(owner)}`),
+
     deleteConfig: (owner: string) =>
         fetchApi<{ configured: false }>(`/config/${encodeURIComponent(owner)}`, {
             method: "DELETE"

@@ -12,6 +12,7 @@ import { ingestOwner, ingestCommitsForRepo, ingestPRsForRepo, type IngestOwnerRe
 import { aggregateOwner, aggregateRepo, type AggregateResult } from "./aggregate.ts";
 import { getOwner, getRepoByName } from "../db/queries/identity.ts";
 import type { RepositoryMetaRow } from "../db/types.ts";
+import { initProgress, updateProgress, clearProgress } from "./progress.ts";
 
 // ── Types ────────────────────────────────────────────────────────────────────────
 
@@ -151,6 +152,9 @@ async function doSync(
     const initialBudget = await refreshRateLimit(octokit);
     console.log(`[sync] Rate limit budget: ${initialBudget.remaining}/${initialBudget.limit} remaining (resets ${initialBudget.resetAt.toISOString()})`);
 
+    // Initialize progress tracking
+    initProgress(owner);
+
     // Step 1: Ingest from GitHub into event tables
     // Per-repo aggregation happens inside ingestOwner() — each repo's snapshot
     // is built immediately after its commits+PRs are ingested.
@@ -159,6 +163,15 @@ async function doSync(
         until: options?.until,
         skipAggregation: options?.skipAggregation,
         mode: options?.mode,
+        onProgress: (update) => {
+            updateProgress(owner, {
+                status: "syncing_repos",
+                syncedRepos: update.syncedRepos,
+                totalRepos: update.totalRepos,
+                currentRepo: update.currentRepo,
+                totalEvents: update.totalEvents,
+            });
+        },
     });
 
     const totalSynced = ingestResult.repos.reduce(
@@ -177,6 +190,7 @@ async function doSync(
     console.log(`[sync] Rate limit budget after ingestion: ${postIngestBudget.remaining}/${postIngestBudget.limit} remaining`);
 
     // Step 2: Aggregate events into snapshots
+    updateProgress(owner, { status: "aggregating" });
     let aggregation: AggregateResult;
 
     if (options?.skipAggregation) {
@@ -199,6 +213,10 @@ async function doSync(
 
     const durationMs = Date.now() - start;
     console.log(`[sync] Completed sync for ${owner} in ${durationMs}ms`);
+
+    // Mark complete and clear after 30s
+    updateProgress(owner, { status: "complete" });
+    setTimeout(() => clearProgress(owner), 30_000);
 
     return {
         synced: totalSynced,
@@ -337,3 +355,5 @@ export { ingestOwner, ingestRepos, ingestCommitsForRepo, ingestPRsForRepo } from
 export type { IngestOwnerResult, IngestCommitsResult, IngestPRsResult } from "./ingest.ts";
 export { aggregateOwner, aggregateRepo } from "./aggregate.ts";
 export type { AggregateResult } from "./aggregate.ts";
+export { getProgress } from "./progress.ts";
+export type { SyncProgress } from "./progress.ts";

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { requireConfig } from "../config.ts";
 import { errorResponse } from "../errors.ts";
-import { syncOwner, syncRepo } from "../scraper/index.ts";
+import { syncOwner, syncRepo, getProgress } from "../scraper/index.ts";
 
 const sync = new Hono();
 
@@ -49,6 +49,24 @@ sync.post("/api/sync/:owner/:repo", async (c) => {
     } catch (error) {
         return errorResponse(c, error);
     }
+});
+
+// ── GET /api/sync/progress/:owner — Poll sync progress ──────────────────────
+sync.get("/api/sync/progress/:owner", (c) => {
+    const { owner } = c.req.param();
+    const progress = getProgress(owner);
+    if (!progress) {
+        return c.json({ active: false });
+    }
+    return c.json({
+        active: true,
+        status: progress.status,
+        totalRepos: progress.totalRepos,
+        syncedRepos: progress.syncedRepos,
+        currentRepo: progress.currentRepo,
+        totalEvents: progress.totalEvents,
+        elapsedMs: Date.now() - progress.startedAt,
+    });
 });
 
 export { sync };

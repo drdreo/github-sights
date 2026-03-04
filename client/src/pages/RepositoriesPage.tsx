@@ -6,6 +6,7 @@ import { useRepos, useCommitTimelines } from "../hooks/useGitHub";
 import { useOwner } from "../hooks/useOwner";
 import { RepoGrid } from "../components/RepoGrid";
 import { FetchedAtBadge } from "../components/FetchedAtBadge";
+import { SyncBanner } from "../components/SyncBanner";
 
 
 export default function RepositoriesPage() {
@@ -50,7 +51,7 @@ export default function RepositoriesPage() {
                         <span className="text-gray-500 font-normal text-xl">/ Repositories</span>
                         {fetchedAt && <FetchedAtBadge fetchedAt={fetchedAt} />}
                     </h1>
-
+                    <SyncBanner owner={owner} />
                 </div>
 
                 <RepoGrid

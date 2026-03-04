@@ -296,7 +296,7 @@ export async function ingestOwner(
     octokit: Octokit,
     owner: string,
     ownerType: "user" | "org",
-    options?: { since?: string; until?: string; skipAggregation?: boolean; mode?: "shallow" | "deep" }
+    options?: { since?: string; until?: string; skipAggregation?: boolean; mode?: "shallow" | "deep"; onProgress?: (update: { syncedRepos: number; totalRepos: number; currentRepo: string; totalEvents: number }) => void }
 ): Promise<IngestOwnerResult> {
     // Step 1: Ingest repos
     const { repos } = await ingestRepos(octokit, owner, ownerType);
@@ -342,6 +342,18 @@ export async function ingestOwner(
 
         const budget = getRateLimitState(octokit);
         console.log(`[ingest] ${owner}: batch ${Math.floor(i / CONCURRENCY) + 1}/${Math.ceil(repos.length / CONCURRENCY)} complete (API budget: ${budget.remaining}/${budget.limit})`);
+
+        // Report progress to caller
+        if (options?.onProgress) {
+            const totalEvents = results.reduce((sum, r) => sum + r.commits.inserted + r.prs.upserted, 0);
+            const lastRepo = batch[batch.length - 1];
+            options.onProgress({
+                syncedRepos: Math.min(i + CONCURRENCY, repos.length),
+                totalRepos: repos.length,
+                currentRepo: lastRepo?.name ?? "",
+                totalEvents,
+            });
+        }
 
         // Run progressive per-repo aggregation so snapshots are available immediately
         if (!options?.skipAggregation) {

@@ -11,6 +11,7 @@ import { FetchedAtBadge } from "../components/FetchedAtBadge";
 import { useContributorOverview } from "../hooks/useGitHub";
 import { useOwner } from "../hooks/useOwner";
 import { getContributorColumns } from "../lib/contributorColumns";
+import { SyncBanner } from "../components/SyncBanner";
 import type { ContributorOverview } from "../types";
 
 const columnHelper = createColumnHelper<ContributorOverview>();
@@ -95,7 +96,7 @@ export default function ContributorsPage() {
                             </span>
                             {fetchedAt && <FetchedAtBadge fetchedAt={fetchedAt} />}
                         </h1>
-
+                        <SyncBanner owner={owner} />
                     </div>
                     <TimeRangeSelector
                         startDate={dateRange.startDate}

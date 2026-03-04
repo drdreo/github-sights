@@ -8,6 +8,7 @@ import { StatCards } from "../components/StatCards";
 
 import { useCommitTimelines, useStats, useSync } from "../hooks/useGitHub";
 import { useOwner } from "../hooks/useOwner";
+import { useSyncProgress } from "../hooks/useSyncProgress";
 import { useSearchParams } from "react-router-dom";
 
 export default function DashboardPage() {
@@ -34,6 +35,7 @@ export default function DashboardPage() {
 
     // Background sync: incremental from high-water mark → now, then refreshes queries
     const { isSyncing } = useSync(owner, syncSince);
+    const { data: syncProgress } = useSyncProgress(owner, isSyncing);
 
     return (
         <div className="min-h-screen bg-gray-950">
@@ -42,6 +44,7 @@ export default function DashboardPage() {
                 <DashboardHeader
                     owner={owner}
                     isSyncing={isSyncing}
+                    syncProgress={syncProgress}
                     dateRange={dateRange}
                     onDateRangeChange={setDateRange}
                 />
