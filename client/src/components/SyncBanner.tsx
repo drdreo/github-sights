@@ -16,7 +16,7 @@ interface SyncBannerProps {
  * Use on pages that don't trigger syncs themselves (repos, contributors).
  */
 export function SyncBanner({ owner }: SyncBannerProps) {
-    const { data: progress } = useSyncProgress(owner, true);
+    const { data: progress } = useSyncProgress(owner);
 
     if (!progress?.active) return null;
 

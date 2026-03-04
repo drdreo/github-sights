@@ -41,9 +41,9 @@ export default function DashboardPage() {
     const [searchParams] = useSearchParams();
     const syncSince = searchParams.get("syncSince") || undefined;
 
-    // Background sync: incremental from high-water mark → now, then refreshes queries
-    const { isSyncing } = useSync(owner, syncSince);
-    const { data: syncProgress } = useSyncProgress(owner, isSyncing);
+    useSync(owner, syncSince);
+    const { data: syncProgress } = useSyncProgress(owner);
+    const isSyncing = syncProgress?.active ?? false;
 
     return (
         <div className="min-h-screen bg-gray-950">

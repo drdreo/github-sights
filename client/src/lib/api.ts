@@ -141,7 +141,7 @@ export const api = {
         const params = new URLSearchParams();
         if (since) params.append("since", since);
         const qs = params.toString();
-        return fetchApi<{ synced: number; repos: string[]; errors: string[] }>(
+        return fetchApi<{ synced: number; repos: string[]; errors: string[]; backgroundSync?: boolean }>(
             `/sync/${encodeURIComponent(owner)}${qs ? `?${qs}` : ""}`,
             {
                 method: "POST"

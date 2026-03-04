@@ -104,20 +104,18 @@ export function useCommitTimelines(owner: string, since?: string, until?: string
  * Date filtering is handled by the read queries (useStats, useCommitTimelines),
  * NOT by the sync. Changing the date picker should never re-trigger a sync.
  */
+/**
+ * Fire-and-forget freshness check.
+ * Triggers POST /api/sync/:owner once per owner to ensure data is fresh.
+ * Does NOT drive UI — use useSyncProgress for that.
+ */
 export function useSync(owner: string, since?: string) {
     const queryClient = useQueryClient();
     const syncedRef = useRef<string | null>(null);
 
     const syncMutation = useMutation({
         mutationFn: () => api.sync(owner, since),
-        onSuccess: (result) => {
-            console.log(
-                `[sync] Done: ${result.synced} events across ${result.repos.length} repos`
-            );
-            if (result.errors.length > 0) {
-                console.warn(`[sync] Errors:`, result.errors);
-            }
-            // Invalidate cached queries so they refetch from the now-fresh DB
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["stats", owner] });
             queryClient.invalidateQueries({ queryKey: ["timelines", owner] });
         },
@@ -128,20 +126,12 @@ export function useSync(owner: string, since?: string) {
 
     useEffect(() => {
         if (!owner) return;
-
-        // Only sync once per owner
         if (syncedRef.current === owner) return;
         if (syncMutation.isPending) return;
 
         syncedRef.current = owner;
         syncMutation.mutate();
     }, [owner]);
-
-    return {
-        isSyncing: syncMutation.isPending,
-        syncError: syncMutation.error,
-        syncResult: syncMutation.data
-    };
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────────
