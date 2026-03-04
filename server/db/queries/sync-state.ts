@@ -59,8 +59,8 @@ export async function advanceSyncState(
     lastCursor?: string | null
 ): Promise<void> {
     await execute(
-        `INSERT INTO sync_state (owner_login, repo_id, resource_type, last_synced_at, last_cursor, error_count)
-         VALUES ($1, $2, $3, $4, $5, 0)
+        `INSERT INTO sync_state (owner_login, repo_id, resource_type, last_synced_at, earliest_synced_at, last_cursor, error_count)
+         VALUES ($1, $2, $3, $4, $4, $5, 0)
          ON CONFLICT (owner_login, repo_id, resource_type) DO UPDATE SET
            last_synced_at = GREATEST(sync_state.last_synced_at, $4),
            last_cursor = COALESCE($5, sync_state.last_cursor),
@@ -68,6 +68,38 @@ export async function advanceSyncState(
            last_error = NULL`,
         [ownerLogin, repoId, resourceType, lastSyncedAt, lastCursor ?? null]
     );
+}
+
+/**
+ * Move the earliest_synced_at boundary backward (never forward).
+ * Used to track how far back we've fetched for backward gap detection.
+ */
+export async function retreatEarliestSynced(
+    ownerLogin: string,
+    repoId: number,
+    resourceType: "commits" | "pulls" | "workflows",
+    earliestSyncedAt: string
+): Promise<void> {
+    await execute(
+        `UPDATE sync_state
+         SET earliest_synced_at = LEAST(COALESCE(earliest_synced_at, $4), $4)
+         WHERE owner_login = $1 AND repo_id = $2 AND resource_type = $3`,
+        [ownerLogin, repoId, resourceType, earliestSyncedAt]
+    );
+}
+
+/** Get the earliest synced boundary for a repo + resource type. */
+export async function getEarliestSynced(
+    ownerLogin: string,
+    repoId: number,
+    resourceType: "commits" | "pulls" | "workflows"
+): Promise<string | null> {
+    const row = await queryOne<{ earliest_synced_at: Date | null }>(
+        `SELECT earliest_synced_at FROM sync_state
+         WHERE owner_login = $1 AND repo_id = $2 AND resource_type = $3`,
+        [ownerLogin, repoId, resourceType]
+    );
+    return row?.earliest_synced_at?.toISOString() ?? null;
 }
 
 /** Record a sync error for a resource. Increments error_count. */

@@ -47,6 +47,7 @@ export interface OwnerConfigRow {
     owner: string;
     token: string;
     owner_type: "user" | "org";
+    sync_since: Date | null;
     updated_at: Date;
 }
 
@@ -217,6 +218,7 @@ export interface SyncStateRow {
     repo_id: number;
     resource_type: "commits" | "pulls" | "workflows";
     last_synced_at: Date;
+    earliest_synced_at: Date | null;
     last_cursor: string | null;
     error_count: number;
     last_error: string | null;

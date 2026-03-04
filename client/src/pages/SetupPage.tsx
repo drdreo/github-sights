@@ -29,7 +29,7 @@ export default function SetupPage() {
         }
 
         try {
-            await setConfig.mutateAsync({ token, owner, ownerType });
+            await setConfig.mutateAsync({ token, owner, ownerType, syncSince });
             addRecentOwner(owner);
             navigate(`/${owner}/dashboard?syncSince=${syncSince}`);
         } catch (err) {

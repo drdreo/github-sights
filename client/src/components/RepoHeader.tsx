@@ -1,14 +1,30 @@
 import React from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Star, GitBranch, ExternalLink, Clock, AlertCircle } from "lucide-react";
-import type { Repository } from "../types";
+import { Star, GitBranch, ExternalLink, Clock, AlertCircle, GitCommit, GitPullRequest, GitMerge, Users, Code } from "lucide-react";
+import type { Repository, Commit, PullRequest, RepoContributorStat } from "../types";
 import { getLanguageColor } from "../lib/languageColors";
+
+function formatCompact(n: number): string {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+    return n.toString();
+}
 
 interface RepoHeaderProps {
     repository: Repository;
+    commits?: Commit[];
+    pulls?: PullRequest[];
+    contributors?: RepoContributorStat[];
 }
 
-export function RepoHeader({ repository }: RepoHeaderProps) {
+export function RepoHeader({ repository, commits, pulls, contributors }: RepoHeaderProps) {
+    const totalCommits = commits?.length ?? 0;
+    const totalPRs = pulls?.length ?? 0;
+    const mergedPRs = pulls?.filter((pr) => pr.merged_at).length ?? 0;
+    const totalContributors = contributors?.length ?? 0;
+    const totalAdditions = commits?.reduce((sum, c) => sum + (c.stats?.additions ?? 0), 0) ?? 0;
+    const totalDeletions = commits?.reduce((sum, c) => sum + (c.stats?.deletions ?? 0), 0) ?? 0;
+
     return (
         <div className="bg-gray-900 rounded-xl border border-gray-800 p-8 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
@@ -42,7 +58,7 @@ export function RepoHeader({ repository }: RepoHeaderProps) {
                     </a>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-6 mt-8 text-sm">
+                <div className="flex flex-wrap items-center gap-4 mt-8 text-sm">
                     {repository.language && (
                         <div className="flex items-center gap-2">
                             <span
@@ -55,26 +71,46 @@ export function RepoHeader({ repository }: RepoHeaderProps) {
                             <span className="font-medium text-gray-300">{repository.language}</span>
                         </div>
                     )}
-                    <div className="flex items-center gap-1.5 text-gray-400 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
+                    <div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
                         <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                        <span className="font-semibold text-gray-100">
-                            {repository.stargazers_count}
-                        </span>
+                        <span className="font-semibold text-gray-100">{formatCompact(repository.stargazers_count)}</span>
                         <span className="text-gray-500">stars</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-gray-400 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
+                    <div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
                         <GitBranch className="w-4 h-4 text-purple-500" />
-                        <span className="font-semibold text-gray-100">
-                            {repository.forks_count}
-                        </span>
+                        <span className="font-semibold text-gray-100">{formatCompact(repository.forks_count)}</span>
                         <span className="text-gray-500">forks</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-gray-400 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
+                    <div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
                         <AlertCircle className="w-4 h-4 text-green-500" />
-                        <span className="font-semibold text-gray-100">
-                            {repository.open_issues_count}
-                        </span>
+                        <span className="font-semibold text-gray-100">{formatCompact(repository.open_issues_count)}</span>
                         <span className="text-gray-500">issues</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
+                        <GitCommit className="w-4 h-4 text-blue-400" />
+                        <span className="font-semibold text-gray-100">{formatCompact(totalCommits)}</span>
+                        <span className="text-gray-500">commits</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
+                        <GitPullRequest className="w-4 h-4 text-cyan-400" />
+                        <span className="font-semibold text-gray-100">{formatCompact(totalPRs)}</span>
+                        <span className="text-gray-500">PRs</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
+                        <GitMerge className="w-4 h-4 text-purple-400" />
+                        <span className="font-semibold text-gray-100">{formatCompact(mergedPRs)}</span>
+                        <span className="text-gray-500">merged</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
+                        <Users className="w-4 h-4 text-orange-400" />
+                        <span className="font-semibold text-gray-100">{formatCompact(totalContributors)}</span>
+                        <span className="text-gray-500">contributors</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
+                        <Code className="w-4 h-4 text-green-400" />
+                        <span className="font-semibold text-green-400">+{formatCompact(totalAdditions)}</span>
+                        <span className="text-gray-600">/</span>
+                        <span className="font-semibold text-red-400">-{formatCompact(totalDeletions)}</span>
                     </div>
                     <div className="ml-auto text-gray-500 flex items-center gap-1.5">
                         <Clock className="w-4 h-4" />

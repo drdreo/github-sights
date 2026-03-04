@@ -124,6 +124,7 @@ export interface ApiConfig {
     token: string;
     owner: string;
     ownerType: "user" | "org";
+    syncSince?: string;
 }
 
 export interface DailyCommitActivity {

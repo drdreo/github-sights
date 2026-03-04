@@ -35,6 +35,8 @@ import {
     getSyncState,
     upsertSyncState,
     advanceSyncState,
+    retreatEarliestSynced,
+    getEarliestSynced,
     recordSyncError,
 } from "../db/queries/sync-state.ts";
 import { updateOwnerSyncedAt } from "../db/queries/identity.ts";
@@ -137,7 +139,7 @@ export async function ingestCommitsForRepo(
     octokit: Octokit,
     owner: string,
     repo: GitHubRepo,
-    options?: { since?: string; until?: string }
+    options?: { since?: string; until?: string; desiredSince?: string }
 ): Promise<IngestCommitsResult> {
     const repoId = repo.id;
     const repoName = repo.name;
@@ -162,37 +164,82 @@ export async function ingestCommitsForRepo(
         until: fetchUntil,
     });
 
+    let totalInserted = 0;
+
     if (ghCommits.length === 0) {
         // Only advance high-water mark forward, never backward (protects backfills)
         await advanceSyncState(owner, repoId, "commits", fetchUntil);
-        return { repoName, repoId, inserted: 0, since: fetchSince, until: fetchUntil };
+    } else {
+        console.log(`[ingest] ${owner}/${repoName}: fetched ${ghCommits.length} commits${fetchSince ? ` (since ${fetchSince.split('T')[0]})` : ' (full history)'}`);
+
+        // Map to DB shape
+        const commitInputs: InsertCommitInput[] = ghCommits.map((c) => ({
+            sha: c.sha,
+            repo_id: repoId,
+            author_login: c.author_login,
+            committer_login: c.committer_login,
+            message: c.message,
+            html_url: c.html_url,
+            committed_at: c.committed_at,
+            additions: c.additions,
+            deletions: c.deletions,
+        }));
+
+        totalInserted += await insertCommits(commitInputs);
+
+        // Extract and upsert contributor profiles from commit authors
+        const contributors = extractContributorsFromCommits(ghCommits);
+        await upsertContributors(contributors);
+
+        // Only advance high-water mark forward, never backward (protects backfills)
+        await advanceSyncState(owner, repoId, "commits", fetchUntil);
     }
 
-    console.log(`[ingest] ${owner}/${repoName}: fetched ${ghCommits.length} commits${fetchSince ? ` (since ${fetchSince.split('T')[0]})` : ' (full history)'}`);
+    // Track what the forward pass covered
+    if (fetchSince) {
+        await retreatEarliestSynced(owner, repoId, "commits", fetchSince);
+    }
 
-    // Map to DB shape
-    const commitInputs: InsertCommitInput[] = ghCommits.map((c) => ({
-        sha: c.sha,
-        repo_id: repoId,
-        author_login: c.author_login,
-        committer_login: c.committer_login,
-        message: c.message,
-        html_url: c.html_url,
-        committed_at: c.committed_at,
-        additions: c.additions,
-        deletions: c.deletions,
-    }));
+    // ── Backward gap detection ───────────────────────────────────────────────
+    const desiredSince = options?.desiredSince;
+    if (desiredSince) {
+        const earliestSynced = await getEarliestSynced(owner, repoId, "commits");
 
-    const inserted = await insertCommits(commitInputs);
+        if (!earliestSynced || new Date(desiredSince) < new Date(earliestSynced)) {
+            const backfillUntil = earliestSynced ?? fetchUntil;
+            console.log(`[ingest] ${owner}/${repoName}: backfilling commits ${desiredSince.split('T')[0]} → ${backfillUntil.split('T')[0]}`);
 
-    // Extract and upsert contributor profiles from commit authors
-    const contributors = extractContributorsFromCommits(ghCommits);
-    await upsertContributors(contributors);
+            const backfillCommits = await fetchCommits(octokit, owner, repoName, {
+                since: desiredSince,
+                until: backfillUntil,
+            });
 
-    // Only advance high-water mark forward, never backward (protects backfills)
-    await advanceSyncState(owner, repoId, "commits", fetchUntil);
+            if (backfillCommits.length > 0) {
+                console.log(`[ingest] ${owner}/${repoName}: backfill fetched ${backfillCommits.length} commits`);
 
-    return { repoName, repoId, inserted, since: fetchSince, until: fetchUntil };
+                const backfillInputs: InsertCommitInput[] = backfillCommits.map((c) => ({
+                    sha: c.sha,
+                    repo_id: repoId,
+                    author_login: c.author_login,
+                    committer_login: c.committer_login,
+                    message: c.message,
+                    html_url: c.html_url,
+                    committed_at: c.committed_at,
+                    additions: c.additions,
+                    deletions: c.deletions,
+                }));
+
+                totalInserted += await insertCommits(backfillInputs);
+
+                const contributors = extractContributorsFromCommits(backfillCommits);
+                await upsertContributors(contributors);
+            }
+
+            await retreatEarliestSynced(owner, repoId, "commits", desiredSince);
+        }
+    }
+
+    return { repoName, repoId, inserted: totalInserted, since: fetchSince, until: fetchUntil };
 }
 
 /**
@@ -261,7 +308,7 @@ export async function ingestOwner(
     octokit: Octokit,
     owner: string,
     ownerType: "user" | "org",
-    options?: { since?: string; until?: string; skipAggregation?: boolean; onProgress?: (update: { syncedRepos: number; totalRepos: number; currentRepo: string; totalEvents: number }) => void }
+    options?: { since?: string; until?: string; desiredSince?: string; skipAggregation?: boolean; onProgress?: (update: { syncedRepos: number; totalRepos: number; currentRepo: string; totalEvents: number }) => void }
 ): Promise<IngestOwnerResult> {
     // Step 1: Ingest repos
     const { repos } = await ingestRepos(octokit, owner, ownerType);
@@ -276,7 +323,11 @@ export async function ingestOwner(
         const batchResults = await Promise.allSettled(
             batch.map(async (repo) => {
                 const [commits, prs] = await Promise.all([
-                    ingestCommitsForRepo(octokit, owner, repo, options),
+                    ingestCommitsForRepo(octokit, owner, repo, {
+                        since: options?.since,
+                        until: options?.until,
+                        desiredSince: options?.desiredSince,
+                    }),
                     ingestPRsForRepo(octokit, owner, repo),
                 ]);
                 return { name: repo.name, repoGh: repo, commits, prs };

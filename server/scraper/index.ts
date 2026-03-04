@@ -11,6 +11,7 @@ import { createOctokit, refreshRateLimit, getRateLimitState, type GitHubRepo } f
 import { ingestOwner, ingestCommitsForRepo, ingestPRsForRepo, type IngestOwnerResult } from "./ingest.ts";
 import { aggregateOwner, aggregateRepo, type AggregateResult } from "./aggregate.ts";
 import { getOwner, getRepoByName } from "../db/queries/identity.ts";
+import { getSyncSince } from "../db/queries/config.ts";
 import type { RepositoryMetaRow } from "../db/types.ts";
 import { initProgress, updateProgress, clearProgress } from "./progress.ts";
 
@@ -153,12 +154,16 @@ async function doSync(
     // Initialize progress tracking
     initProgress(owner);
 
+    // Resolve desiredSince: explicit option first, then persisted sync_since from DB
+    const desiredSince = options?.since ?? (await getSyncSince(owner)) ?? undefined;
+
     // Step 1: Ingest from GitHub into event tables
     // Per-repo aggregation happens inside ingestOwner() — each repo's snapshot
     // is built immediately after its commits+PRs are ingested.
     const ingestResult = await ingestOwner(octokit, owner, ownerType, {
         since: options?.since,
         until: options?.until,
+        desiredSince,
         skipAggregation: options?.skipAggregation,
         onProgress: (update) => {
             updateProgress(owner, {

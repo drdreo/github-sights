@@ -3,6 +3,7 @@ import { clearConfig } from "../config.ts";
 import { requireConfig } from "../config.ts";
 import { errorResponse } from "../errors.ts";
 import { deleteOwnerData } from "../db/queries/identity.ts";
+import { updateSyncSince } from "../db/queries/config.ts";
 import { syncOwner, syncRepo, ensureFresh, getProgress } from "../scraper/index.ts";
 
 const sync = new Hono();
@@ -18,6 +19,11 @@ sync.post("/api/sync/:owner", async (c) => {
         const config = requireConfig(owner);
         const since = c.req.query("since") || undefined;
         const until = c.req.query("until") || undefined;
+
+        // Persist sync_since when explicitly provided
+        if (since) {
+            await updateSyncSince(owner, since);
+        }
 
         // Explicit backfill (since/until provided): always run full sync
         if (since || until) {

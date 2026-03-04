@@ -28,8 +28,9 @@ config.post("/api/config", async (c) => {
             token?: string;
             owner?: string;
             ownerType?: string;
+            syncSince?: string;
         }>();
-        const { token, owner, ownerType } = body;
+        const { token, owner, ownerType, syncSince } = body;
 
         // ── Validation ──────────────────────────────────────────────
         if (!token) {
@@ -96,7 +97,8 @@ config.post("/api/config", async (c) => {
         await setConfig({
             token,
             owner,
-            ownerType: ownerType as "user" | "org"
+            ownerType: ownerType as "user" | "org",
+            syncSince,
         });
 
         console.log(

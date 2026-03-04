@@ -5,7 +5,12 @@
 
 import { query, execute, transaction } from "./pool.ts";
 
-const MIGRATIONS_DIR = new URL("./migrations/", import.meta.url).pathname;
+// Convert file:// URL to a local path that works on both Windows and Unix.
+// On Windows, URL.pathname produces "/C:/..." — we strip the leading slash.
+const migrationsUrl = new URL("./migrations/", import.meta.url);
+const MIGRATIONS_DIR = Deno.build.os === "windows"
+    ? migrationsUrl.pathname.replace(/^\//, "")
+    : migrationsUrl.pathname;
 
 /** Ensure the migrations tracking table exists. */
 async function ensureMigrationsTable(): Promise<void> {
@@ -33,7 +38,7 @@ async function discoverMigrations(): Promise<{ name: string; path: string }[]> {
             if (entry.isFile && entry.name.endsWith(".sql")) {
                 entries.push({
                     name: entry.name,
-                    path: `${MIGRATIONS_DIR}${entry.name}`,
+                    path: `${MIGRATIONS_DIR}/${entry.name}`,
                 });
             }
         }

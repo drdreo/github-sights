@@ -30,8 +30,8 @@ export default function RepoDetailPage() {
             <div className="p-8 flex flex-col items-center justify-center h-screen text-center">
                 <AlertCircle className="w-16 h-16 text-gray-600 mb-4" />
                 <h1 className="text-2xl font-bold text-gray-100">Repository not found</h1>
-                <Link to={`/${owner}/dashboard`} className="mt-4 text-blue-600 hover:underline">
-                    Return to Dashboard
+                <Link to={`/${owner}/repositories`} className="mt-4 text-blue-600 hover:underline">
+                    Return to Repositories
                 </Link>
             </div>
         );
@@ -41,14 +41,19 @@ export default function RepoDetailPage() {
         <div className="min-h-screen bg-gray-950 p-8">
             <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
                 <Link
-                    to={`/${owner}/dashboard`}
+                    to={`/${owner}/repositories`}
                     className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-100 transition-colors font-medium group"
                 >
                     <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                    Back to Dashboard
+                    Back to Repositories
                 </Link>
 
-                <RepoHeader repository={repository} />
+                <RepoHeader
+                    repository={repository}
+                    commits={commits}
+                    pulls={pulls}
+                    contributors={contributors}
+                />
 
                 <RepoTabs
                     commits={commits}

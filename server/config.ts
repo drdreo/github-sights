@@ -29,6 +29,7 @@ export async function loadConfig(): Promise<void> {
             token: row.token,
             owner: row.owner,
             ownerType: row.owner_type,
+            syncSince: row.sync_since?.toISOString(),
         };
         configStore.set(row.owner.toLowerCase(), config);
         console.log(`[config] Loaded from database: ${config.ownerType}:${config.owner}`);
@@ -53,7 +54,7 @@ export async function setConfig(config: ApiConfig): Promise<void> {
 
     // Persist to Postgres via new owner_config table
     if (isPoolAvailable()) {
-        await dbUpsertConfig(config.owner, config.token, config.ownerType);
+        await dbUpsertConfig(config.owner, config.token, config.ownerType, config.syncSince);
     }
 }
 
