@@ -49,12 +49,17 @@ const reposColumn = columnHelper.accessor((row) => row.repos.length, {
     meta: { align: "right" as const }
 });
 
-// Shared base columns + page-specific repos column
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const columns: ColumnDef<ContributorOverview, any>[] = [
-    ...getContributorColumns<ContributorOverview>(),
-    reposColumn
-];
+// Columns are built inside the component so we can use the owner for linkBase
+function useColumns(owner: string) {
+    return React.useMemo(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const cols: ColumnDef<ContributorOverview, any>[] = [
+            ...getContributorColumns<ContributorOverview>({ linkBase: `/${owner}/contributors` }),
+            reposColumn
+        ];
+        return cols;
+    }, [owner]);
+}
 
 export default function ContributorsPage() {
     const [dateRange, setDateRange] = useState<{
@@ -66,6 +71,7 @@ export default function ContributorsPage() {
     });
 
     const owner = useOwner();
+    const columns = useColumns(owner);
 
     // Convert dates to ISO strings for the API (null = all time)
     const since = dateRange.startDate?.toISOString() ?? undefined;

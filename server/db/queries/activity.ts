@@ -261,6 +261,75 @@ export async function aggregateContributorActivity(
     );
 }
 
+// ── Contributor Detail Queries ────────────────────────────────────────────────
+
+/** Get daily activity time-series for a specific contributor. */
+export async function getContributorDailyActivity(
+    ownerLogin: string,
+    contributorLogin: string
+): Promise<DailyActivityRow[]> {
+    return query<DailyActivityRow>(
+        `SELECT * FROM daily_activity
+         WHERE owner_login = $1
+           AND contributor_login = $2
+           AND repo_id IS NULL
+         ORDER BY date`,
+        [ownerLogin, contributorLogin]
+    );
+}
+
+export interface ContributorRepoBreakdownRow {
+    repo: string;
+    commits: number;
+    additions: number;
+    deletions: number;
+    prs: number;
+    prs_merged: number;
+}
+
+/** Aggregate per-repo breakdown for a contributor from event tables. */
+export async function getContributorRepoBreakdown(
+    ownerLogin: string,
+    contributorLogin: string
+): Promise<ContributorRepoBreakdownRow[]> {
+    return query<ContributorRepoBreakdownRow>(
+        `WITH commit_stats AS (
+            SELECT
+                rm.name AS repo,
+                COUNT(*)::INTEGER AS commits,
+                COALESCE(SUM(ce.additions), 0)::BIGINT AS additions,
+                COALESCE(SUM(ce.deletions), 0)::BIGINT AS deletions
+            FROM commit_event ce
+            JOIN repository_meta rm ON rm.id = ce.repo_id
+            WHERE rm.owner_login = $1
+              AND ce.author_login = $2
+            GROUP BY rm.name
+        ),
+        pr_stats AS (
+            SELECT
+                rm.name AS repo,
+                COUNT(*)::INTEGER AS prs,
+                COUNT(*) FILTER (WHERE pe.merged_at IS NOT NULL)::INTEGER AS prs_merged
+            FROM pr_event pe
+            JOIN repository_meta rm ON rm.id = pe.repo_id
+            WHERE rm.owner_login = $1
+              AND pe.author_login = $2
+            GROUP BY rm.name
+        )
+        SELECT
+            COALESCE(c.repo, p.repo) AS repo,
+            COALESCE(c.commits, 0) AS commits,
+            COALESCE(c.additions, 0) AS additions,
+            COALESCE(c.deletions, 0) AS deletions,
+            COALESCE(p.prs, 0) AS prs,
+            COALESCE(p.prs_merged, 0) AS prs_merged
+        FROM commit_stats c
+        FULL OUTER JOIN pr_stats p ON c.repo = p.repo
+        ORDER BY COALESCE(c.commits, 0) DESC`,
+        [ownerLogin, contributorLogin]
+    );
+}
+
 /** Delete all daily_activity for an owner (used before full rebuild). */
 export async function clearDailyActivity(ownerLogin: string): Promise<void> {
     await execute(

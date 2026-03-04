@@ -218,6 +218,17 @@ export async function getContributorSnapshotsByOwner(
     );
 }
 
+/** Get a single contributor snapshot. */
+export async function getContributorSnapshot(
+    ownerLogin: string,
+    contributorLogin: string
+): Promise<ContributorSnapshotRow | null> {
+    return queryOne<ContributorSnapshotRow>(
+        "SELECT * FROM contributor_snapshot WHERE owner_login = $1 AND contributor_login = $2",
+        [ownerLogin, contributorLogin]
+    );
+}
+
 /** Get contributors for a specific repo (filtering by repos JSONB array). */
 export async function getContributorSnapshotsByRepo(
     ownerLogin: string,

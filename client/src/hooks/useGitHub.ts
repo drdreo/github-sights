@@ -212,6 +212,14 @@ export function useContributorOverview(owner: string, since?: string, until?: st
     });
 }
 
+export function useContributorDetail(owner: string, login: string) {
+    return useQuery({
+        queryKey: ["contributor-detail", owner, login],
+        queryFn: () => api.getContributorDetail(owner, login),
+        enabled: !!owner && !!login
+    });
+}
+
 export function useRepoContributorStats(owner: string, repo: string) {
     return useQuery({
         queryKey: ["repo-contributor-stats", owner, repo],

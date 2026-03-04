@@ -143,3 +143,34 @@ export interface DateRange {
     startDate: string;
     endDate: string;
 }
+
+/** Detail view for a single contributor across all repos. */
+export interface ContributorDetail {
+    login: string;
+    avatar_url: string;
+    html_url: string;
+    totalCommits: number;
+    totalAdditions: number;
+    totalDeletions: number;
+    totalPRs: number;
+    totalPRsMerged: number;
+    activeDays: number;
+    firstCommitAt: string | null;
+    lastCommitAt: string | null;
+    repoBreakdown: {
+        repo: string;
+        commits: number;
+        additions: number;
+        deletions: number;
+        prs: number;
+        prsMerged: number;
+    }[];
+    dailyActivity: {
+        date: string;
+        commits: number;
+        additions: number;
+        deletions: number;
+        prsOpened: number;
+        prsMerged: number;
+    }[];
+}

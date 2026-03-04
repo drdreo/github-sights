@@ -10,6 +10,7 @@ import { contributors } from "./routes/contributors.ts";
 import { repos } from "./routes/repos.ts";
 import { stats } from "./routes/stats.ts";
 import { sync } from "./routes/sync.ts";
+import { contributorDetail } from "./routes/contributorDetail.ts";
 
 // ── App ────────────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,7 @@ app.use("/*", cors({ origin: allowedOrigins }));
 // Mount route modules
 app.route("/", health);
 app.route("/", config);
+app.route("/", contributorDetail);
 app.route("/", contributors);
 app.route("/", repos);
 app.route("/", stats);

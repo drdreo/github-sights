@@ -1,6 +1,7 @@
 import {
     ApiConfig,
     ContributorOverview,
+    ContributorDetail,
     OverviewStats,
     Repository,
     Commit,
@@ -121,6 +122,9 @@ export const api = {
 
     getRepoContributorStats: (owner: string, repo: string) =>
         fetchApi<RepoContributorStat[]>(`/repos/${owner}/${repo}/contributor-stats`),
+
+    getContributorDetail: (owner: string, login: string) =>
+        fetchApi<ContributorDetail>(`/contributors/${encodeURIComponent(owner)}/${encodeURIComponent(login)}`),
 
     getContributorOverview: (owner: string, since?: string, until?: string) => {
         const params = new URLSearchParams();

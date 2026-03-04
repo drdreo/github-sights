@@ -14,4 +14,5 @@ export type {
     DailyCommitActivity,
     RepoCommitTimeline,
     DateRange,
+    ContributorDetail,
 } from "@github-sights/shared";
