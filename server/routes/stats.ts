@@ -34,9 +34,9 @@ stats.get("/api/stats/:owner", async (c) => {
                 totalCommits: agg.total_commits,
                 totalAdditions: Number(agg.total_additions),
                 totalDeletions: Number(agg.total_deletions),
-                totalPRs: agg.total_pr_opened,
+                totalPRs: agg.total_pr_opened + agg.total_pr_merged + agg.total_pr_closed,
+                openPRs: agg.total_pr_opened,
                 mergedPRs: agg.total_pr_merged,
-                // openPRs doesn't make sense for a historical range, keep snapshot value
             });
         }
 

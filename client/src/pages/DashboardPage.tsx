@@ -1,4 +1,4 @@
-import { subDays } from "date-fns";
+import { differenceInDays, subDays } from "date-fns";
 import React, { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { CommitActivity } from "../components/CommitActivity";
@@ -58,7 +58,12 @@ export default function DashboardPage() {
                     onDelete={handleDelete}
                 />
                 <div className="grid grid-cols-1 gap-6">
-                    <StatCards stats={stats} loading={statsLoading} owner={owner} />
+                    <StatCards
+                        stats={stats}
+                        loading={statsLoading}
+                        owner={owner}
+                        dateRangeLabel={`Last ${differenceInDays(dateRange.endDate, dateRange.startDate)} days`}
+                    />
                 </div>
 
                 <LanguageDistribution stats={stats} loading={statsLoading} />
