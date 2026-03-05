@@ -71,7 +71,7 @@ export function DashboardHeader({
                 <h1 className="text-3xl font-bold text-gray-100 tracking-tight flex items-center gap-2">
                     {owner}
                     <span className="text-gray-500 font-normal text-xl">/ Dashboard</span>
-                    {isSyncing && <RefreshCw className="w-4 h-4 text-blue-400 animate-spin ml-1" />}
+                    {isSyncing && <RefreshCw className="text-blue-400 animate-spin ml-1" />}
                 </h1>
                 {isSyncing && (
                     <div className="mt-1">
