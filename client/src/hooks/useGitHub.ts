@@ -17,8 +17,12 @@ export function useSetConfig() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: api.setConfig,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["config"] });
+        onSuccess: (_data, variables) => {
+            queryClient.setQueryData(["config", variables.owner], {
+                configured: true,
+                owner: variables.owner,
+                ownerType: variables.ownerType,
+            });
         }
     });
 }
