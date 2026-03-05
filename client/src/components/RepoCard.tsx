@@ -25,8 +25,10 @@ function IconTooltip({ children, label }: { children: React.ReactNode; label: st
 }
 
 function formatCompact(n: number): string {
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+    const abs = Math.abs(n);
+    const sign = n < 0 ? "-" : "";
+    if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(1)}M`;
+    if (abs >= 1_000) return `${sign}${(abs / 1_000).toFixed(1)}k`;
     return n.toString();
 }
 
@@ -116,7 +118,7 @@ export function RepoCard({ repo, owner, totalCommits, snapshot }: RepoCardProps)
                     <IconTooltip label={snapshot ? `+${formatCompact(snapshot.totalAdditions)} / -${formatCompact(snapshot.totalDeletions)} lines` : "Lines changed"}>
                         <div className="flex items-center gap-1">
                             <Code className="w-3.5 h-3.5 text-gray-500" />
-                            <span>{formatCompact((snapshot?.totalAdditions ?? 0) + (snapshot?.totalDeletions ?? 0))}</span>
+                            <span>{formatCompact((snapshot?.totalAdditions ?? 0) - (snapshot?.totalDeletions ?? 0))}</span>
                         </div>
                     </IconTooltip>
 

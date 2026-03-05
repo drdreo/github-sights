@@ -287,7 +287,11 @@ export interface ContributorRepoBreakdownRow {
     prs_merged: number;
 }
 
-/** Aggregate per-repo breakdown for a contributor from event tables. */
+/**
+ * Aggregate per-repo breakdown for a contributor from event tables.
+ * LoC always from commits (GraphQL provides per-commit stats).
+ * Works for all merge strategies: squash, merge commit, ff, direct push.
+ */
 export async function getContributorRepoBreakdown(
     ownerLogin: string,
     contributorLogin: string

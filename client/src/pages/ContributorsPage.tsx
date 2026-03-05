@@ -15,6 +15,14 @@ import type { ContributorOverview } from "../types";
 
 const columnHelper = createColumnHelper<ContributorOverview>();
 
+const prsColumn = columnHelper.accessor("totalPRs", {
+    id: "totalPRs",
+    header: "PRs",
+    cell: (info) => info.getValue().toLocaleString(),
+    sortingFn: "basic",
+    meta: { align: "right" as const },
+});
+
 const reposColumn = columnHelper.accessor((row) => row.repos.length, {
     id: "repos",
     header: "Repos",
@@ -55,6 +63,7 @@ function useColumns(owner: string) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const cols: ColumnDef<ContributorOverview, any>[] = [
             ...getContributorColumns<ContributorOverview>({ linkBase: `/${owner}/contributors` }),
+            prsColumn,
             reposColumn
         ];
         return cols;

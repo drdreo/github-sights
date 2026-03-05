@@ -5,6 +5,7 @@ import { errorResponse } from "../errors.ts";
 import { deleteOwnerData } from "../db/queries/identity.ts";
 import { updateSyncSince } from "../db/queries/config.ts";
 import { syncOwner, syncRepo, ensureFresh, getProgress, isSyncing, abortInflight } from "../scraper/index.ts";
+import { aggregateOwner } from "../scraper/aggregate.ts";
 
 const sync = new Hono();
 
@@ -82,6 +83,22 @@ sync.get("/api/sync/progress/:owner", (c) => {
         totalEvents: progress.totalEvents,
         elapsedMs: Date.now() - progress.startedAt,
     });
+});
+
+// ── POST /api/aggregate/:owner — Re-aggregate snapshots from existing events ──
+//
+// Rebuilds all snapshots + daily_activity without re-fetching from GitHub.
+// Useful after changing aggregation logic.
+sync.post("/api/aggregate/:owner", async (c) => {
+    try {
+        const { owner } = c.req.param();
+        requireConfig(owner);
+
+        const result = await aggregateOwner(owner);
+        return c.json(result);
+    } catch (error) {
+        return errorResponse(c, error);
+    }
 });
 
 // ── DELETE /api/owner/:owner — Purge all owner data (GDPR / reset) ───────────

@@ -167,24 +167,24 @@ function buildRepoDailyActivity(
         return dateMap.get(date)!;
     };
 
-    // Aggregate commits by date (count only — LOC comes from PRs)
+    // LoC always from commits (GraphQL provides per-commit stats).
+    // Works for all merge strategies: squash, merge commit (0 LoC), ff, direct push.
     for (const c of commits) {
         const date = toDateString(c.committed_at);
-        ensureDate(date).commits++;
+        const entry = ensureDate(date);
+        entry.commits++;
+        entry.additions += c.additions;
+        entry.deletions += c.deletions;
     }
 
-    // Aggregate PRs by date
+    // PR counts only (no LoC from PRs)
     for (const pr of prs) {
         const createdDate = toDateString(pr.created_at);
         ensureDate(createdDate).prOpened++;
 
         if (pr.merged_at) {
             const mergedDate = toDateString(pr.merged_at);
-            const mergedEntry = ensureDate(mergedDate);
-            mergedEntry.prMerged++;
-            // LOC attributed to merge date (commit-level LOC is unavailable from GitHub list API)
-            mergedEntry.additions += pr.additions;
-            mergedEntry.deletions += pr.deletions;
+            ensureDate(mergedDate).prMerged++;
         } else if (pr.closed_at) {
             const closedDate = toDateString(pr.closed_at);
             ensureDate(closedDate).prClosed++;
@@ -220,12 +220,12 @@ async function buildAndUpsertRepoSnapshot(
 ): Promise<void> {
     const contribStats = await getContributorStatsByRepo(repo.id);
 
-    // LOC sourced from merged PRs (GitHub list API doesn't return commit-level stats)
     const mergedPrs = prs.filter((pr) => pr.merged_at !== null);
     const openPrs = prs.filter((pr) => pr.state === "open").length;
 
-    const totalAdditions = mergedPrs.reduce((sum, pr) => sum + pr.additions, 0);
-    const totalDeletions = mergedPrs.reduce((sum, pr) => sum + pr.deletions, 0);
+    // LoC always from commits (GraphQL provides per-commit stats)
+    const totalAdditions = commits.reduce((sum, c) => sum + c.additions, 0);
+    const totalDeletions = commits.reduce((sum, c) => sum + c.deletions, 0);
 
     // Build top contributors for this repo
     const topContributors: SnapshotContributor[] = contribStats
@@ -283,10 +283,7 @@ async function rebuildOwnerDailyActivity(
 
     const ownerDateMap = new Map<string, UpsertDailyActivityInput>();
 
-    // Query all commits for the owner in one go (count only — LOC comes from merged PRs)
-    const allCommits = await getCommitsByOwner(ownerLogin);
-    for (const c of allCommits) {
-        const date = toDateString(c.committed_at);
+    const ensureOwnerDate = (date: string) => {
         if (!ownerDateMap.has(date)) {
             ownerDateMap.set(date, {
                 owner_login: ownerLogin,
@@ -298,59 +295,29 @@ async function rebuildOwnerDailyActivity(
                 workflow_runs: 0, workflow_failures: 0,
             });
         }
-        ownerDateMap.get(date)!.commit_count++;
-    }
+        return ownerDateMap.get(date)!;
+    };
 
-    // Add PR data to owner-level rows
+    // LoC always from commits (GraphQL provides per-commit stats)
     for (const repo of repos) {
+        const commits = await getCommitsByRepo(repo.id);
         const prs = await getPrsByRepo(repo.id);
+
+        for (const c of commits) {
+            const entry = ensureOwnerDate(toDateString(c.committed_at));
+            entry.commit_count++;
+            entry.additions += c.additions;
+            entry.deletions += c.deletions;
+        }
+
+        // PR counts only (no LoC from PRs)
         for (const pr of prs) {
-            const createdDate = toDateString(pr.created_at);
-            if (!ownerDateMap.has(createdDate)) {
-                ownerDateMap.set(createdDate, {
-                    owner_login: ownerLogin,
-                    repo_id: null,
-                    contributor_login: null,
-                    date: createdDate,
-                    commit_count: 0, additions: 0, deletions: 0,
-                    pr_opened: 0, pr_merged: 0, pr_closed: 0,
-                    workflow_runs: 0, workflow_failures: 0,
-                });
-            }
-            ownerDateMap.get(createdDate)!.pr_opened++;
+            ensureOwnerDate(toDateString(pr.created_at)).pr_opened++;
 
             if (pr.merged_at) {
-                const mergedDate = toDateString(pr.merged_at);
-                if (!ownerDateMap.has(mergedDate)) {
-                    ownerDateMap.set(mergedDate, {
-                        owner_login: ownerLogin,
-                        repo_id: null,
-                        contributor_login: null,
-                        date: mergedDate,
-                        commit_count: 0, additions: 0, deletions: 0,
-                        pr_opened: 0, pr_merged: 0, pr_closed: 0,
-                        workflow_runs: 0, workflow_failures: 0,
-                    });
-                }
-                const mergedEntry = ownerDateMap.get(mergedDate)!;
-                mergedEntry.pr_merged++;
-                // LOC attributed to merge date
-                mergedEntry.additions += pr.additions;
-                mergedEntry.deletions += pr.deletions;
+                ensureOwnerDate(toDateString(pr.merged_at)).pr_merged++;
             } else if (pr.closed_at) {
-                const closedDate = toDateString(pr.closed_at);
-                if (!ownerDateMap.has(closedDate)) {
-                    ownerDateMap.set(closedDate, {
-                        owner_login: ownerLogin,
-                        repo_id: null,
-                        contributor_login: null,
-                        date: closedDate,
-                        commit_count: 0, additions: 0, deletions: 0,
-                        pr_opened: 0, pr_merged: 0, pr_closed: 0,
-                        workflow_runs: 0, workflow_failures: 0,
-                    });
-                }
-                ownerDateMap.get(closedDate)!.pr_closed++;
+                ensureOwnerDate(toDateString(pr.closed_at)).pr_closed++;
             }
         }
     }
@@ -411,11 +378,13 @@ async function rebuildContributorSnapshots(
         const commits = await getCommitsByRepo(repo.id);
         const prs = await getPrsByRepo(repo.id);
 
-        // Process commits (count only — LOC comes from merged PRs)
+        // LoC always from commits (GraphQL provides per-commit stats)
         for (const c of commits) {
             if (!c.author_login) continue;
             const entry = ensureContrib(c.author_login);
             entry.totalCommits++;
+            entry.totalAdditions += c.additions;
+            entry.totalDeletions += c.deletions;
             entry.repos.add(repo.name);
             entry.commitDates.add(toDateString(c.committed_at));
 
@@ -428,15 +397,13 @@ async function rebuildContributorSnapshots(
             }
         }
 
-        // Process PRs (LOC attributed from merged PRs)
+        // PR counts only (no LoC from PRs)
         for (const pr of prs) {
             if (!pr.author_login) continue;
             const entry = ensureContrib(pr.author_login);
             entry.totalPRs++;
             if (pr.merged_at) {
                 entry.totalPRsMerged++;
-                entry.totalAdditions += pr.additions;
-                entry.totalDeletions += pr.deletions;
             }
             entry.repos.add(repo.name);
         }
