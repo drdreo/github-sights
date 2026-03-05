@@ -308,7 +308,7 @@ export async function ingestOwner(
     octokit: Octokit,
     owner: string,
     ownerType: "user" | "org",
-    options?: { since?: string; until?: string; desiredSince?: string; skipAggregation?: boolean; onProgress?: (update: { syncedRepos: number; totalRepos: number; currentRepo: string; totalEvents: number }) => void }
+    options?: { since?: string; until?: string; desiredSince?: string; skipAggregation?: boolean; signal?: AbortSignal; onProgress?: (update: { syncedRepos: number; totalRepos: number; currentRepo: string; totalEvents: number }) => void }
 ): Promise<IngestOwnerResult> {
     // Step 1: Ingest repos
     const { repos } = await ingestRepos(octokit, owner, ownerType);
@@ -319,6 +319,10 @@ export async function ingestOwner(
 
     // Step 2: Ingest commits + PRs per repo in batches
     for (let i = 0; i < repos.length; i += CONCURRENCY) {
+        if (options?.signal?.aborted) {
+            console.log(`[ingest] ${owner}: sync aborted, stopping ingestion`);
+            break;
+        }
         const batch = repos.slice(i, i + CONCURRENCY);
         const batchResults = await Promise.allSettled(
             batch.map(async (repo) => {

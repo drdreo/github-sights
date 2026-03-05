@@ -407,6 +407,32 @@ GET /api/repos/:owner/:repo/workflows
 
 ---
 
+## Owner Deletion & Cascade Cleanup
+
+Deleting an owner (`DELETE FROM owner WHERE login = ?`) triggers a full cascading cleanup of all associated data via FK constraints:
+
+```
+owner DELETE
+  ├→ owner_config          (FK CASCADE)
+  ├→ owner_snapshot        (FK CASCADE)
+  ├→ contributor_snapshot   (FK CASCADE)
+  ├→ daily_activity         (FK CASCADE)
+  └→ repository_meta        (FK CASCADE)
+       ├→ commit_event      (FK CASCADE)
+       ├→ pr_event          (FK CASCADE)
+       ├→ workflow_event    (FK CASCADE)
+       ├→ repo_snapshot     (FK CASCADE)
+       └→ sync_state        (FK CASCADE)
+```
+
+All tables with an `owner_login` or `repo_id` reference use `ON DELETE CASCADE`, so a single `DELETE FROM owner` is enough to wipe every row tied to that owner — no manual cleanup needed.
+
+**Special case: `contributor_profile`**
+
+This is a global table keyed by `login` with no owner reference. A contributor can appear under multiple owners. After the cascading delete, orphaned profiles (contributors no longer referenced by any remaining `contributor_snapshot`) are cleaned up separately. This ensures shared contributors are never accidentally removed.
+
+---
+
 ## Key Difference From Design A
 
 | Concern | Design A (Normalized) | Design B (Event-Sourced + Snapshots) |

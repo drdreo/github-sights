@@ -4,7 +4,7 @@ import { requireConfig } from "../config.ts";
 import { errorResponse } from "../errors.ts";
 import { deleteOwnerData } from "../db/queries/identity.ts";
 import { updateSyncSince } from "../db/queries/config.ts";
-import { syncOwner, syncRepo, ensureFresh, getProgress } from "../scraper/index.ts";
+import { syncOwner, syncRepo, ensureFresh, getProgress, isSyncing, abortInflight } from "../scraper/index.ts";
 
 const sync = new Hono();
 
@@ -88,6 +88,12 @@ sync.get("/api/sync/progress/:owner", (c) => {
 sync.delete("/api/owner/:owner", async (c) => {
     try {
         const { owner } = c.req.param();
+
+        // Abort any in-flight sync before deleting to avoid FK violations
+        if (isSyncing(owner)) {
+            await abortInflight(owner);
+        }
+
         const deleted = await deleteOwnerData(owner);
         if (!deleted) {
             return c.json({ error: "Owner not found" }, 404);

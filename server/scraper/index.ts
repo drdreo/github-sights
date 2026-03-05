@@ -43,6 +43,7 @@ export interface SyncRepoResult {
 // ── Inflight Tracking ────────────────────────────────────────────────────────────
 
 const inflight = new Map<string, Promise<SyncResult>>();
+const inflightAbort = new Map<string, AbortController>();
 const inflightRepo = new Map<string, Promise<SyncRepoResult>>();
 
 // ── Staleness Config ─────────────────────────────────────────────────────────────
@@ -73,13 +74,16 @@ export async function syncOwner(
         return existing;
     }
 
-    const promise = doSync(owner, token, ownerType, options);
+    const ac = new AbortController();
+    const promise = doSync(owner, token, ownerType, options, ac.signal);
 
     inflight.set(key, promise);
+    inflightAbort.set(key, ac);
     try {
         return await promise;
     } finally {
         inflight.delete(key);
+        inflightAbort.delete(key);
     }
 }
 
@@ -130,13 +134,31 @@ export function isSyncing(owner: string): boolean {
     return inflight.has(owner.toLowerCase());
 }
 
+/**
+ * Abort any in-flight sync for this owner and wait for it to finish.
+ * Resolves immediately if no sync is running.
+ */
+export async function abortInflight(owner: string): Promise<void> {
+    const key = owner.toLowerCase();
+    const ac = inflightAbort.get(key);
+    if (ac) {
+        console.log(`[sync] Aborting in-flight sync for ${owner}`);
+        ac.abort();
+    }
+    const existing = inflight.get(key);
+    if (existing) {
+        await existing.catch(() => {});
+    }
+}
+
 // ── Internal ─────────────────────────────────────────────────────────────────────
 
 async function doSync(
     owner: string,
     token: string,
     ownerType: "user" | "org",
-    options?: SyncOptions
+    options?: SyncOptions,
+    signal?: AbortSignal
 ): Promise<SyncResult> {
     const start = Date.now();
     const isBackfill = !!(options?.since || options?.until);
@@ -165,6 +187,7 @@ async function doSync(
         until: options?.until,
         desiredSince,
         skipAggregation: options?.skipAggregation,
+        signal,
         onProgress: (update) => {
             updateProgress(owner, {
                 status: "syncing_repos",
@@ -190,6 +213,13 @@ async function doSync(
     // Log rate limit budget after ingestion
     const postIngestBudget = getRateLimitState(octokit);
     console.log(`[sync] Rate limit budget after ingestion: ${postIngestBudget.remaining}/${postIngestBudget.limit} remaining`);
+
+    // Bail out if aborted (e.g. owner deletion in progress)
+    if (signal?.aborted) {
+        console.log(`[sync] Sync aborted for ${owner}, skipping aggregation`);
+        clearProgress(owner);
+        return { synced: 0, repos: repoNames, errors: ["Sync aborted"], aggregation: { owner, dailyActivityRows: 0, repoSnapshots: 0, contributorSnapshots: 0, ownerSnapshotUpdated: false }, durationMs: Date.now() - start };
+    }
 
     // Step 2: Aggregate events into snapshots
     updateProgress(owner, { status: "aggregating" });
