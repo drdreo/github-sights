@@ -127,15 +127,20 @@ export async function upsertRepos(repos: UpsertRepoInput[]): Promise<void> {
                     created_at, updated_at, pushed_at
                  ) VALUES ${text}
                  ON CONFLICT (id) DO UPDATE SET
-                    owner_login = EXCLUDED.owner_login, name = EXCLUDED.name,
-                    full_name = EXCLUDED.full_name, description = EXCLUDED.description,
-                    html_url = EXCLUDED.html_url, is_private = EXCLUDED.is_private,
-                    is_fork = EXCLUDED.is_fork, language = EXCLUDED.language,
+                    owner_login = EXCLUDED.owner_login,
+                    name = EXCLUDED.name,
+                    full_name = EXCLUDED.full_name,
+                    description = EXCLUDED.description,
+                    html_url = EXCLUDED.html_url,
+                    is_private = EXCLUDED.is_private,
+                    is_fork = EXCLUDED.is_fork,
+                    language = EXCLUDED.language,
                     default_branch = EXCLUDED.default_branch,
                     stargazers_count = EXCLUDED.stargazers_count,
                     forks_count = EXCLUDED.forks_count,
                     open_issues_count = EXCLUDED.open_issues_count,
-                    created_at = EXCLUDED.created_at, updated_at = EXCLUDED.updated_at,
+                    created_at = EXCLUDED.created_at,
+                    updated_at = EXCLUDED.updated_at,
                     pushed_at = EXCLUDED.pushed_at`,
                 params
             );

@@ -1,5 +1,7 @@
 # AGENTS.md — Project Rules for AI Agents
 
+This is a GitHub insights project.
+
 ## Database Architecture Rules
 
 This project follows an **event-sourced + pre-aggregated snapshot** architecture.
