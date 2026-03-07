@@ -97,21 +97,30 @@ export async function aggregateOwner(ownerLogin: string): Promise<AggregateResul
 
     // Step 1: Rebuild per-repo daily_activity via SQL (INSERT INTO ... SELECT)
     let dailyActivityRows = 0;
-    for (const repo of nonForkRepos) {
+    for (let i = 0; i < nonForkRepos.length; i++) {
+        const repo = nonForkRepos[i];
         await clearRepoDailyActivity(repo.id);
         const inserted = await rebuildRepoDailyActivitySQL(ownerLogin, repo.id);
         dailyActivityRows += inserted;
+        if ((i + 1) % 50 === 0) {
+            console.log(`[aggregate] ${ownerLogin}: daily activity ${i + 1}/${nonForkRepos.length} repos done`);
+        }
     }
 
     // Rebuild repo snapshots via SQL aggregation (no raw event rows in JS)
-    for (const repo of nonForkRepos) {
+    for (let i = 0; i < nonForkRepos.length; i++) {
+        const repo = nonForkRepos[i];
         await rebuildRepoSnapshotSQL(ownerLogin, repo);
+        if ((i + 1) % 50 === 0) {
+            console.log(`[aggregate] ${ownerLogin}: repo snapshots ${i + 1}/${nonForkRepos.length} done`);
+        }
     }
     console.log(
         `[aggregate] ${ownerLogin}: rebuilt ${nonForkRepos.length} repo snapshots + ${dailyActivityRows} repo daily activity rows`
     );
 
     // Step 2: Rebuild owner-level daily_activity (aggregated across all repos)
+    console.log(`[aggregate] ${ownerLogin}: rebuilding owner daily activity`);
     const ownerDailyRows = await rebuildOwnerDailyActivity(ownerLogin);
     dailyActivityRows += ownerDailyRows;
     console.log(
@@ -119,10 +128,12 @@ export async function aggregateOwner(ownerLogin: string): Promise<AggregateResul
     );
 
     // Step 3: Rebuild contributor_snapshot
+    console.log(`[aggregate] ${ownerLogin}: rebuilding contributor snapshots`);
     const contributorSnapshots = await rebuildContributorSnapshots(ownerLogin);
     console.log(`[aggregate] ${ownerLogin}: rebuilt ${contributorSnapshots} contributor snapshots`);
 
     // Step 4: Rebuild owner_snapshot
+    console.log(`[aggregate] ${ownerLogin}: rebuilding owner snapshot`);
     await rebuildOwnerSnapshot(ownerLogin, nonForkRepos);
     console.log(`[aggregate] ${ownerLogin}: owner snapshot updated`);
 

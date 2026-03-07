@@ -375,6 +375,8 @@ export async function ingestOwner(
             break;
         }
         const batch = repos.slice(i, i + CONCURRENCY);
+        const batchNames = batch.map((r) => r.name).join(", ");
+        console.log(`[ingest] ${owner}: batch ${Math.floor(i / CONCURRENCY) + 1}/${Math.ceil(repos.length / CONCURRENCY)} starting (${batchNames})`);
         const batchResults = await Promise.allSettled(
             batch.map(async (repo) => {
                 const [commits, prs] = await Promise.all([
