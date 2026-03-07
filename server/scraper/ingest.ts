@@ -74,7 +74,7 @@ export interface IngestOwnerResult {
 
 // ── Constants ────────────────────────────────────────────────────────────────────
 
-const CONCURRENCY = 3;
+const CONCURRENCY = 1;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────
 
