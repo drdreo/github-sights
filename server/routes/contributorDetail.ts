@@ -44,7 +44,8 @@ contributorDetail.get("/api/contributors/:owner/:login", async (c) => {
             ? repoBreakdown.reduce((sum, r) => sum + Number(r.prs_merged), 0)
             : snapshot.total_prs_merged;
         const activeDays = isFiltered
-            ? dailyRows.filter((r) => r.commit_count > 0 || r.pr_opened > 0 || r.pr_merged > 0).length
+            ? dailyRows.filter((r) => r.commit_count > 0 || r.pr_opened > 0 || r.pr_merged > 0)
+                  .length
             : snapshot.active_days;
 
         const result: ContributorDetail = {

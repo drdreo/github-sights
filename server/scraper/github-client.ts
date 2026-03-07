@@ -76,8 +76,7 @@ export interface GitHubPR {
 }
 
 // ── Excluded Repos ───────────────────────────────────────────────────────────────
-
-const DEFAULT_EXCLUDED = ["lumicode"];
+const DEFAULT_EXCLUDED: string[] = [];
 
 function getExcludedRepos(): Set<string> {
     const envVal = typeof Deno !== "undefined" ? Deno.env.get("EXCLUDED_REPOS") : undefined;

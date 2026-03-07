@@ -99,6 +99,18 @@ export async function upsertRepos(repos: UpsertRepoInput[]): Promise<void> {
     console.log(`Upserting ${repos.length} repos`);
 
     await transaction(async (client) => {
+        // Clear stale full_name values that would conflict with incoming repos.
+        // This handles renamed/transferred/deleted repos whose old full_name
+        // is now used by a different repo id.
+        const fnParams = repos.map((_, i) => `$${i + 1}`).join(",");
+        const idParams = repos.map((_, i) => `$${repos.length + i + 1}`).join(",");
+        await client.query(
+            `UPDATE repository_meta SET full_name = '__stale_' || id
+             WHERE full_name IN (${fnParams})
+               AND id NOT IN (${idParams})`,
+            [...repos.map((r) => r.full_name), ...repos.map((r) => r.id)]
+        );
+
         for (let i = 0; i < repos.length; i += BATCH_SIZE) {
             const chunk = repos.slice(i, i + BATCH_SIZE);
             const { text, params } = buildMultiRowValues(chunk, (r) => [
