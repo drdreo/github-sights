@@ -1,13 +1,15 @@
 import React, { useState } from "react";
 import { useSetConfig } from "../hooks/useGitHub";
 import { useNavigate } from "react-router-dom";
-import { Key, Building2, User, ArrowRight, Loader2, Github, Shield } from "lucide-react";
+import { Key, Building2, User, ArrowRight, Loader2, Github, Shield, Calendar } from "lucide-react";
 import { addRecentOwner } from "./LandingPage";
+import { subYears, format } from "date-fns";
 
 export default function SetupPage() {
     const [token, setToken] = useState("");
     const [owner, setOwner] = useState("");
     const [ownerType, setOwnerType] = useState<"user" | "org">("org");
+    const [syncSince, setSyncSince] = useState(() => format(subYears(new Date(), 1), "yyyy-MM-dd"));
     const [error, setError] = useState<string | null>(null);
 
     const setConfig = useSetConfig();
@@ -27,9 +29,9 @@ export default function SetupPage() {
         }
 
         try {
-            await setConfig.mutateAsync({ token, owner, ownerType });
+            await setConfig.mutateAsync({ token, owner, ownerType, syncSince });
             addRecentOwner(owner);
-            navigate(`/${owner}/dashboard`);
+            navigate(`/${owner}/dashboard?syncSince=${syncSince}`);
         } catch (err) {
             console.error("Setup failed:", err);
             setError("Failed to save configuration. Please try again.");
@@ -135,6 +137,25 @@ export default function SetupPage() {
                                 User
                             </button>
                         </div>
+                    </div>
+
+                    {/* Initial Sync Range */}
+                    <div className="space-y-2 group">
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-300 group-focus-within:text-blue-400 transition-colors">
+                            <Calendar className="w-4 h-4" />
+                            Sync History Since
+                        </label>
+                        <input
+                            type="date"
+                            value={syncSince}
+                            onChange={(e) => setSyncSince(e.target.value)}
+                            max={format(new Date(), "yyyy-MM-dd")}
+                            className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-gray-100 focus:bg-gray-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 outline-none transition-all duration-200"
+                        />
+                        <p className="text-xs text-gray-500">
+                            How far back to crawl commit and PR history. Older dates use more API
+                            budget.
+                        </p>
                     </div>
 
                     {/* Error Message */}

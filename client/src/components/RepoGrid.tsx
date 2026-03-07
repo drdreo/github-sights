@@ -3,14 +3,23 @@ import { LoadingSkeleton } from "./LoadingSkeleton";
 import { RepoCard } from "./RepoCard";
 import type { Repository } from "../types";
 
+export interface RepoSnapshotStats {
+    totalPRs: number;
+    openPRs: number;
+    mergedPRs: number;
+    totalAdditions: number;
+    totalDeletions: number;
+}
+
 interface RepoGridProps {
     repos: Repository[];
     owner: string;
     loading: boolean;
     commitCounts?: Map<string, number>;
+    snapshotStats?: Map<string, RepoSnapshotStats>;
 }
 
-export function RepoGrid({ repos, owner, loading, commitCounts }: RepoGridProps) {
+export function RepoGrid({ repos, owner, loading, commitCounts, snapshotStats }: RepoGridProps) {
     return (
         <div>
             <h2 className="text-xl font-semibold text-gray-100 mb-6 flex items-center gap-2">
@@ -34,6 +43,7 @@ export function RepoGrid({ repos, owner, loading, commitCounts }: RepoGridProps)
                             repo={repo}
                             owner={owner}
                             totalCommits={commitCounts?.get(repo.name)}
+                            snapshot={snapshotStats?.get(repo.name)}
                         />
                     ))}
                 </div>

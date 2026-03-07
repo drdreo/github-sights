@@ -19,7 +19,7 @@ export function FetchedAtBadge({ fetchedAt }: FetchedAtBadgeProps) {
     }
 
     return (
-        <span 
+        <span
             className="inline-flex items-center gap-1 text-xs font-normal text-gray-500 bg-gray-800/50 px-2 py-0.5 rounded-full ml-2 select-none"
             title={`Last fetched: ${new Date(fetchedAt).toLocaleString()}`}
         >

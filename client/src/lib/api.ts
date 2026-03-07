@@ -1,6 +1,7 @@
 import {
     ApiConfig,
     ContributorOverview,
+    ContributorDetail,
     OverviewStats,
     Repository,
     Commit,
@@ -13,10 +14,20 @@ export interface CachedResponse<T> {
     fetchedAt: number;
 }
 
-
 interface BulkCommitEntry {
     repo: Repository;
     commits: Commit[];
+}
+
+export interface SyncProgressResponse {
+    active: boolean;
+    status?: "fetching_repos" | "syncing_repos" | "aggregating" | "complete" | "error";
+    totalRepos?: number;
+    syncedRepos?: number;
+    currentRepo?: string | null;
+    totalEvents?: number;
+    elapsedMs?: number;
+    lastSyncedAt?: string | null;
 }
 
 const API_BASE = `${import.meta.env.VITE_API_BASE_URL ?? ""}/api`;
@@ -58,9 +69,12 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
     getConfig: (owner: string) =>
-        fetchApi<{ configured: boolean; owner?: string; ownerType?: "user" | "org" }>(
-            `/config/${encodeURIComponent(owner)}`
-        ),
+        fetchApi<{
+            configured: boolean;
+            owner?: string;
+            ownerType?: "user" | "org";
+            syncSince?: string | null;
+        }>(`/config/${encodeURIComponent(owner)}`),
 
     setConfig: (config: ApiConfig) =>
         fetchApi<void>("/config", {
@@ -72,8 +86,19 @@ export const api = {
         return fetchApi<CachedResponse<Repository[]>>(`/repos/${encodeURIComponent(owner)}`);
     },
 
-
     getRepo: (owner: string, repo: string) => fetchApi<Repository>(`/repos/${owner}/${repo}`),
+
+    getRepoSnapshots: (owner: string) =>
+        fetchApi<
+            {
+                name: string;
+                totalPRs: number;
+                openPRs: number;
+                mergedPRs: number;
+                totalAdditions: number;
+                totalDeletions: number;
+            }[]
+        >(`/repo-snapshots/${encodeURIComponent(owner)}`),
 
     getCommits: (
         owner: string,
@@ -107,14 +132,25 @@ export const api = {
     getRepoContributorStats: (owner: string, repo: string) =>
         fetchApi<RepoContributorStat[]>(`/repos/${owner}/${repo}/contributor-stats`),
 
+    getContributorDetail: (owner: string, login: string, since?: string, until?: string) => {
+        const params = new URLSearchParams();
+        if (since) params.append("since", since);
+        if (until) params.append("until", until);
+        const qs = params.toString();
+        return fetchApi<ContributorDetail>(
+            `/contributors/${encodeURIComponent(owner)}/${encodeURIComponent(login)}${qs ? `?${qs}` : ""}`
+        );
+    },
+
     getContributorOverview: (owner: string, since?: string, until?: string) => {
         const params = new URLSearchParams();
         if (since) params.append("since", since);
         if (until) params.append("until", until);
         const qs = params.toString();
-        return fetchApi<CachedResponse<ContributorOverview[]>>(`/contributors/${owner}${qs ? `?${qs}` : ""}`);
+        return fetchApi<CachedResponse<ContributorOverview[]>>(
+            `/contributors/${owner}${qs ? `?${qs}` : ""}`
+        );
     },
-
 
     getStats: (owner: string, since?: string, until?: string, cacheOnly?: boolean) => {
         const params = new URLSearchParams();
@@ -125,22 +161,29 @@ export const api = {
         return fetchApi<OverviewStats>(`/stats/${owner}${qs ? `?${qs}` : ""}`);
     },
 
-    /** Trigger background sync — fills commit gaps from last fetch to now. */
-    sync: (owner: string, since?: string, until?: string) => {
+    /** Trigger sync — ensures data freshness (debounced to hourly).
+     *  Pass `since` for explicit backfill syncs. */
+    sync: (owner: string, since?: string) => {
         const params = new URLSearchParams();
         if (since) params.append("since", since);
-        if (until) params.append("until", until);
         const qs = params.toString();
-        return fetchApi<{ synced: number; repos: string[]; errors: string[] }>(
-            `/sync/${encodeURIComponent(owner)}${qs ? `?${qs}` : ""}`,
-            {
-                method: "POST"
-            }
-        );
+        return fetchApi<{
+            triggered?: boolean;
+            synced?: number;
+            repos?: string[];
+            errors?: string[];
+        }>(`/sync/${encodeURIComponent(owner)}${qs ? `?${qs}` : ""}`, { method: "POST" });
     },
+    getSyncProgress: (owner: string) =>
+        fetchApi<SyncProgressResponse>(`/sync/progress/${encodeURIComponent(owner)}`),
 
     deleteConfig: (owner: string) =>
         fetchApi<{ configured: false }>(`/config/${encodeURIComponent(owner)}`, {
+            method: "DELETE"
+        }),
+
+    deleteOwnerData: (owner: string) =>
+        fetchApi<{ deleted: boolean; owner: string }>(`/owner/${encodeURIComponent(owner)}`, {
             method: "DELETE"
         })
 };

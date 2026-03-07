@@ -8,3 +8,5 @@ Thumbs.db
 .vite/
 .cache/
 .idea
+.claude
+nul

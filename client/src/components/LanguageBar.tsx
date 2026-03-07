@@ -10,7 +10,7 @@ export function LanguageBar({ data }: LanguageBarProps) {
 
     return (
         <div className="w-full">
-            <div className="flex h-4 w-full rounded-full overflow-hidden bg-gray-800 mb-2">
+            <div className="flex h-3 w-full rounded-full overflow-hidden bg-gray-800 mb-2">
                 {data.map((item) => {
                     const width = (item.count / total) * 100;
                     if (width === 0) return null;

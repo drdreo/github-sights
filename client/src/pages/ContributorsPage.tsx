@@ -1,5 +1,4 @@
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
-import { subDays } from "date-fns";
 import { ArrowLeft } from "lucide-react";
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
@@ -11,9 +10,18 @@ import { FetchedAtBadge } from "../components/FetchedAtBadge";
 import { useContributorOverview } from "../hooks/useGitHub";
 import { useOwner } from "../hooks/useOwner";
 import { getContributorColumns } from "../lib/contributorColumns";
+import { SyncBanner } from "../components/SyncBanner";
 import type { ContributorOverview } from "../types";
 
 const columnHelper = createColumnHelper<ContributorOverview>();
+
+const prsColumn = columnHelper.accessor("totalPRs", {
+    id: "totalPRs",
+    header: "PRs",
+    cell: (info) => info.getValue().toLocaleString(),
+    sortingFn: "basic",
+    meta: { align: "right" as const }
+});
 
 const reposColumn = columnHelper.accessor((row) => row.repos.length, {
     id: "repos",
@@ -49,29 +57,38 @@ const reposColumn = columnHelper.accessor((row) => row.repos.length, {
     meta: { align: "right" as const }
 });
 
-// Shared base columns + page-specific repos column
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const columns: ColumnDef<ContributorOverview, any>[] = [
-    ...getContributorColumns<ContributorOverview>(),
-    reposColumn
-];
+// Columns are built inside the component so we can use the owner for linkBase
+function useColumns(owner: string) {
+    return React.useMemo(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const cols: ColumnDef<ContributorOverview, any>[] = [
+            ...getContributorColumns<ContributorOverview>({ linkBase: `/${owner}/contributors` }),
+            prsColumn,
+            reposColumn
+        ];
+        return cols;
+    }, [owner]);
+}
 
 export default function ContributorsPage() {
-    const [dateRange, setDateRange] = useState({
-        startDate: subDays(new Date(), 30),
-        endDate: new Date()
+    const [dateRange, setDateRange] = useState<{
+        startDate: Date | null;
+        endDate: Date | null;
+    }>({
+        startDate: null,
+        endDate: null
     });
 
     const owner = useOwner();
+    const columns = useColumns(owner);
 
-    // Convert dates to ISO strings for the API
-    const since = dateRange.startDate.toISOString();
-    const until = dateRange.endDate.toISOString();
+    // Convert dates to ISO strings for the API (null = all time)
+    const since = dateRange.startDate?.toISOString() ?? undefined;
+    const until = dateRange.endDate?.toISOString() ?? undefined;
 
     const { data: contributorsResponse, isLoading } = useContributorOverview(owner, since, until);
     const contributors = contributorsResponse?.data;
     const fetchedAt = contributorsResponse?.fetchedAt;
-
 
     return (
         <div className="min-h-screen bg-gray-950 p-8">
@@ -95,12 +112,13 @@ export default function ContributorsPage() {
                             </span>
                             {fetchedAt && <FetchedAtBadge fetchedAt={fetchedAt} />}
                         </h1>
-
+                        <SyncBanner owner={owner} />
                     </div>
                     <TimeRangeSelector
                         startDate={dateRange.startDate}
                         endDate={dateRange.endDate}
                         onChange={setDateRange}
+                        showAllTime
                     />
                 </div>
 

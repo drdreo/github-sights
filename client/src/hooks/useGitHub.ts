@@ -17,8 +17,12 @@ export function useSetConfig() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: api.setConfig,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["config"] });
+        onSuccess: (_data, variables) => {
+            queryClient.setQueryData(["config", variables.owner], {
+                configured: true,
+                owner: variables.owner,
+                ownerType: variables.ownerType
+            });
         }
     });
 }
@@ -30,6 +34,14 @@ export function useRepos(owner: string) {
         queryKey: ["repos", owner],
         queryFn: () => api.getRepos(owner),
 
+        enabled: !!owner
+    });
+}
+
+export function useRepoSnapshots(owner: string) {
+    return useQuery({
+        queryKey: ["repo-snapshots", owner],
+        queryFn: () => api.getRepoSnapshots(owner),
         enabled: !!owner
     });
 }
@@ -89,33 +101,37 @@ export function useCommitTimelines(owner: string, since?: string, until?: string
     });
 }
 
-// ── Background Sync ─────────────────────────────────────────────────────────────
-
 /**
- * Cache-first background sync hook.
+ * Background sync hook — triggers a single incremental sync per owner.
  *
- * After the dashboard renders cached data, this hook fires POST /api/sync
- * to fill commit gaps (last fetch → now). When sync completes, it invalidates
- * the stats + timelines queries so they refetch from the now-fresh DB.
+ * Fires POST /api/sync/:owner to fill event tables with repos + PRs
+ * from the high-water mark to now. When complete, invalidates stats +
+ * timelines queries so they refetch from the now-fresh DB.
  *
- * Only syncs once per owner+range combination to avoid redundant calls.
+ * Commits are fetched on-demand server-side when a user views a repo detail page.
+ *
+ * Optionally accepts `since` (ISO date string) for initial syncs to control
+ * how far back to crawl. Only used once per owner session.
+ *
+ * Date filtering is handled by the read queries (useStats, useCommitTimelines),
+ * NOT by the sync. Changing the date picker should never re-trigger a sync.
  */
-export function useSync(owner: string, since?: string, until?: string) {
+/**
+ * Fire-and-forget freshness check.
+ * Triggers POST /api/sync/:owner once per owner to ensure data is fresh.
+ * Does NOT drive UI — use useSyncProgress for that.
+ */
+export function useSync(owner: string, since?: string) {
     const queryClient = useQueryClient();
     const syncedRef = useRef<string | null>(null);
 
     const syncMutation = useMutation({
-        mutationFn: () => api.sync(owner, since, until),
-        onSuccess: (result) => {
-            console.log(
-                `[sync] Done: ${result.synced} commits across ${result.repos.length} repos`
-            );
-            if (result.errors.length > 0) {
-                console.warn(`[sync] Errors:`, result.errors);
-            }
-            // Invalidate cached queries so they refetch from the now-fresh DB
+        mutationFn: () => api.sync(owner, since),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["syncProgress", owner] });
             queryClient.invalidateQueries({ queryKey: ["stats", owner] });
             queryClient.invalidateQueries({ queryKey: ["timelines", owner] });
+            queryClient.invalidateQueries({ queryKey: ["repo-snapshots", owner] });
         },
         onError: (error) => {
             console.error("[sync] Failed:", error);
@@ -124,21 +140,12 @@ export function useSync(owner: string, since?: string, until?: string) {
 
     useEffect(() => {
         if (!owner) return;
-
-        // Create a key for this specific sync request to avoid double-firing
-        const syncKey = `${owner}:${since}:${until}`;
-        if (syncedRef.current === syncKey) return;
+        if (syncedRef.current === owner) return;
         if (syncMutation.isPending) return;
 
-        syncedRef.current = syncKey;
+        syncedRef.current = owner;
         syncMutation.mutate();
-    }, [owner, since, until]);
-
-    return {
-        isSyncing: syncMutation.isPending,
-        syncError: syncMutation.error,
-        syncResult: syncMutation.data
-    };
+    }, [owner]);
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────────
@@ -207,6 +214,14 @@ export function useContributorOverview(owner: string, since?: string, until?: st
         queryFn: () => api.getContributorOverview(owner, since, until),
 
         enabled: !!owner
+    });
+}
+
+export function useContributorDetail(owner: string, login: string, since?: string, until?: string) {
+    return useQuery({
+        queryKey: ["contributor-detail", owner, login, since, until],
+        queryFn: () => api.getContributorDetail(owner, login, since, until),
+        enabled: !!owner && !!login
     });
 }
 

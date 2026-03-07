@@ -1,7 +1,13 @@
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import React from "react";
+import { Link } from "react-router-dom";
 import type { RepoContributorStat } from "../types";
 import { formatLoc } from "./format";
+
+interface ContributorColumnOptions {
+    /** When set, contributor login becomes a router Link to `${linkBase}/${login}`. */
+    linkBase?: string;
+}
 
 /**
  * Shared contributor column definitions.
@@ -10,7 +16,9 @@ import { formatLoc } from "./format";
  * Consumers can spread these and append extra columns.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getContributorColumns<T extends RepoContributorStat>(): ColumnDef<T, any>[] {
+export function getContributorColumns<T extends RepoContributorStat>(
+    options?: ContributorColumnOptions
+): ColumnDef<T, any>[] {
     const col = createColumnHelper<T>();
 
     return [
@@ -25,6 +33,23 @@ export function getContributorColumns<T extends RepoContributorStat>(): ColumnDe
             header: "Contributor",
             cell: (info) => {
                 const row = info.row.original;
+                const nameEl = options?.linkBase ? (
+                    <Link
+                        to={`${options.linkBase}/${row.login}`}
+                        className="text-gray-100 hover:text-blue-400 font-medium transition-colors"
+                    >
+                        {row.login}
+                    </Link>
+                ) : (
+                    <a
+                        href={row.html_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-100 hover:text-blue-400 font-medium transition-colors"
+                    >
+                        {row.login}
+                    </a>
+                );
                 return (
                     <div className="flex items-center gap-3">
                         <img
@@ -32,14 +57,7 @@ export function getContributorColumns<T extends RepoContributorStat>(): ColumnDe
                             alt={row.login}
                             className="w-8 h-8 rounded-full bg-gray-800 ring-2 ring-gray-800 group-hover:ring-gray-700 transition-all"
                         />
-                        <a
-                            href={row.html_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-gray-100 hover:text-blue-400 font-medium transition-colors"
-                        >
-                            {row.login}
-                        </a>
+                        {nameEl}
                     </div>
                 );
             },

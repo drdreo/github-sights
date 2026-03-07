@@ -305,6 +305,16 @@ function CommitBubble({ commit, color }: { commit: Commit; color: string }) {
                             </div>
                         </div>
 
+                        {commit.stats &&
+                            (commit.stats.additions > 0 || commit.stats.deletions > 0) && (
+                                <div className="flex items-center gap-3 text-xs font-mono">
+                                    <span className="text-green-400">
+                                        +{commit.stats.additions}
+                                    </span>
+                                    <span className="text-red-400">-{commit.stats.deletions}</span>
+                                </div>
+                            )}
+
                         <div className="text-gray-500 text-[10px] font-mono mt-1 flex justify-between items-center bg-gray-950/50 rounded px-2 py-1.5 border border-gray-800">
                             <span className="select-all">{commit.sha.substring(0, 7)}</span>
                             <a
@@ -313,7 +323,7 @@ function CommitBubble({ commit, color }: { commit: Commit; color: string }) {
                                 rel="noopener noreferrer"
                                 className="hover:text-blue-400 flex items-center gap-1 transition-colors text-blue-500/80"
                             >
-                                View on GitHub <ExternalLink className="w-3 h-3" />
+                                GitHub <ExternalLink className="w-3 h-3" />
                             </a>
                         </div>
                     </div>

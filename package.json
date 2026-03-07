@@ -3,8 +3,8 @@
     "version": "1.0.0",
     "private": true,
     "scripts": {
-        "client:dev": "npm run dev -w client",
-        "client:build": "npm run build -w client",
+        "client:dev": "pnpm --filter client run dev",
+        "client:build": "pnpm --filter client run build",
         "server:dev": "cd server && deno task dev",
         "fmt": "oxfmt .",
         "lint": "oxlint . --fix"

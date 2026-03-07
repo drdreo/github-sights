@@ -63,6 +63,14 @@ export function CommitList({ commits, loading }: CommitListProps) {
                             <span>
                                 committed {formatDistanceToNow(new Date(commit.author.date))} ago
                             </span>
+                            {commit.stats && (
+                                <div className="flex items-center gap-3 font-mono">
+                                    <span className="text-green-400">
+                                        +{commit.stats.additions}
+                                    </span>
+                                    <span className="text-red-400">-{commit.stats.deletions}</span>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

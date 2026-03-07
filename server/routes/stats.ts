@@ -1,6 +1,9 @@
 import { Hono } from "hono";
-import { requireService } from "../config.ts";
+import { requireConfig } from "../config.ts";
 import { errorResponse } from "../errors.ts";
+import { getOwnerSnapshot } from "../db/queries/snapshots.ts";
+import { aggregateOwnerActivity } from "../db/queries/activity.ts";
+import { mapOwnerSnapshotToStats, emptyOverviewStats } from "../mappers.ts";
 
 const stats = new Hono();
 
@@ -9,14 +12,41 @@ const stats = new Hono();
 stats.get("/api/stats/:owner", async (c) => {
     try {
         const { owner } = c.req.param();
-        const { service, config } = requireService(owner);
+        requireConfig(owner);
+
         const since = c.req.query("since") || undefined;
         const until = c.req.query("until") || undefined;
-        const cacheOnly = c.req.query("cacheOnly") === "true";
-        const data = await service.getOverviewStats(owner, config.ownerType, since, until, {
-            cacheOnly
-        });
-        return c.json(data);
+
+        // If date range is specified, aggregate from daily_activity
+        if (since && until) {
+            const agg = await aggregateOwnerActivity(owner, since, until);
+            if (!agg) {
+                return c.json(emptyOverviewStats());
+            }
+
+            // Get the full snapshot for non-time-dependent fields (streaks, language, top contributors)
+            const snap = await getOwnerSnapshot(owner);
+            const base = snap ? mapOwnerSnapshotToStats(snap) : emptyOverviewStats();
+
+            // Override time-dependent counts with the date-range aggregation
+            return c.json({
+                ...base,
+                totalCommits: agg.total_commits,
+                totalAdditions: Number(agg.total_additions),
+                totalDeletions: Number(agg.total_deletions),
+                totalPRs: agg.total_pr_opened + agg.total_pr_merged + agg.total_pr_closed,
+                openPRs: agg.total_pr_opened,
+                mergedPRs: agg.total_pr_merged
+            });
+        }
+
+        // All-time stats from the pre-computed snapshot
+        const snap = await getOwnerSnapshot(owner);
+        if (!snap) {
+            return c.json(emptyOverviewStats());
+        }
+
+        return c.json(mapOwnerSnapshotToStats(snap));
     } catch (error) {
         return errorResponse(c, error);
     }

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { getConfig, setConfig, clearConfig } from "../config.ts";
-import { GitHubService } from "../github.ts";
+import { createOctokit, verifyToken } from "../scraper/index.ts";
 import { badCredentials, tokenMissingScopes, validationError, errorResponse } from "../errors.ts";
 
 const config = new Hono();
@@ -14,7 +14,8 @@ config.get("/api/config/:owner", (c) => {
         return c.json({
             configured: true,
             owner: current.owner,
-            ownerType: current.ownerType
+            ownerType: current.ownerType,
+            syncSince: current.syncSince ?? null
         });
     }
     return c.json({ configured: false });
@@ -28,8 +29,9 @@ config.post("/api/config", async (c) => {
             token?: string;
             owner?: string;
             ownerType?: string;
+            syncSince?: string;
         }>();
-        const { token, owner, ownerType } = body;
+        const { token, owner, ownerType, syncSince } = body;
 
         // ── Validation ──────────────────────────────────────────────
         if (!token) {
@@ -67,11 +69,11 @@ config.post("/api/config", async (c) => {
         }
 
         // ── Verify token against GitHub ─────────────────────────────
-        const service = new GitHubService(token);
+        const octokit = createOctokit(token);
 
         let authResult: { login: string; scopes: string[] };
         try {
-            authResult = await service.verifyAuth();
+            authResult = await verifyToken(octokit);
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
 
@@ -96,7 +98,8 @@ config.post("/api/config", async (c) => {
         await setConfig({
             token,
             owner,
-            ownerType: ownerType as "user" | "org"
+            ownerType: ownerType as "user" | "org",
+            syncSince
         });
 
         console.log(
