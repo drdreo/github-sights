@@ -7,8 +7,18 @@
 //   - Error isolation: per-repo failures don't abort the entire sync
 
 import type { Octokit } from "octokit";
-import { createOctokit, refreshRateLimit, getRateLimitState, type GitHubRepo } from "./github-client.ts";
-import { ingestOwner, ingestCommitsForRepo, ingestPRsForRepo, type IngestOwnerResult } from "./ingest.ts";
+import {
+    createOctokit,
+    refreshRateLimit,
+    getRateLimitState,
+    type GitHubRepo
+} from "./github-client.ts";
+import {
+    ingestOwner,
+    ingestCommitsForRepo,
+    ingestPRsForRepo,
+    type IngestOwnerResult
+} from "./ingest.ts";
 import { aggregateOwner, aggregateRepo, type AggregateResult } from "./aggregate.ts";
 import { getOwner, getRepoByName } from "../db/queries/identity.ts";
 import { getSyncSince } from "../db/queries/config.ts";
@@ -162,16 +172,22 @@ async function doSync(
 ): Promise<SyncResult> {
     const start = Date.now();
     const isBackfill = !!(options?.since || options?.until);
-    console.log(`[sync] Starting ${isBackfill ? 'BACKFILL' : 'sync'} for ${ownerType}:${owner}${isBackfill ? ` (range: ${options?.since ?? 'beginning'} → ${options?.until ?? 'now'})` : ''}`);
+    console.log(
+        `[sync] Starting ${isBackfill ? "BACKFILL" : "sync"} for ${ownerType}:${owner}${isBackfill ? ` (range: ${options?.since ?? "beginning"} → ${options?.until ?? "now"})` : ""}`
+    );
     if (isBackfill) {
-        console.warn(`[sync] ⚠ Manual backfill: only the specified range will be fetched. Gaps outside this range will NOT be auto-filled.`);
+        console.warn(
+            `[sync] ⚠ Manual backfill: only the specified range will be fetched. Gaps outside this range will NOT be auto-filled.`
+        );
     }
 
     const octokit = createOctokit(token);
 
     // Log initial rate limit budget
     const initialBudget = await refreshRateLimit(octokit);
-    console.log(`[sync] Rate limit budget: ${initialBudget.remaining}/${initialBudget.limit} remaining (resets ${initialBudget.resetAt.toISOString()})`);
+    console.log(
+        `[sync] Rate limit budget: ${initialBudget.remaining}/${initialBudget.limit} remaining (resets ${initialBudget.resetAt.toISOString()})`
+    );
 
     // Initialize progress tracking
     initProgress(owner);
@@ -194,9 +210,9 @@ async function doSync(
                 syncedRepos: update.syncedRepos,
                 totalRepos: update.totalRepos,
                 currentRepo: update.currentRepo,
-                totalEvents: update.totalEvents,
+                totalEvents: update.totalEvents
             });
-        },
+        }
     });
 
     const totalSynced = ingestResult.repos.reduce(
@@ -207,18 +223,32 @@ async function doSync(
 
     console.log(
         `[sync] Ingested ${totalSynced} events across ${ingestResult.repoCount} repos for ${owner} ` +
-        `(${ingestResult.errors.length} errors)`
+            `(${ingestResult.errors.length} errors)`
     );
 
     // Log rate limit budget after ingestion
     const postIngestBudget = getRateLimitState(octokit);
-    console.log(`[sync] Rate limit budget after ingestion: ${postIngestBudget.remaining}/${postIngestBudget.limit} remaining`);
+    console.log(
+        `[sync] Rate limit budget after ingestion: ${postIngestBudget.remaining}/${postIngestBudget.limit} remaining`
+    );
 
     // Bail out if aborted (e.g. owner deletion in progress)
     if (signal?.aborted) {
         console.log(`[sync] Sync aborted for ${owner}, skipping aggregation`);
         clearProgress(owner);
-        return { synced: 0, repos: repoNames, errors: ["Sync aborted"], aggregation: { owner, dailyActivityRows: 0, repoSnapshots: 0, contributorSnapshots: 0, ownerSnapshotUpdated: false }, durationMs: Date.now() - start };
+        return {
+            synced: 0,
+            repos: repoNames,
+            errors: ["Sync aborted"],
+            aggregation: {
+                owner,
+                dailyActivityRows: 0,
+                repoSnapshots: 0,
+                contributorSnapshots: 0,
+                ownerSnapshotUpdated: false
+            },
+            durationMs: Date.now() - start
+        };
     }
 
     // Step 2: Aggregate events into snapshots
@@ -231,15 +261,15 @@ async function doSync(
             dailyActivityRows: 0,
             repoSnapshots: 0,
             contributorSnapshots: 0,
-            ownerSnapshotUpdated: false,
+            ownerSnapshotUpdated: false
         };
     } else {
         aggregation = await aggregateOwner(owner);
         console.log(
             `[sync] Aggregated for ${owner}: ` +
-            `${aggregation.repoSnapshots} repo snapshots, ` +
-            `${aggregation.contributorSnapshots} contributor snapshots, ` +
-            `${aggregation.dailyActivityRows} daily activity rows`
+                `${aggregation.repoSnapshots} repo snapshots, ` +
+                `${aggregation.contributorSnapshots} contributor snapshots, ` +
+                `${aggregation.dailyActivityRows} daily activity rows`
         );
     }
 
@@ -255,7 +285,7 @@ async function doSync(
         repos: repoNames,
         errors: ingestResult.errors,
         aggregation,
-        durationMs,
+        durationMs
     };
 }
 
@@ -300,12 +330,16 @@ async function doSyncRepo(
 
     const octokit = createOctokit(token);
     const initialBudget = await refreshRateLimit(octokit);
-    console.log(`[sync] Rate limit budget: ${initialBudget.remaining}/${initialBudget.limit} remaining`);
+    console.log(
+        `[sync] Rate limit budget: ${initialBudget.remaining}/${initialBudget.limit} remaining`
+    );
 
     // Look up the repo in DB to get its GitHub ID
     const repoRow = await getRepoByName(owner, repoName);
     if (!repoRow) {
-        throw new Error(`Repository ${owner}/${repoName} not found in database. Run an owner sync first.`);
+        throw new Error(
+            `Repository ${owner}/${repoName} not found in database. Run an owner sync first.`
+        );
     }
 
     // Build the GitHubRepo shape needed by ingest functions
@@ -328,8 +362,8 @@ async function doSyncRepo(
         owner: {
             login: owner,
             avatar_url: "",
-            html_url: `https://github.com/${owner}`,
-        },
+            html_url: `https://github.com/${owner}`
+        }
     };
 
     const errors: string[] = [];
@@ -339,7 +373,7 @@ async function doSyncRepo(
     try {
         const [commits, prs] = await Promise.all([
             ingestCommitsForRepo(octokit, owner, ghRepo),
-            ingestPRsForRepo(octokit, owner, ghRepo),
+            ingestPRsForRepo(octokit, owner, ghRepo)
         ]);
         commitCount = commits.inserted;
         prCount = prs.upserted;
@@ -366,7 +400,7 @@ async function doSyncRepo(
             open_issues_count: repoRow.open_issues_count,
             created_at: repoRow.created_at,
             updated_at: repoRow.updated_at,
-            pushed_at: repoRow.pushed_at,
+            pushed_at: repoRow.pushed_at
         };
         await aggregateRepo(owner, repoMeta);
     } catch (err) {
@@ -374,14 +408,24 @@ async function doSyncRepo(
     }
 
     const durationMs = Date.now() - start;
-    console.log(`[sync] Completed repo sync for ${owner}/${repoName} in ${durationMs}ms (${commitCount} commits, ${prCount} PRs)`);
+    console.log(
+        `[sync] Completed repo sync for ${owner}/${repoName} in ${durationMs}ms (${commitCount} commits, ${prCount} PRs)`
+    );
 
     return { repo: repoName, commits: commitCount, prs: prCount, errors, durationMs };
 }
 
 // ── Re-exports (barrel) ────────────────────────────────────────────────────────────
 
-export { createOctokit, verifyToken, isRepoExcluded, LANGUAGE_COLORS, guardRateLimit, refreshRateLimit, getRateLimitState } from "./github-client.ts";
+export {
+    createOctokit,
+    verifyToken,
+    isRepoExcluded,
+    LANGUAGE_COLORS,
+    guardRateLimit,
+    refreshRateLimit,
+    getRateLimitState
+} from "./github-client.ts";
 export type { GitHubRepo, GitHubCommit, GitHubPR, RateLimitState } from "./github-client.ts";
 export { ingestOwner, ingestRepos, ingestCommitsForRepo, ingestPRsForRepo } from "./ingest.ts";
 export type { IngestOwnerResult, IngestCommitsResult, IngestPRsResult } from "./ingest.ts";

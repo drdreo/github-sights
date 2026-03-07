@@ -8,7 +8,7 @@ import { LanguageDistribution } from "../components/LanguageDistribution";
 import { StatCards } from "../components/StatCards";
 import { api } from "../lib/api";
 
-import { useCommitTimelines, useStats, useSync } from "../hooks/useGitHub";
+import { useCommitTimelines, useOwnerConfig, useStats, useSync } from "../hooks/useGitHub";
 import { useOwner } from "../hooks/useOwner";
 import { useSyncProgress } from "../hooks/useSyncProgress";
 
@@ -41,6 +41,8 @@ export default function DashboardPage() {
     const [searchParams] = useSearchParams();
     const syncSince = searchParams.get("syncSince") || undefined;
 
+    const { data: ownerConfig } = useOwnerConfig(owner);
+
     useSync(owner, syncSince);
     const { data: syncProgress } = useSyncProgress(owner);
     const isSyncing = syncProgress?.active ?? false;
@@ -63,6 +65,7 @@ export default function DashboardPage() {
                         loading={statsLoading}
                         owner={owner}
                         dateRangeLabel={`Last ${differenceInDays(dateRange.endDate, dateRange.startDate)} days`}
+                        syncSince={ownerConfig?.syncSince ?? undefined}
                     />
                 </div>
 

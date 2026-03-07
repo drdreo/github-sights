@@ -4,7 +4,14 @@ import { requireConfig } from "../config.ts";
 import { errorResponse } from "../errors.ts";
 import { deleteOwnerData } from "../db/queries/identity.ts";
 import { updateSyncSince } from "../db/queries/config.ts";
-import { syncOwner, syncRepo, ensureFresh, getProgress, isSyncing, abortInflight } from "../scraper/index.ts";
+import {
+    syncOwner,
+    syncRepo,
+    ensureFresh,
+    getProgress,
+    isSyncing,
+    abortInflight
+} from "../scraper/index.ts";
 import { aggregateOwner } from "../scraper/aggregate.ts";
 
 const sync = new Hono();
@@ -32,7 +39,7 @@ sync.post("/api/sync/:owner", async (c) => {
             return c.json({
                 synced: result.synced,
                 repos: result.repos,
-                errors: result.errors,
+                errors: result.errors
             });
         }
 
@@ -60,7 +67,7 @@ sync.post("/api/sync/:owner/:repo", async (c) => {
             repo: result.repo,
             commits: result.commits,
             prs: result.prs,
-            errors: result.errors,
+            errors: result.errors
         });
     } catch (error) {
         return errorResponse(c, error);
@@ -81,7 +88,7 @@ sync.get("/api/sync/progress/:owner", (c) => {
         syncedRepos: progress.syncedRepos,
         currentRepo: progress.currentRepo,
         totalEvents: progress.totalEvents,
-        elapsedMs: Date.now() - progress.startedAt,
+        elapsedMs: Date.now() - progress.startedAt
     });
 });
 

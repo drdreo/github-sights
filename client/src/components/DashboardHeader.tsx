@@ -83,7 +83,12 @@ export function DashboardHeader({
                 <TimeRangeSelector
                     startDate={dateRange.startDate}
                     endDate={dateRange.endDate}
-                    onChange={onDateRangeChange as (range: { startDate: Date | null; endDate: Date | null }) => void}
+                    onChange={
+                        onDateRangeChange as (range: {
+                            startDate: Date | null;
+                            endDate: Date | null;
+                        }) => void
+                    }
                 />
                 {onDelete && (
                     <button

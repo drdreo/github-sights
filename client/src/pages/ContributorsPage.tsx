@@ -20,7 +20,7 @@ const prsColumn = columnHelper.accessor("totalPRs", {
     header: "PRs",
     cell: (info) => info.getValue().toLocaleString(),
     sortingFn: "basic",
-    meta: { align: "right" as const },
+    meta: { align: "right" as const }
 });
 
 const reposColumn = columnHelper.accessor((row) => row.repos.length, {
@@ -89,7 +89,6 @@ export default function ContributorsPage() {
     const { data: contributorsResponse, isLoading } = useContributorOverview(owner, since, until);
     const contributors = contributorsResponse?.data;
     const fetchedAt = contributorsResponse?.fetchedAt;
-
 
     return (
         <div className="min-h-screen bg-gray-950 p-8">

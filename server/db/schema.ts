@@ -8,9 +8,10 @@ import { query, execute, transaction } from "./pool.ts";
 // Convert file:// URL to a local path that works on both Windows and Unix.
 // On Windows, URL.pathname produces "/C:/..." — we strip the leading slash.
 const migrationsUrl = new URL("./migrations/", import.meta.url);
-const MIGRATIONS_DIR = Deno.build.os === "windows"
-    ? migrationsUrl.pathname.replace(/^\//, "")
-    : migrationsUrl.pathname;
+const MIGRATIONS_DIR =
+    Deno.build.os === "windows"
+        ? migrationsUrl.pathname.replace(/^\//, "")
+        : migrationsUrl.pathname;
 
 /** Ensure the migrations tracking table exists. */
 async function ensureMigrationsTable(): Promise<void> {
@@ -24,9 +25,7 @@ async function ensureMigrationsTable(): Promise<void> {
 
 /** Get list of already-applied migration names. */
 async function getAppliedMigrations(): Promise<Set<string>> {
-    const rows = await query<{ name: string }>(
-        "SELECT name FROM schema_migrations ORDER BY name"
-    );
+    const rows = await query<{ name: string }>("SELECT name FROM schema_migrations ORDER BY name");
     return new Set(rows.map((r) => r.name));
 }
 
@@ -38,7 +37,7 @@ async function discoverMigrations(): Promise<{ name: string; path: string }[]> {
             if (entry.isFile && entry.name.endsWith(".sql")) {
                 entries.push({
                     name: entry.name,
-                    path: `${MIGRATIONS_DIR}/${entry.name}`,
+                    path: `${MIGRATIONS_DIR}/${entry.name}`
                 });
             }
         }
@@ -77,10 +76,9 @@ export async function runMigrations(): Promise<number> {
         await transaction(async (client) => {
             console.log(`[db]   > ${migration.name}`);
             await client.query(sql);
-            await client.query(
-                "INSERT INTO schema_migrations (name) VALUES ($1)",
-                [migration.name]
-            );
+            await client.query("INSERT INTO schema_migrations (name) VALUES ($1)", [
+                migration.name
+            ]);
         });
         console.log(`[db]   ✓ ${migration.name}`);
     }

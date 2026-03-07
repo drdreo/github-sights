@@ -16,28 +16,27 @@ import {
     getRateLimitState,
     type GitHubRepo,
     type GitHubCommit,
-    type GitHubPR,
+    type GitHubPR
 } from "./github-client.ts";
 import {
     upsertOwner,
     upsertRepos,
     upsertContributors,
     type UpsertRepoInput,
-    type UpsertContributorInput,
+    type UpsertContributorInput
 } from "../db/queries/identity.ts";
 import {
     insertCommits,
     upsertPrs,
     type InsertCommitInput,
-    type InsertPrInput,
+    type InsertPrInput
 } from "../db/queries/events.ts";
 import {
     getSyncState,
-    upsertSyncState,
     advanceSyncState,
     retreatEarliestSynced,
     getEarliestSynced,
-    recordSyncError,
+    recordSyncError
 } from "../db/queries/sync-state.ts";
 import { updateOwnerSyncedAt } from "../db/queries/identity.ts";
 import { aggregateRepo } from "./aggregate.ts";
@@ -114,7 +113,7 @@ export async function ingestRepos(
         open_issues_count: r.open_issues_count,
         created_at: r.created_at,
         updated_at: r.updated_at,
-        pushed_at: r.pushed_at,
+        pushed_at: r.pushed_at
     }));
 
     await upsertRepos(repoInputs);
@@ -123,7 +122,9 @@ export async function ingestRepos(
     const activeRepos = ghRepos
         .filter((r) => !r.fork && !isRepoExcluded(r.name))
         .sort((a, b) => new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime());
-    console.log(`[ingest] ${owner}: ${activeRepos.length}/${ghRepos.length} repos eligible (excluded forks + ignored)`);
+    console.log(
+        `[ingest] ${owner}: ${activeRepos.length}/${ghRepos.length} repos eligible (excluded forks + ignored)`
+    );
 
     return { repos: activeRepos, repoCount: ghRepos.length };
 }
@@ -161,7 +162,7 @@ export async function ingestCommitsForRepo(
     // Fetch from GitHub
     const ghCommits = await fetchCommits(octokit, owner, repoName, {
         since: fetchSince ?? undefined,
-        until: fetchUntil,
+        until: fetchUntil
     });
 
     let totalInserted = 0;
@@ -170,7 +171,9 @@ export async function ingestCommitsForRepo(
         // Only advance high-water mark forward, never backward (protects backfills)
         await advanceSyncState(owner, repoId, "commits", fetchUntil);
     } else {
-        console.log(`[ingest] ${owner}/${repoName}: fetched ${ghCommits.length} commits${fetchSince ? ` (since ${fetchSince.split('T')[0]})` : ' (full history)'}`);
+        console.log(
+            `[ingest] ${owner}/${repoName}: fetched ${ghCommits.length} commits${fetchSince ? ` (since ${fetchSince.split("T")[0]})` : " (full history)"}`
+        );
 
         // Map to DB shape
         const commitInputs: InsertCommitInput[] = ghCommits.map((c) => ({
@@ -183,6 +186,7 @@ export async function ingestCommitsForRepo(
             committed_at: c.committed_at,
             additions: c.additions,
             deletions: c.deletions,
+            is_merge: c.is_merge
         }));
 
         totalInserted += await insertCommits(commitInputs);
@@ -207,15 +211,19 @@ export async function ingestCommitsForRepo(
 
         if (!earliestSynced || new Date(desiredSince) < new Date(earliestSynced)) {
             const backfillUntil = earliestSynced ?? fetchUntil;
-            console.log(`[ingest] ${owner}/${repoName}: backfilling commits ${desiredSince.split('T')[0]} → ${backfillUntil.split('T')[0]}`);
+            console.log(
+                `[ingest] ${owner}/${repoName}: backfilling commits ${desiredSince.split("T")[0]} → ${backfillUntil.split("T")[0]}`
+            );
 
             const backfillCommits = await fetchCommits(octokit, owner, repoName, {
                 since: desiredSince,
-                until: backfillUntil,
+                until: backfillUntil
             });
 
             if (backfillCommits.length > 0) {
-                console.log(`[ingest] ${owner}/${repoName}: backfill fetched ${backfillCommits.length} commits`);
+                console.log(
+                    `[ingest] ${owner}/${repoName}: backfill fetched ${backfillCommits.length} commits`
+                );
 
                 const backfillInputs: InsertCommitInput[] = backfillCommits.map((c) => ({
                     sha: c.sha,
@@ -227,6 +235,7 @@ export async function ingestCommitsForRepo(
                     committed_at: c.committed_at,
                     additions: c.additions,
                     deletions: c.deletions,
+                    is_merge: c.is_merge
                 }));
 
                 totalInserted += await insertCommits(backfillInputs);
@@ -283,7 +292,7 @@ export async function ingestPRsForRepo(
         changed_files: pr.changed_files,
         created_at: pr.created_at,
         closed_at: pr.closed_at,
-        merged_at: pr.merged_at,
+        merged_at: pr.merged_at
     }));
 
     const upserted = await upsertPrs(prInputs);
@@ -308,11 +317,25 @@ export async function ingestOwner(
     octokit: Octokit,
     owner: string,
     ownerType: "user" | "org",
-    options?: { since?: string; until?: string; desiredSince?: string; skipAggregation?: boolean; signal?: AbortSignal; onProgress?: (update: { syncedRepos: number; totalRepos: number; currentRepo: string; totalEvents: number }) => void }
+    options?: {
+        since?: string;
+        until?: string;
+        desiredSince?: string;
+        skipAggregation?: boolean;
+        signal?: AbortSignal;
+        onProgress?: (update: {
+            syncedRepos: number;
+            totalRepos: number;
+            currentRepo: string;
+            totalEvents: number;
+        }) => void;
+    }
 ): Promise<IngestOwnerResult> {
     // Step 1: Ingest repos
     const { repos } = await ingestRepos(octokit, owner, ownerType);
-    console.log(`[ingest] ${owner}: starting ingestion for ${repos.length} repos (concurrency=${CONCURRENCY})`);
+    console.log(
+        `[ingest] ${owner}: starting ingestion for ${repos.length} repos (concurrency=${CONCURRENCY})`
+    );
 
     const results: IngestOwnerResult["repos"] = [];
     const errors: string[] = [];
@@ -330,9 +353,9 @@ export async function ingestOwner(
                     ingestCommitsForRepo(octokit, owner, repo, {
                         since: options?.since,
                         until: options?.until,
-                        desiredSince: options?.desiredSince,
+                        desiredSince: options?.desiredSince
                     }),
-                    ingestPRsForRepo(octokit, owner, repo),
+                    ingestPRsForRepo(octokit, owner, repo)
                 ]);
                 return { name: repo.name, repoGh: repo, commits, prs };
             })
@@ -342,7 +365,11 @@ export async function ingestOwner(
             const result = batchResults[j];
             const repo = batch[j];
             if (result.status === "fulfilled") {
-                results.push({ name: result.value.name, commits: result.value.commits, prs: result.value.prs });
+                results.push({
+                    name: result.value.name,
+                    commits: result.value.commits,
+                    prs: result.value.prs
+                });
             } else {
                 const errMsg = `${repo.name}: ${String(result.reason)}`;
                 errors.push(errMsg);
@@ -353,17 +380,22 @@ export async function ingestOwner(
         }
 
         const budget = getRateLimitState(octokit);
-        console.log(`[ingest] ${owner}: batch ${Math.floor(i / CONCURRENCY) + 1}/${Math.ceil(repos.length / CONCURRENCY)} complete (API budget: ${budget.remaining}/${budget.limit})`);
+        console.log(
+            `[ingest] ${owner}: batch ${Math.floor(i / CONCURRENCY) + 1}/${Math.ceil(repos.length / CONCURRENCY)} complete (API budget: ${budget.remaining}/${budget.limit})`
+        );
 
         // Report progress to caller
         if (options?.onProgress) {
-            const totalEvents = results.reduce((sum, r) => sum + r.commits.inserted + r.prs.upserted, 0);
+            const totalEvents = results.reduce(
+                (sum, r) => sum + r.commits.inserted + r.prs.upserted,
+                0
+            );
             const lastRepo = batch[batch.length - 1];
             options.onProgress({
                 syncedRepos: Math.min(i + CONCURRENCY, repos.length),
                 totalRepos: repos.length,
                 currentRepo: lastRepo?.name ?? "",
-                totalEvents,
+                totalEvents
             });
         }
 
@@ -390,11 +422,14 @@ export async function ingestOwner(
                             open_issues_count: repo.open_issues_count,
                             created_at: repo.created_at ? new Date(repo.created_at) : null,
                             updated_at: repo.updated_at ? new Date(repo.updated_at) : null,
-                            pushed_at: repo.pushed_at ? new Date(repo.pushed_at) : null,
+                            pushed_at: repo.pushed_at ? new Date(repo.pushed_at) : null
                         };
                         await aggregateRepo(owner, repoMeta);
                     } catch (err) {
-                        console.warn(`[ingest] ${owner}/${repo.name}: progressive aggregation failed (non-fatal):`, err);
+                        console.warn(
+                            `[ingest] ${owner}/${repo.name}: progressive aggregation failed (non-fatal):`,
+                            err
+                        );
                     }
                 }
             }
@@ -407,7 +442,7 @@ export async function ingestOwner(
         owner,
         repoCount: repos.length,
         repos: results,
-        errors,
+        errors
     };
 }
 
@@ -423,7 +458,7 @@ function extractContributorsFromCommits(commits: GitHubCommit[]): UpsertContribu
                 avatar_url: c.author_avatar_url,
                 html_url: `https://github.com/${c.author_login}`,
                 name: c.author_name !== "Unknown" ? c.author_name : null,
-                email: c.author_email || null,
+                email: c.author_email || null
             });
         }
     }
@@ -439,7 +474,7 @@ function extractContributorsFromPRs(prs: GitHubPR[]): UpsertContributorInput[] {
             seen.set(pr.author_login, {
                 login: pr.author_login,
                 avatar_url: pr.author_avatar_url,
-                html_url: `https://github.com/${pr.author_login}`,
+                html_url: `https://github.com/${pr.author_login}`
             });
         }
     }

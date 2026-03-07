@@ -65,7 +65,9 @@ export function CommitList({ commits, loading }: CommitListProps) {
                             </span>
                             {commit.stats && (
                                 <div className="flex items-center gap-3 font-mono">
-                                    <span className="text-green-400">+{commit.stats.additions}</span>
+                                    <span className="text-green-400">
+                                        +{commit.stats.additions}
+                                    </span>
                                     <span className="text-red-400">-{commit.stats.deletions}</span>
                                 </div>
                             )}

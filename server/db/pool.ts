@@ -32,9 +32,7 @@ let pool: InstanceType<typeof Pool> | null = null;
 export async function initPool(): Promise<boolean> {
     const connectionString = Deno.env.get("DATABASE_URL");
     if (!connectionString) {
-        console.warn(
-            "[db] DATABASE_URL not set — database features disabled."
-        );
+        console.warn("[db] DATABASE_URL not set — database features disabled.");
         return false;
     }
 
@@ -42,7 +40,7 @@ export async function initPool(): Promise<boolean> {
         connectionString,
         max: 3,
         idleTimeoutMillis: 30_000,
-        connectionTimeoutMillis: 10_000,
+        connectionTimeoutMillis: 10_000
     });
 
     pool.on("error", (err: Error) => {
@@ -108,9 +106,7 @@ export async function queryOne<T extends Record<string, any> = Record<string, an
  *   await tx.query("UPDATE ...", []);
  * });
  */
-export async function transaction<T>(
-    fn: (client: PoolClient) => Promise<T>
-): Promise<T> {
+export async function transaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
     if (!pool) throw new Error("[db] Pool not initialized");
     const client = await pool.connect();
     try {
@@ -143,7 +139,7 @@ export function poolStats(): {
     return {
         totalCount: pool.totalCount,
         idleCount: pool.idleCount,
-        waitingCount: pool.waitingCount,
+        waitingCount: pool.waitingCount
     };
 }
 

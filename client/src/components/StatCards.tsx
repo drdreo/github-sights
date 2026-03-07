@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
 import { formatLoc } from "../lib/format";
 import { OverviewStats } from "../types";
 import { LoadingSkeleton } from "./LoadingSkeleton";
@@ -20,9 +21,10 @@ interface StatCardsProps {
     loading?: boolean;
     owner: string;
     dateRangeLabel?: string;
+    syncSince?: string;
 }
 
-export function StatCards({ stats, loading, owner, dateRangeLabel }: StatCardsProps) {
+export function StatCards({ stats, loading, owner, dateRangeLabel, syncSince }: StatCardsProps) {
     const navigate = useNavigate();
 
     if (loading || !stats) {
@@ -102,7 +104,10 @@ export function StatCards({ stats, loading, owner, dateRangeLabel }: StatCardsPr
             subtext: `${stats.mostActiveRepo?.commits || 0} commits`,
             icon: Activity,
             color: "text-emerald-400",
-            bg: "bg-emerald-500/10"
+            bg: "bg-emerald-500/10",
+            href: stats.mostActiveRepo?.name
+                ? `/${owner}/repo/${stats.mostActiveRepo.name}`
+                : undefined
         },
         {
             label: "Longest Streak",
@@ -147,7 +152,8 @@ export function StatCards({ stats, loading, owner, dateRangeLabel }: StatCardsPr
             </div>
             <div>
                 <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">
-                    Overview · All time
+                    Overview
+                    {syncSince ? ` · Since ${format(new Date(syncSince), "MMM d, yyyy")}` : ""}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {overviewCards.map(renderCard)}

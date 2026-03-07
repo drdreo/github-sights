@@ -2,8 +2,8 @@
 //
 // Batch insert and query operations for commit_event, pr_event, and workflow_event.
 
-import { query, execute, transaction } from "../pool.ts";
-import type { CommitEventRow, CommitEventWithAvatarRow, PrEventRow, PrEventWithAvatarRow, WorkflowEventRow } from "../types.ts";
+import { query, transaction } from "../pool.ts";
+import type { CommitEventWithAvatarRow, PrEventWithAvatarRow } from "../types.ts";
 
 const BATCH_SIZE = 500;
 
@@ -38,6 +38,7 @@ export interface InsertCommitInput {
     committed_at: string;
     additions: number;
     deletions: number;
+    is_merge: boolean;
 }
 
 /** Batch insert commits. Skips duplicates (ON CONFLICT DO NOTHING). */
@@ -49,15 +50,23 @@ export async function insertCommits(commits: InsertCommitInput[]): Promise<numbe
         for (let i = 0; i < commits.length; i += BATCH_SIZE) {
             const chunk = commits.slice(i, i + BATCH_SIZE);
             const { text, params } = buildMultiRowValues(chunk, (c) => [
-                c.sha, c.repo_id, c.author_login, c.committer_login,
-                c.message, c.html_url, c.committed_at, c.additions, c.deletions,
+                c.sha,
+                c.repo_id,
+                c.author_login,
+                c.committer_login,
+                c.message,
+                c.html_url,
+                c.committed_at,
+                c.additions,
+                c.deletions,
+                c.is_merge
             ]);
             const result = await client.query(
                 `INSERT INTO commit_event (
                     sha, repo_id, author_login, committer_login,
-                    message, html_url, committed_at, additions, deletions
+                    message, html_url, committed_at, additions, deletions, is_merge
                  ) VALUES ${text}
-                 ON CONFLICT (sha) DO NOTHING`,
+                 ON CONFLICT (sha) DO UPDATE SET is_merge = EXCLUDED.is_merge`,
                 params
             );
             inserted += result.rowCount ?? 0;
@@ -104,10 +113,7 @@ export async function getCommitsByOwner(
     ownerLogin: string,
     options?: { since?: string; until?: string }
 ): Promise<CommitEventWithAvatarRow[]> {
-    const conditions = [
-        "ce.repo_id = rm.id",
-        "rm.owner_login = $1",
-    ];
+    const conditions = ["ce.repo_id = rm.id", "rm.owner_login = $1"];
     const params: unknown[] = [ownerLogin];
     let idx = 2;
 
@@ -166,10 +172,22 @@ export async function upsertPrs(prs: InsertPrInput[]): Promise<number> {
         for (let i = 0; i < prs.length; i += BATCH_SIZE) {
             const chunk = prs.slice(i, i + BATCH_SIZE);
             const { text, params } = buildMultiRowValues(chunk, (pr) => [
-                pr.id, pr.repo_id, pr.number, pr.author_login, pr.title,
-                pr.state, pr.is_draft, pr.html_url, pr.base_ref, pr.head_ref,
-                pr.additions, pr.deletions, pr.changed_files,
-                pr.created_at, pr.closed_at, pr.merged_at,
+                pr.id,
+                pr.repo_id,
+                pr.number,
+                pr.author_login,
+                pr.title,
+                pr.state,
+                pr.is_draft,
+                pr.html_url,
+                pr.base_ref,
+                pr.head_ref,
+                pr.additions,
+                pr.deletions,
+                pr.changed_files,
+                pr.created_at,
+                pr.closed_at,
+                pr.merged_at
             ]);
             const result = await client.query(
                 `INSERT INTO pr_event (
@@ -221,16 +239,28 @@ export async function getPrsByRepo(
 }
 
 /** Get contributor stats for a repo (commits grouped by author). */
-export async function getContributorStatsByRepo(
-    repoId: number
-): Promise<Array<{ login: string; avatar_url: string | null; commits: number; additions: number; deletions: number }>> {
-    return query<{ login: string; avatar_url: string | null; commits: number; additions: number; deletions: number }>(
+export async function getContributorStatsByRepo(repoId: number): Promise<
+    Array<{
+        login: string;
+        avatar_url: string | null;
+        commits: number;
+        additions: number;
+        deletions: number;
+    }>
+> {
+    return query<{
+        login: string;
+        avatar_url: string | null;
+        commits: number;
+        additions: number;
+        deletions: number;
+    }>(
         `SELECT
             c.author_login AS login,
             cp.avatar_url,
             COUNT(*)::INTEGER AS commits,
-            COALESCE(SUM(c.additions), 0)::INTEGER AS additions,
-            COALESCE(SUM(c.deletions), 0)::INTEGER AS deletions
+            COALESCE(SUM(c.additions) FILTER (WHERE c.is_merge = false), 0)::INTEGER AS additions,
+            COALESCE(SUM(c.deletions) FILTER (WHERE c.is_merge = false), 0)::INTEGER AS deletions
          FROM commit_event c
          LEFT JOIN contributor_profile cp ON cp.login = c.author_login
          WHERE c.repo_id = $1 AND c.author_login IS NOT NULL
@@ -266,9 +296,18 @@ export async function insertWorkflows(workflows: InsertWorkflowInput[]): Promise
         for (let i = 0; i < workflows.length; i += BATCH_SIZE) {
             const chunk = workflows.slice(i, i + BATCH_SIZE);
             const { text, params } = buildMultiRowValues(chunk, (w) => [
-                w.id, w.repo_id, w.workflow_name, w.workflow_path, w.actor_login,
-                w.run_number, w.status, w.conclusion, w.head_branch, w.head_sha,
-                w.duration_seconds, w.created_at,
+                w.id,
+                w.repo_id,
+                w.workflow_name,
+                w.workflow_path,
+                w.actor_login,
+                w.run_number,
+                w.status,
+                w.conclusion,
+                w.head_branch,
+                w.head_sha,
+                w.duration_seconds,
+                w.created_at
             ]);
             const result = await client.query(
                 `INSERT INTO workflow_event (

@@ -52,6 +52,7 @@ export interface GitHubCommit {
     committer_login: string | null;
     additions: number;
     deletions: number;
+    is_merge: boolean;
 }
 
 export interface GitHubPR {
@@ -81,7 +82,10 @@ const DEFAULT_EXCLUDED = ["lumicode"];
 function getExcludedRepos(): Set<string> {
     const envVal = typeof Deno !== "undefined" ? Deno.env.get("EXCLUDED_REPOS") : undefined;
     const names = envVal
-        ? envVal.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
+        ? envVal
+              .split(",")
+              .map((s) => s.trim().toLowerCase())
+              .filter(Boolean)
         : DEFAULT_EXCLUDED.map((s) => s.toLowerCase());
     return new Set(names);
 }
@@ -160,7 +164,7 @@ export async function guardRateLimit(octokit: Octokit): Promise<void> {
     const waitMin = (waitMs / 60000).toFixed(1);
     console.warn(
         `[rate-limit] Budget low: ${budget.remaining}/${budget.limit} remaining. ` +
-        `Pausing ${waitMin}min until reset at ${budget.resetAt.toISOString()}`
+            `Pausing ${waitMin}min until reset at ${budget.resetAt.toISOString()}`
     );
     await new Promise((resolve) => setTimeout(resolve, waitMs));
     // After waking, re-check via explicit API call
@@ -212,8 +216,8 @@ export function createOctokit(token: string): Octokit {
                     `[secondary-rate-limit] ${options.method} ${options.url} — retry after ${retryAfter}s (attempt ${retryCount + 1})`
                 );
                 return retryCount < 1;
-            },
-        },
+            }
+        }
     });
 
     // Passively track rate limit headers on every response
@@ -263,6 +267,9 @@ query ($owner: String!, $repo: String!, $since: GitTimestamp, $until: GitTimesta
                                     login
                                     avatarUrl
                                 }
+                            }
+                            parents(first: 0) {
+                                totalCount
                             }
                         }
                     }
@@ -320,16 +327,16 @@ query ($owner: String!, $repo: String!, $states: [PullRequestState!], $after: St
 function logGraphQLRateLimit(response: any): void {
     const rl = response?.rateLimit;
     if (rl && rl.remaining <= 200) {
-        console.warn(`[graphql-rate-limit] ${rl.remaining}/${rl.limit} remaining — resets at ${rl.resetAt}`);
+        console.warn(
+            `[graphql-rate-limit] ${rl.remaining}/${rl.limit} remaining — resets at ${rl.resetAt}`
+        );
     }
 }
 
 // ── API Calls ────────────────────────────────────────────────────────────────────
 
 /** Verify a token by calling /user. Returns the authenticated user's login. */
-export async function verifyToken(
-    octokit: Octokit
-): Promise<{ login: string; scopes: string[] }> {
+export async function verifyToken(octokit: Octokit): Promise<{ login: string; scopes: string[] }> {
     console.log("[github] Verifying token");
     const response = await octokit.rest.users.getAuthenticated();
     const scopes = (response.headers["x-oauth-scopes"] || "")
@@ -352,41 +359,43 @@ export async function fetchRepos(
                 ? await octokit.paginate(octokit.rest.repos.listForOrg, {
                       org: owner,
                       per_page: 100,
-                      type: "all",
+                      type: "all"
                   })
                 : await octokit.paginate(octokit.rest.repos.listForUser, {
                       username: owner,
                       per_page: 100,
-                      sort: "updated",
+                      sort: "updated"
                   });
 
         console.log(`[github] GET repos for ${ownerType}:${owner} → ${raw.length} repos`);
 
-        return raw
-            // deno-lint-ignore no-explicit-any
-            .map((r: any) => ({
-                id: r.id,
-                name: r.name,
-                full_name: r.full_name,
-                description: r.description,
-                html_url: r.html_url,
-                private: r.private,
-                fork: !!r.fork,
-                language: r.language,
-                default_branch: r.default_branch,
-                stargazers_count: r.stargazers_count,
-                forks_count: r.forks_count,
-                open_issues_count: r.open_issues_count,
-                created_at: r.created_at,
-                updated_at: r.updated_at,
-                pushed_at: r.pushed_at,
-                owner: {
-                    login: r.owner.login,
-                    avatar_url: r.owner.avatar_url,
-                    html_url: r.owner.html_url,
-                },
-            }))
-            .filter((r) => !excludedRepos.has(r.name.toLowerCase()));
+        return (
+            raw
+                // deno-lint-ignore no-explicit-any
+                .map((r: any) => ({
+                    id: r.id,
+                    name: r.name,
+                    full_name: r.full_name,
+                    description: r.description,
+                    html_url: r.html_url,
+                    private: r.private,
+                    fork: !!r.fork,
+                    language: r.language,
+                    default_branch: r.default_branch,
+                    stargazers_count: r.stargazers_count,
+                    forks_count: r.forks_count,
+                    open_issues_count: r.open_issues_count,
+                    created_at: r.created_at,
+                    updated_at: r.updated_at,
+                    pushed_at: r.pushed_at,
+                    owner: {
+                        login: r.owner.login,
+                        avatar_url: r.owner.avatar_url,
+                        html_url: r.owner.html_url
+                    }
+                }))
+                .filter((r) => !excludedRepos.has(r.name.toLowerCase()))
+        );
     } catch (error) {
         throw githubApiError(`list repos for ${ownerType}:${owner}`, error);
     }
@@ -416,7 +425,7 @@ export async function fetchCommits(
                 repo,
                 since: toGitTimestamp(options?.since),
                 until: toGitTimestamp(options?.until),
-                after: cursor,
+                after: cursor
             });
 
             logGraphQLRateLimit(response);
@@ -430,7 +439,8 @@ export async function fetchCommits(
                     sha: node.oid,
                     message: node.message,
                     html_url: node.url,
-                    committed_at: node.committer?.date || node.author?.date || new Date().toISOString(),
+                    committed_at:
+                        node.committer?.date || node.author?.date || new Date().toISOString(),
                     author_login: node.author?.user?.login ?? null,
                     author_name: node.author?.name || "Unknown",
                     author_email: node.author?.email || "",
@@ -438,6 +448,7 @@ export async function fetchCommits(
                     committer_login: node.committer?.user?.login ?? null,
                     additions: node.additions ?? 0,
                     deletions: node.deletions ?? 0,
+                    is_merge: (node.parents?.totalCount ?? 0) > 1
                 });
             }
 
@@ -447,7 +458,7 @@ export async function fetchCommits(
 
         console.log(
             `[github] GET commits for ${owner}/${repo} → ${allCommits.length} commits (via GraphQL)` +
-            (options?.since ? ` (since ${options.since.split("T")[0]})` : "")
+                (options?.since ? ` (since ${options.since.split("T")[0]})` : "")
         );
 
         return allCommits;
@@ -465,7 +476,7 @@ export async function fetchPullRequests(
     octokit: Octokit,
     owner: string,
     repo: string,
-    state: "all" | "open" | "closed" = "all",
+    state: "all" | "open" | "closed" = "all"
 ): Promise<GitHubPR[]> {
     try {
         await guardRateLimit(octokit);
@@ -474,7 +485,7 @@ export async function fetchPullRequests(
         const stateMap: Record<string, string[]> = {
             all: ["OPEN", "CLOSED", "MERGED"],
             open: ["OPEN"],
-            closed: ["CLOSED", "MERGED"],
+            closed: ["CLOSED", "MERGED"]
         };
         const states = stateMap[state];
 
@@ -490,7 +501,7 @@ export async function fetchPullRequests(
                 owner,
                 repo,
                 states,
-                after: cursor,
+                after: cursor
             });
 
             logGraphQLRateLimit(response);
@@ -520,7 +531,7 @@ export async function fetchPullRequests(
                     created_at: node.createdAt,
                     closed_at: node.closedAt || null,
                     merged_at: node.mergedAt || null,
-                    updated_at: node.updatedAt,
+                    updated_at: node.updatedAt
                 });
             }
 
@@ -555,22 +566,22 @@ export async function searchPRCounts(
         const [totalResult, openResult, mergedResult] = await Promise.all([
             octokit.rest.search.issuesAndPullRequests({
                 q: [baseQuery, dateRange].filter(Boolean).join(" "),
-                per_page: 1,
+                per_page: 1
             }),
             octokit.rest.search.issuesAndPullRequests({
                 q: [baseQuery, "is:open"].filter(Boolean).join(" "),
-                per_page: 1,
+                per_page: 1
             }),
             octokit.rest.search.issuesAndPullRequests({
                 q: [baseQuery, "is:merged", dateRange].filter(Boolean).join(" "),
-                per_page: 1,
-            }),
+                per_page: 1
+            })
         ]);
 
         return {
             totalPRs: totalResult.data.total_count,
             openPRs: openResult.data.total_count,
-            mergedPRs: mergedResult.data.total_count,
+            mergedPRs: mergedResult.data.total_count
         };
     } catch (error) {
         console.warn(`[search] PR count search failed for ${owner}:`, error);
@@ -599,5 +610,5 @@ export const LANGUAGE_COLORS: Record<string, string> = {
     HTML: "#e34c26",
     CSS: "#563d7c",
     Vue: "#41b883",
-    Svelte: "#ff3e00",
+    Svelte: "#ff3e00"
 };

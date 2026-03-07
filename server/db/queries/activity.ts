@@ -46,10 +46,18 @@ export async function upsertDailyActivity(rows: UpsertDailyActivityInput[]): Pro
                 const placeholders = Array.from({ length: COLS_PER_ROW }, () => `$${idx++}`);
                 tuples.push(`(${placeholders.join(",")},NOW())`);
                 params.push(
-                    r.owner_login, r.repo_id, r.contributor_login, r.date,
-                    r.commit_count, r.additions, r.deletions,
-                    r.pr_opened, r.pr_merged, r.pr_closed,
-                    r.workflow_runs, r.workflow_failures,
+                    r.owner_login,
+                    r.repo_id,
+                    r.contributor_login,
+                    r.date,
+                    r.commit_count,
+                    r.additions,
+                    r.deletions,
+                    r.pr_opened,
+                    r.pr_merged,
+                    r.pr_closed,
+                    r.workflow_runs,
+                    r.workflow_failures
                 );
             }
 
@@ -84,11 +92,7 @@ export async function getOwnerDailyActivity(
     ownerLogin: string,
     options?: { since?: string; until?: string }
 ): Promise<DailyActivityRow[]> {
-    const conditions = [
-        "owner_login = $1",
-        "repo_id IS NULL",
-        "contributor_login IS NULL",
-    ];
+    const conditions = ["owner_login = $1", "repo_id IS NULL", "contributor_login IS NULL"];
     const params: unknown[] = [ownerLogin];
     let idx = 2;
 
@@ -116,10 +120,7 @@ export async function getRepoDailyActivity(
     repoId: number,
     options?: { since?: string; until?: string }
 ): Promise<DailyActivityRow[]> {
-    const conditions = [
-        "repo_id = $1",
-        "contributor_login IS NULL",
-    ];
+    const conditions = ["repo_id = $1", "contributor_login IS NULL"];
     const params: unknown[] = [repoId];
     let idx = 2;
 
@@ -208,8 +209,8 @@ export async function aggregateContributorActivity(
             SELECT
                 ce.author_login AS login,
                 COUNT(*)::INTEGER AS total_commits,
-                COALESCE(SUM(ce.additions), 0)::BIGINT AS total_additions,
-                COALESCE(SUM(ce.deletions), 0)::BIGINT AS total_deletions,
+                COALESCE(SUM(ce.additions) FILTER (WHERE ce.is_merge = false), 0)::BIGINT AS total_additions,
+                COALESCE(SUM(ce.deletions) FILTER (WHERE ce.is_merge = false), 0)::BIGINT AS total_deletions,
                 ARRAY_AGG(DISTINCT rm.name) AS commit_repos
             FROM commit_event ce
             JOIN repository_meta rm ON rm.id = ce.repo_id
@@ -287,11 +288,8 @@ export interface ContributorRepoBreakdownRow {
     prs_merged: number;
 }
 
-/**
- * Aggregate per-repo breakdown for a contributor from event tables.
- * LoC always from commits (GraphQL provides per-commit stats).
- * Works for all merge strategies: squash, merge commit, ff, direct push.
- */
+/** Aggregate per-repo breakdown for a contributor from event tables.
+ *  LoC is sourced from non-merge commits (is_merge = false). */
 export async function getContributorRepoBreakdown(
     ownerLogin: string,
     contributorLogin: string
@@ -307,6 +305,7 @@ export async function getContributorRepoBreakdown(
             JOIN repository_meta rm ON rm.id = ce.repo_id
             WHERE rm.owner_login = $1
               AND ce.author_login = $2
+              AND ce.is_merge = false
             GROUP BY rm.name
         ),
         pr_stats AS (
@@ -336,16 +335,10 @@ export async function getContributorRepoBreakdown(
 
 /** Delete all daily_activity for an owner (used before full rebuild). */
 export async function clearDailyActivity(ownerLogin: string): Promise<void> {
-    await execute(
-        "DELETE FROM daily_activity WHERE owner_login = $1",
-        [ownerLogin]
-    );
+    await execute("DELETE FROM daily_activity WHERE owner_login = $1", [ownerLogin]);
 }
 
 /** Delete daily_activity for a specific repo (used before per-repo rebuild). */
 export async function clearRepoDailyActivity(repoId: number): Promise<void> {
-    await execute(
-        "DELETE FROM daily_activity WHERE repo_id = $1",
-        [repoId]
-    );
+    await execute("DELETE FROM daily_activity WHERE repo_id = $1", [repoId]);
 }

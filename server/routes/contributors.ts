@@ -29,7 +29,7 @@ contributors.get("/api/contributors/:owner", async (c) => {
                 totalAdditions: r.total_additions,
                 totalDeletions: r.total_deletions,
                 totalPRs: r.total_prs,
-                repos: r.repos ?? [],
+                repos: r.repos ?? []
             }));
         } else {
             const rows = await getContributorSnapshotsByOwner(owner);

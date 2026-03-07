@@ -23,7 +23,7 @@ export function initProgress(owner: string): void {
         currentRepo: null,
         totalEvents: 0,
         errors: [],
-        startedAt: Date.now(),
+        startedAt: Date.now()
     });
 }
 

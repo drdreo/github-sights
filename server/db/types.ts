@@ -74,6 +74,7 @@ export interface CommitEventRow {
     committed_at: Date;
     additions: number;
     deletions: number;
+    is_merge: boolean;
     ingested_at: Date;
 }
 
@@ -105,7 +106,16 @@ export interface WorkflowEventRow {
     actor_login: string | null;
     run_number: number | null;
     status: "completed" | "in_progress" | "queued" | null;
-    conclusion: "success" | "failure" | "cancelled" | "skipped" | "timed_out" | "action_required" | "neutral" | "stale" | null;
+    conclusion:
+        | "success"
+        | "failure"
+        | "cancelled"
+        | "skipped"
+        | "timed_out"
+        | "action_required"
+        | "neutral"
+        | "stale"
+        | null;
     head_branch: string | null;
     head_sha: string | null;
     duration_seconds: number | null;

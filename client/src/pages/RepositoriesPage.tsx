@@ -8,7 +8,6 @@ import { RepoGrid } from "../components/RepoGrid";
 import { FetchedAtBadge } from "../components/FetchedAtBadge";
 import { SyncBanner } from "../components/SyncBanner";
 
-
 export default function RepositoriesPage() {
     const owner = useOwner();
 
@@ -17,7 +16,6 @@ export default function RepositoriesPage() {
     const fetchedAt = reposResponse?.fetchedAt;
     const { data: timelines } = useCommitTimelines(owner);
     const { data: snapshots } = useRepoSnapshots(owner);
-
 
     const sortedRepos = useMemo(() => {
         if (!repos) return [];
@@ -37,13 +35,18 @@ export default function RepositoriesPage() {
 
     const snapshotStats = useMemo(() => {
         if (!snapshots) return new Map();
-        return new Map(snapshots.map((s) => [s.name, {
-            totalPRs: s.totalPRs,
-            openPRs: s.openPRs,
-            mergedPRs: s.mergedPRs,
-            totalAdditions: s.totalAdditions,
-            totalDeletions: s.totalDeletions,
-        }]));
+        return new Map(
+            snapshots.map((s) => [
+                s.name,
+                {
+                    totalPRs: s.totalPRs,
+                    openPRs: s.openPRs,
+                    mergedPRs: s.mergedPRs,
+                    totalAdditions: s.totalAdditions,
+                    totalDeletions: s.totalDeletions
+                }
+            ])
+        );
     }, [snapshots]);
 
     return (

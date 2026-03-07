@@ -28,15 +28,15 @@ export function SyncBanner({ owner }: SyncBannerProps) {
             {status === "fetching_repos" && (
                 <span className="text-gray-400">Discovering repositories…</span>
             )}
-            {status === "aggregating" && (
-                <span className="text-gray-400">Building snapshots…</span>
-            )}
+            {status === "aggregating" && <span className="text-gray-400">Building snapshots…</span>}
             {status === "syncing_repos" && totalRepos && totalRepos > 0 ? (
                 <div className="flex items-center gap-2">
                     <div className="w-24 h-1.5 bg-gray-800 rounded-full overflow-hidden">
                         <div
                             className="h-full bg-blue-400 rounded-full transition-all duration-500 ease-out"
-                            style={{ width: `${Math.round(((syncedRepos ?? 0) / totalRepos) * 100)}%` }}
+                            style={{
+                                width: `${Math.round(((syncedRepos ?? 0) / totalRepos) * 100)}%`
+                            }}
                         />
                     </div>
                     <span className="text-gray-400">

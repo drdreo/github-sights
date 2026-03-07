@@ -14,7 +14,6 @@ export interface CachedResponse<T> {
     fetchedAt: number;
 }
 
-
 interface BulkCommitEntry {
     repo: Repository;
     commits: Commit[];
@@ -69,9 +68,12 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
     getConfig: (owner: string) =>
-        fetchApi<{ configured: boolean; owner?: string; ownerType?: "user" | "org" }>(
-            `/config/${encodeURIComponent(owner)}`
-        ),
+        fetchApi<{
+            configured: boolean;
+            owner?: string;
+            ownerType?: "user" | "org";
+            syncSince?: string | null;
+        }>(`/config/${encodeURIComponent(owner)}`),
 
     setConfig: (config: ApiConfig) =>
         fetchApi<void>("/config", {
@@ -83,13 +85,19 @@ export const api = {
         return fetchApi<CachedResponse<Repository[]>>(`/repos/${encodeURIComponent(owner)}`);
     },
 
-
     getRepo: (owner: string, repo: string) => fetchApi<Repository>(`/repos/${owner}/${repo}`),
 
     getRepoSnapshots: (owner: string) =>
-        fetchApi<{ name: string; totalPRs: number; openPRs: number; mergedPRs: number; totalAdditions: number; totalDeletions: number }[]>(
-            `/repo-snapshots/${encodeURIComponent(owner)}`
-        ),
+        fetchApi<
+            {
+                name: string;
+                totalPRs: number;
+                openPRs: number;
+                mergedPRs: number;
+                totalAdditions: number;
+                totalDeletions: number;
+            }[]
+        >(`/repo-snapshots/${encodeURIComponent(owner)}`),
 
     getCommits: (
         owner: string,
@@ -124,16 +132,19 @@ export const api = {
         fetchApi<RepoContributorStat[]>(`/repos/${owner}/${repo}/contributor-stats`),
 
     getContributorDetail: (owner: string, login: string) =>
-        fetchApi<ContributorDetail>(`/contributors/${encodeURIComponent(owner)}/${encodeURIComponent(login)}`),
+        fetchApi<ContributorDetail>(
+            `/contributors/${encodeURIComponent(owner)}/${encodeURIComponent(login)}`
+        ),
 
     getContributorOverview: (owner: string, since?: string, until?: string) => {
         const params = new URLSearchParams();
         if (since) params.append("since", since);
         if (until) params.append("until", until);
         const qs = params.toString();
-        return fetchApi<CachedResponse<ContributorOverview[]>>(`/contributors/${owner}${qs ? `?${qs}` : ""}`);
+        return fetchApi<CachedResponse<ContributorOverview[]>>(
+            `/contributors/${owner}${qs ? `?${qs}` : ""}`
+        );
     },
-
 
     getStats: (owner: string, since?: string, until?: string, cacheOnly?: boolean) => {
         const params = new URLSearchParams();
@@ -150,10 +161,12 @@ export const api = {
         const params = new URLSearchParams();
         if (since) params.append("since", since);
         const qs = params.toString();
-        return fetchApi<{ triggered?: boolean; synced?: number; repos?: string[]; errors?: string[] }>(
-            `/sync/${encodeURIComponent(owner)}${qs ? `?${qs}` : ""}`,
-            { method: "POST" }
-        );
+        return fetchApi<{
+            triggered?: boolean;
+            synced?: number;
+            repos?: string[];
+            errors?: string[];
+        }>(`/sync/${encodeURIComponent(owner)}${qs ? `?${qs}` : ""}`, { method: "POST" });
     },
     getSyncProgress: (owner: string) =>
         fetchApi<SyncProgressResponse>(`/sync/progress/${encodeURIComponent(owner)}`),

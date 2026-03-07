@@ -8,7 +8,7 @@ import {
     XAxis,
     YAxis,
     Tooltip,
-    CartesianGrid,
+    CartesianGrid
 } from "recharts";
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { format } from "date-fns";
@@ -38,42 +38,58 @@ function useRepoBreakdownColumns(owner: string): ColumnDef<RepoBreakdownRow, unk
                             {info.getValue()}
                         </Link>
                     ),
-                    sortingFn: "text",
+                    sortingFn: "text"
                 }),
                 columnHelper.accessor("commits", {
                     header: "Commits",
                     cell: (info) => info.getValue().toLocaleString(),
                     sortingFn: "basic",
-                    meta: { align: "right" as const },
+                    meta: { align: "right" as const }
                 }),
                 columnHelper.accessor("prs", {
                     header: "PRs",
                     cell: (info) => info.getValue().toLocaleString(),
                     sortingFn: "basic",
-                    meta: { align: "right" as const },
+                    meta: { align: "right" as const }
                 }),
                 columnHelper.accessor("prsMerged", {
                     header: "PRs Merged",
                     cell: (info) => info.getValue().toLocaleString(),
                     sortingFn: "basic",
-                    meta: { align: "right" as const },
+                    meta: { align: "right" as const }
                 }),
                 columnHelper.accessor("additions", {
                     header: "Lines Added",
-                    cell: (info) => (
-                        <span className="text-green-400">+{formatLoc(info.getValue())}</span>
-                    ),
+                    cell: (info) => {
+                        const v = info.getValue();
+                        return (
+                            <span
+                                className="text-green-400 cursor-default"
+                                title={`+${v.toLocaleString()}`}
+                            >
+                                +{formatLoc(v)}
+                            </span>
+                        );
+                    },
                     sortingFn: "basic",
-                    meta: { align: "right" as const },
+                    meta: { align: "right" as const }
                 }),
                 columnHelper.accessor("deletions", {
                     header: "Lines Deleted",
-                    cell: (info) => (
-                        <span className="text-red-400">-{formatLoc(info.getValue())}</span>
-                    ),
+                    cell: (info) => {
+                        const v = info.getValue();
+                        return (
+                            <span
+                                className="text-red-400 cursor-default"
+                                title={`-${v.toLocaleString()}`}
+                            >
+                                -{formatLoc(v)}
+                            </span>
+                        );
+                    },
                     sortingFn: "basic",
-                    meta: { align: "right" as const },
-                }),
+                    meta: { align: "right" as const }
+                })
             ] as ColumnDef<RepoBreakdownRow, unknown>[],
         [owner]
     );
@@ -122,7 +138,7 @@ export default function ContributorDetailPage() {
         if (!contributor?.dailyActivity) return [];
         return contributor.dailyActivity.map((d) => ({
             ...d,
-            displayDate: format(new Date(d.date), "MMM d"),
+            displayDate: format(new Date(d.date), "MMM d")
         }));
     }, [contributor?.dailyActivity]);
 
@@ -154,10 +170,7 @@ export default function ContributorDetailPage() {
             <div className="p-8 flex flex-col items-center justify-center h-screen text-center">
                 <AlertCircle className="w-16 h-16 text-gray-600 mb-4" />
                 <h1 className="text-2xl font-bold text-gray-100">Contributor not found</h1>
-                <Link
-                    to={`/${owner}/contributors`}
-                    className="mt-4 text-blue-400 hover:underline"
-                >
+                <Link to={`/${owner}/contributors`} className="mt-4 text-blue-400 hover:underline">
                     Return to Contributors
                 </Link>
             </div>
@@ -201,12 +214,27 @@ export default function ContributorDetailPage() {
 
                 {/* Stat Badges */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatBadge label="Total Commits" value={contributor.totalCommits.toLocaleString()} />
+                    <StatBadge
+                        label="Total Commits"
+                        value={contributor.totalCommits.toLocaleString()}
+                    />
                     <StatBadge label="Total PRs" value={contributor.totalPRs.toLocaleString()} />
-                    <StatBadge label="PRs Merged" value={contributor.totalPRsMerged.toLocaleString()} />
-                    <StatBadge label="Active Days" value={contributor.activeDays.toLocaleString()} />
-                    <StatBadge label="Lines Added" value={`+${formatLoc(contributor.totalAdditions)}`} />
-                    <StatBadge label="Lines Deleted" value={`-${formatLoc(contributor.totalDeletions)}`} />
+                    <StatBadge
+                        label="PRs Merged"
+                        value={contributor.totalPRsMerged.toLocaleString()}
+                    />
+                    <StatBadge
+                        label="Active Days"
+                        value={contributor.activeDays.toLocaleString()}
+                    />
+                    <StatBadge
+                        label="Lines Added"
+                        value={`+${formatLoc(contributor.totalAdditions)}`}
+                    />
+                    <StatBadge
+                        label="Lines Deleted"
+                        value={`-${formatLoc(contributor.totalDeletions)}`}
+                    />
                     <StatBadge
                         label="First Commit"
                         value={
@@ -228,9 +256,7 @@ export default function ContributorDetailPage() {
                 {/* Activity Chart */}
                 {chartData.length > 0 && (
                     <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-                        <h2 className="text-lg font-semibold text-gray-100 mb-4">
-                            Daily Activity
-                        </h2>
+                        <h2 className="text-lg font-semibold text-gray-100 mb-4">Daily Activity</h2>
                         <div className="h-64">
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart
@@ -262,7 +288,7 @@ export default function ContributorDetailPage() {
                                         cursor={{
                                             stroke: "#6b7280",
                                             strokeWidth: 1,
-                                            strokeDasharray: "4 4",
+                                            strokeDasharray: "4 4"
                                         }}
                                     />
                                     <Area

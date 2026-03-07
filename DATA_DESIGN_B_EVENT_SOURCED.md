@@ -321,7 +321,7 @@
 ## Tradeoffs
 
 | Aspect                   | Assessment                                                                                |
-|--------------------------|-------------------------------------------------------------------------------------------|
+| ------------------------ | ----------------------------------------------------------------------------------------- |
 | **Read performance**     | Excellent — every page is a single-row or single-table scan, zero JOINs                   |
 | **Write performance**    | Moderate — events are fast appends, but snapshots need rebuild after sync                 |
 | **Data integrity**       | Moderate — snapshots can drift from events if pipeline fails (need idempotent rebuild)    |

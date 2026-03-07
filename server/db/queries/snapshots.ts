@@ -9,7 +9,7 @@ import type {
     RepoSnapshotRow,
     ContributorSnapshotRow,
     SnapshotContributor,
-    LanguageBreakdownEntry,
+    LanguageBreakdownEntry
 } from "../types.ts";
 
 // ── Owner Snapshot ───────────────────────────────────────────────────────────────
@@ -56,22 +56,33 @@ export async function upsertOwnerSnapshot(snap: UpsertOwnerSnapshotInput): Promi
             total_workflow_runs=$17, workflow_success_rate=$18, avg_workflow_duration=$19,
             computed_at=NOW()`,
         [
-            snap.owner_login, snap.total_repos, snap.total_commits,
-            snap.total_prs, snap.open_prs, snap.merged_prs,
-            snap.total_additions, snap.total_deletions, snap.unique_contributors,
-            snap.most_active_repo_name, snap.most_active_repo_commits,
-            snap.longest_streak, snap.current_streak, snap.avg_commits_per_day,
-            JSON.stringify(snap.top_contributors), JSON.stringify(snap.language_breakdown),
-            snap.total_workflow_runs, snap.workflow_success_rate, snap.avg_workflow_duration,
+            snap.owner_login,
+            snap.total_repos,
+            snap.total_commits,
+            snap.total_prs,
+            snap.open_prs,
+            snap.merged_prs,
+            snap.total_additions,
+            snap.total_deletions,
+            snap.unique_contributors,
+            snap.most_active_repo_name,
+            snap.most_active_repo_commits,
+            snap.longest_streak,
+            snap.current_streak,
+            snap.avg_commits_per_day,
+            JSON.stringify(snap.top_contributors),
+            JSON.stringify(snap.language_breakdown),
+            snap.total_workflow_runs,
+            snap.workflow_success_rate,
+            snap.avg_workflow_duration
         ]
     );
 }
 
 export async function getOwnerSnapshot(ownerLogin: string): Promise<OwnerSnapshotRow | null> {
-    return queryOne<OwnerSnapshotRow>(
-        "SELECT * FROM owner_snapshot WHERE owner_login = $1",
-        [ownerLogin]
-    );
+    return queryOne<OwnerSnapshotRow>("SELECT * FROM owner_snapshot WHERE owner_login = $1", [
+        ownerLogin
+    ]);
 }
 
 // ── Repo Snapshot ────────────────────────────────────────────────────────────────
@@ -118,22 +129,33 @@ export async function upsertRepoSnapshot(snap: UpsertRepoSnapshotInput): Promise
             ci_success_rate=$18, ci_avg_duration_seconds=$19, last_ci_conclusion=$20,
             top_contributors=$21, computed_at=NOW()`,
         [
-            snap.repo_id, snap.owner_login, snap.name, snap.description, snap.language,
-            snap.stargazers_count, snap.forks_count, snap.open_issues_count,
-            snap.updated_at, snap.pushed_at,
-            snap.total_commits, snap.total_prs, snap.open_prs, snap.merged_prs,
-            snap.total_additions, snap.total_deletions, snap.contributor_count,
-            snap.ci_success_rate, snap.ci_avg_duration_seconds, snap.last_ci_conclusion,
-            JSON.stringify(snap.top_contributors),
+            snap.repo_id,
+            snap.owner_login,
+            snap.name,
+            snap.description,
+            snap.language,
+            snap.stargazers_count,
+            snap.forks_count,
+            snap.open_issues_count,
+            snap.updated_at,
+            snap.pushed_at,
+            snap.total_commits,
+            snap.total_prs,
+            snap.open_prs,
+            snap.merged_prs,
+            snap.total_additions,
+            snap.total_deletions,
+            snap.contributor_count,
+            snap.ci_success_rate,
+            snap.ci_avg_duration_seconds,
+            snap.last_ci_conclusion,
+            JSON.stringify(snap.top_contributors)
         ]
     );
 }
 
 export async function getRepoSnapshot(repoId: number): Promise<RepoSnapshotRow | null> {
-    return queryOne<RepoSnapshotRow>(
-        "SELECT * FROM repo_snapshot WHERE repo_id = $1",
-        [repoId]
-    );
+    return queryOne<RepoSnapshotRow>("SELECT * FROM repo_snapshot WHERE repo_id = $1", [repoId]);
 }
 
 export async function getRepoSnapshotByName(
@@ -176,7 +198,9 @@ export interface UpsertContributorSnapshotInput {
     active_days: number;
 }
 
-export async function upsertContributorSnapshot(snap: UpsertContributorSnapshotInput): Promise<void> {
+export async function upsertContributorSnapshot(
+    snap: UpsertContributorSnapshotInput
+): Promise<void> {
     await execute(
         `INSERT INTO contributor_snapshot (
             owner_login, contributor_login, avatar_url, html_url,
@@ -197,12 +221,22 @@ export async function upsertContributorSnapshot(snap: UpsertContributorSnapshotI
             first_commit_at=$14, last_commit_at=$15, active_days=$16,
             computed_at=NOW()`,
         [
-            snap.owner_login, snap.contributor_login, snap.avatar_url, snap.html_url,
-            snap.total_commits, snap.total_additions, snap.total_deletions,
-            snap.total_prs, snap.total_prs_merged,
-            JSON.stringify(snap.repos), snap.repo_count,
-            snap.workflow_runs_triggered, snap.workflow_failure_rate,
-            snap.first_commit_at, snap.last_commit_at, snap.active_days,
+            snap.owner_login,
+            snap.contributor_login,
+            snap.avatar_url,
+            snap.html_url,
+            snap.total_commits,
+            snap.total_additions,
+            snap.total_deletions,
+            snap.total_prs,
+            snap.total_prs_merged,
+            JSON.stringify(snap.repos),
+            snap.repo_count,
+            snap.workflow_runs_triggered,
+            snap.workflow_failure_rate,
+            snap.first_commit_at,
+            snap.last_commit_at,
+            snap.active_days
         ]
     );
 }

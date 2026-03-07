@@ -15,9 +15,9 @@ health.get("/api/health", (c) => {
                   connected: true,
                   totalConnections: dbStats.totalCount,
                   idleConnections: dbStats.idleCount,
-                  waitingClients: dbStats.waitingCount,
+                  waitingClients: dbStats.waitingCount
               }
-            : { connected: false },
+            : { connected: false }
     });
 });
 

@@ -2,7 +2,12 @@ import { Hono } from "hono";
 import { requireConfig } from "../config.ts";
 import { errorResponse, notFound } from "../errors.ts";
 import { getReposByOwner, getRepoByName, getOwner } from "../db/queries/identity.ts";
-import { getCommitsByOwner, getCommitsByRepo, getPrsByRepo, getContributorStatsByRepo } from "../db/queries/events.ts";
+import {
+    getCommitsByOwner,
+    getCommitsByRepo,
+    getPrsByRepo,
+    getContributorStatsByRepo
+} from "../db/queries/events.ts";
 import { getContributorSnapshotsByRepo, getRepoSnapshotsByOwner } from "../db/queries/snapshots.ts";
 import { mapRepoRow, mapCommitRow, mapPrRow, mapContribSnapshotToContributor } from "../mappers.ts";
 import type { RepositoryMetaRow } from "../db/index.ts";
@@ -19,7 +24,11 @@ repos.get("/api/repos/:owner", async (c) => {
 
         const ownerRow = await getOwner(owner);
         const ownerInfo = ownerRow
-            ? { login: ownerRow.login, avatar_url: ownerRow.avatar_url ?? "", html_url: ownerRow.html_url ?? `https://github.com/${ownerRow.login}` }
+            ? {
+                  login: ownerRow.login,
+                  avatar_url: ownerRow.avatar_url ?? "",
+                  html_url: ownerRow.html_url ?? `https://github.com/${ownerRow.login}`
+              }
             : undefined;
 
         const rows = await getReposByOwner(owner);
@@ -46,7 +55,11 @@ repos.get("/api/repos/:owner/:repo", async (c) => {
 
         const ownerRow = await getOwner(owner);
         const ownerInfo = ownerRow
-            ? { login: ownerRow.login, avatar_url: ownerRow.avatar_url ?? "", html_url: ownerRow.html_url ?? `https://github.com/${ownerRow.login}` }
+            ? {
+                  login: ownerRow.login,
+                  avatar_url: ownerRow.avatar_url ?? "",
+                  html_url: ownerRow.html_url ?? `https://github.com/${ownerRow.login}`
+              }
             : undefined;
 
         return c.json(mapRepoRow(repoRow, ownerInfo));
@@ -68,7 +81,11 @@ repos.get("/api/commits/:owner", async (c) => {
         // Get all repos for this owner (needed to group commits and provide Repository objects)
         const ownerRow = await getOwner(owner);
         const ownerInfo = ownerRow
-            ? { login: ownerRow.login, avatar_url: ownerRow.avatar_url ?? "", html_url: ownerRow.html_url ?? `https://github.com/${ownerRow.login}` }
+            ? {
+                  login: ownerRow.login,
+                  avatar_url: ownerRow.avatar_url ?? "",
+                  html_url: ownerRow.html_url ?? `https://github.com/${ownerRow.login}`
+              }
             : undefined;
 
         const repoRows = await getReposByOwner(owner);
@@ -96,7 +113,7 @@ repos.get("/api/commits/:owner", async (c) => {
             .filter((r) => commitsByRepoId.has(r.id))
             .map((r) => ({
                 repo: mapRepoRow(r, ownerInfo),
-                commits: (commitsByRepoId.get(r.id) ?? []).map((c) => mapCommitRow(c, r.name)),
+                commits: (commitsByRepoId.get(r.id) ?? []).map((c) => mapCommitRow(c, r.name))
             }));
 
         return c.json(data);
@@ -181,7 +198,7 @@ repos.get("/api/repos/:owner/:repo/contributor-stats", async (c) => {
                 html_url: `https://github.com/${s.login}`,
                 totalCommits: s.commits,
                 totalAdditions: s.additions,
-                totalDeletions: s.deletions,
+                totalDeletions: s.deletions
             }))
             .sort((a, b) => b.totalCommits - a.totalCommits);
 
@@ -205,7 +222,7 @@ repos.get("/api/repo-snapshots/:owner", async (c) => {
             openPRs: r.open_prs,
             mergedPRs: r.merged_prs,
             totalAdditions: r.total_additions,
-            totalDeletions: r.total_deletions,
+            totalDeletions: r.total_deletions
         }));
         return c.json(data);
     } catch (error) {

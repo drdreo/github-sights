@@ -12,7 +12,7 @@ export {
     query,
     queryOne,
     execute,
-    transaction,
+    transaction
 } from "./pool.ts";
 export type { QueryResult } from "./pool.ts";
 
@@ -40,5 +40,5 @@ export type {
     ContributorSnapshotRow,
     DailyActivityRow,
     SyncStateRow,
-    SchemaMigrationRow,
+    SchemaMigrationRow
 } from "./types.ts";

@@ -28,17 +28,11 @@ export async function upsertOwner(
 }
 
 export async function getOwner(login: string): Promise<OwnerRow | null> {
-    return queryOne<OwnerRow>(
-        "SELECT * FROM owner WHERE login = $1",
-        [login]
-    );
+    return queryOne<OwnerRow>("SELECT * FROM owner WHERE login = $1", [login]);
 }
 
 export async function updateOwnerSyncedAt(login: string): Promise<void> {
-    await execute(
-        "UPDATE owner SET last_synced_at = NOW() WHERE login = $1",
-        [login]
-    );
+    await execute("UPDATE owner SET last_synced_at = NOW() WHERE login = $1", [login]);
 }
 
 // ── Repository Metadata ──────────────────────────────────────────────────────────
@@ -78,11 +72,22 @@ export async function upsertRepo(repo: UpsertRepoInput): Promise<void> {
             open_issues_count = $13, created_at = $14, updated_at = $15,
             pushed_at = $16`,
         [
-            repo.id, repo.owner_login, repo.name, repo.full_name,
-            repo.description, repo.html_url, repo.is_private, repo.is_fork,
-            repo.language, repo.default_branch, repo.stargazers_count,
-            repo.forks_count, repo.open_issues_count,
-            repo.created_at, repo.updated_at, repo.pushed_at,
+            repo.id,
+            repo.owner_login,
+            repo.name,
+            repo.full_name,
+            repo.description,
+            repo.html_url,
+            repo.is_private,
+            repo.is_fork,
+            repo.language,
+            repo.default_branch,
+            repo.stargazers_count,
+            repo.forks_count,
+            repo.open_issues_count,
+            repo.created_at,
+            repo.updated_at,
+            repo.pushed_at
         ]
     );
 }
@@ -97,11 +102,22 @@ export async function upsertRepos(repos: UpsertRepoInput[]): Promise<void> {
         for (let i = 0; i < repos.length; i += BATCH_SIZE) {
             const chunk = repos.slice(i, i + BATCH_SIZE);
             const { text, params } = buildMultiRowValues(chunk, (r) => [
-                r.id, r.owner_login, r.name, r.full_name,
-                r.description, r.html_url, r.is_private, r.is_fork,
-                r.language, r.default_branch, r.stargazers_count,
-                r.forks_count, r.open_issues_count,
-                r.created_at, r.updated_at, r.pushed_at,
+                r.id,
+                r.owner_login,
+                r.name,
+                r.full_name,
+                r.description,
+                r.html_url,
+                r.is_private,
+                r.is_fork,
+                r.language,
+                r.default_branch,
+                r.stargazers_count,
+                r.forks_count,
+                r.open_issues_count,
+                r.created_at,
+                r.updated_at,
+                r.pushed_at
             ]);
             await client.query(
                 `INSERT INTO repository_meta (
@@ -154,10 +170,7 @@ export async function getRepoByName(
 
 /** Get a single repo by its GitHub ID. */
 export async function getRepoById(id: number): Promise<RepositoryMetaRow | null> {
-    return queryOne<RepositoryMetaRow>(
-        "SELECT * FROM repository_meta WHERE id = $1",
-        [id]
-    );
+    return queryOne<RepositoryMetaRow>("SELECT * FROM repository_meta WHERE id = $1", [id]);
 }
 
 // ── Contributor Profile ──────────────────────────────────────────────────────────
@@ -181,8 +194,13 @@ export async function upsertContributor(contrib: UpsertContributorInput): Promis
            name = COALESCE($4, contributor_profile.name),
            email = COALESCE($5, contributor_profile.email),
            updated_at = NOW()`,
-        [contrib.login, contrib.avatar_url ?? null, contrib.html_url ?? null,
-         contrib.name ?? null, contrib.email ?? null]
+        [
+            contrib.login,
+            contrib.avatar_url ?? null,
+            contrib.html_url ?? null,
+            contrib.name ?? null,
+            contrib.email ?? null
+        ]
     );
 }
 
@@ -195,8 +213,12 @@ export async function upsertContributors(contribs: UpsertContributorInput[]): Pr
         for (let i = 0; i < contribs.length; i += BATCH_SIZE) {
             const chunk = contribs.slice(i, i + BATCH_SIZE);
             const { text, params } = buildMultiRowValues(chunk, (c) => [
-                c.login, c.avatar_url ?? null, c.html_url ?? null,
-                c.name ?? null, c.email ?? null, now,
+                c.login,
+                c.avatar_url ?? null,
+                c.html_url ?? null,
+                c.name ?? null,
+                c.email ?? null,
+                now
             ]);
             await client.query(
                 `INSERT INTO contributor_profile (login, avatar_url, html_url, name, email, updated_at)
@@ -215,10 +237,9 @@ export async function upsertContributors(contribs: UpsertContributorInput[]): Pr
 
 /** Get contributor profile by login. */
 export async function getContributor(login: string): Promise<ContributorProfileRow | null> {
-    return queryOne<ContributorProfileRow>(
-        "SELECT * FROM contributor_profile WHERE login = $1",
-        [login]
-    );
+    return queryOne<ContributorProfileRow>("SELECT * FROM contributor_profile WHERE login = $1", [
+        login
+    ]);
 }
 
 /**
@@ -229,10 +250,7 @@ export async function getContributor(login: string): Promise<ContributorProfileR
  * Returns true if the owner existed.
  */
 export async function deleteOwnerData(owner: string): Promise<boolean> {
-    const result = await execute(
-        "DELETE FROM owner WHERE LOWER(login) = LOWER($1)",
-        [owner]
-    );
+    const result = await execute("DELETE FROM owner WHERE LOWER(login) = LOWER($1)", [owner]);
     return (result.rowCount ?? 0) > 0;
 }
 

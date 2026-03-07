@@ -8,10 +8,9 @@ import type { OwnerConfigRow } from "../types.ts";
 
 /** Get config for a specific owner (case-insensitive). */
 export async function getConfig(owner: string): Promise<OwnerConfigRow | null> {
-    return queryOne<OwnerConfigRow>(
-        "SELECT * FROM owner_config WHERE LOWER(owner) = LOWER($1)",
-        [owner]
-    );
+    return queryOne<OwnerConfigRow>("SELECT * FROM owner_config WHERE LOWER(owner) = LOWER($1)", [
+        owner
+    ]);
 }
 
 /** Get all stored configs. */
@@ -68,8 +67,5 @@ export async function getSyncSince(owner: string): Promise<string | null> {
 
 /** Delete config for an owner. */
 export async function deleteConfig(owner: string): Promise<void> {
-    await execute(
-        "DELETE FROM owner_config WHERE LOWER(owner) = LOWER($1)",
-        [owner]
-    );
+    await execute("DELETE FROM owner_config WHERE LOWER(owner) = LOWER($1)", [owner]);
 }

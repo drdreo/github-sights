@@ -153,7 +153,8 @@ export default function SetupPage() {
                             className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-gray-100 focus:bg-gray-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 outline-none transition-all duration-200"
                         />
                         <p className="text-xs text-gray-500">
-                            How far back to crawl commit and PR history. Older dates use more API budget.
+                            How far back to crawl commit and PR history. Older dates use more API
+                            budget.
                         </p>
                     </div>
 

@@ -24,9 +24,7 @@ export function TimeRangeSelector({
     showAllTime = false,
     className = ""
 }: TimeRangeSelectorProps) {
-    const PRESETS = showAllTime
-        ? [...BASE_PRESETS, { label: "All", days: null }]
-        : BASE_PRESETS;
+    const PRESETS = showAllTime ? [...BASE_PRESETS, { label: "All", days: null }] : BASE_PRESETS;
 
     const handlePresetClick = (days: number | null) => {
         if (days === null) {
@@ -51,10 +49,14 @@ export function TimeRangeSelector({
 
     // Determine active preset
     const isAllTime = startDate === null || endDate === null;
-    const diffDays = isAllTime ? null : Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const diffDays = isAllTime
+        ? null
+        : Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     const activePreset = isAllTime
         ? "All"
-        : PRESETS.find((p) => p.days !== null && diffDays !== null && Math.abs(p.days - diffDays) <= 1)?.label;
+        : PRESETS.find(
+              (p) => p.days !== null && diffDays !== null && Math.abs(p.days - diffDays) <= 1
+          )?.label;
 
     return (
         <div
@@ -79,9 +81,13 @@ export function TimeRangeSelector({
                 ))}
             </div>
 
-            <div className={`h-6 w-px bg-gray-700 hidden sm:block transition-opacity ${isAllTime ? "opacity-0" : ""}`} />
+            <div
+                className={`h-6 w-px bg-gray-700 hidden sm:block transition-opacity ${isAllTime ? "opacity-0" : ""}`}
+            />
 
-            <div className={`flex items-center gap-2 text-sm transition-opacity ${isAllTime ? "opacity-30 pointer-events-none" : "text-gray-400"}`}>
+            <div
+                className={`flex items-center gap-2 text-sm transition-opacity ${isAllTime ? "opacity-30 pointer-events-none" : "text-gray-400"}`}
+            >
                 <Calendar className="w-4 h-4 text-gray-500" />
                 <input
                     type="date"

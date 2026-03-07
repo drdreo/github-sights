@@ -9,7 +9,7 @@ import type {
     CommitEventWithAvatarRow,
     PrEventWithAvatarRow,
     ContributorSnapshotRow,
-    OwnerSnapshotRow,
+    OwnerSnapshotRow
 } from "./db/index.ts";
 
 import type {
@@ -20,7 +20,7 @@ import type {
     PullRequest,
     Contributor,
     ContributorOverview,
-    OverviewStats,
+    OverviewStats
 } from "./types.ts";
 
 // ── Repository ──────────────────────────────────────────────────────────────────
@@ -35,7 +35,11 @@ export function mapRepoRow(
 ): Repository {
     const owner: GitHubUser = ownerInfo
         ? { login: ownerInfo.login, avatar_url: ownerInfo.avatar_url, html_url: ownerInfo.html_url }
-        : { login: row.owner_login, avatar_url: "", html_url: `https://github.com/${row.owner_login}` };
+        : {
+              login: row.owner_login,
+              avatar_url: "",
+              html_url: `https://github.com/${row.owner_login}`
+          };
 
     return {
         id: row.id,
@@ -53,7 +57,7 @@ export function mapRepoRow(
         updated_at: row.updated_at?.toISOString() ?? "",
         pushed_at: row.pushed_at?.toISOString() ?? "",
         fork: row.is_fork,
-        owner,
+        owner
     };
 }
 
@@ -66,7 +70,7 @@ export function mapCommitRow(row: CommitEventWithAvatarRow, repoName?: string): 
         email: "",
         date: row.committed_at.toISOString(),
         login: row.author_login ?? undefined,
-        avatar_url: row.author_avatar_url ?? undefined,
+        avatar_url: row.author_avatar_url ?? undefined
     };
 
     const committer: CommitAuthor = {
@@ -74,7 +78,7 @@ export function mapCommitRow(row: CommitEventWithAvatarRow, repoName?: string): 
         email: "",
         date: row.committed_at.toISOString(),
         login: row.committer_login ?? undefined,
-        avatar_url: row.committer_avatar_url ?? undefined,
+        avatar_url: row.committer_avatar_url ?? undefined
     };
 
     return {
@@ -83,10 +87,15 @@ export function mapCommitRow(row: CommitEventWithAvatarRow, repoName?: string): 
         author,
         committer,
         html_url: row.html_url ?? "",
-        stats: (row.additions || row.deletions)
-            ? { additions: row.additions, deletions: row.deletions, total: row.additions + row.deletions }
-            : undefined,
-        ...(repoName ? { repo_name: repoName } : {}),
+        stats:
+            row.additions || row.deletions
+                ? {
+                      additions: row.additions,
+                      deletions: row.deletions,
+                      total: row.additions + row.deletions
+                  }
+                : undefined,
+        ...(repoName ? { repo_name: repoName } : {})
     };
 }
 
@@ -97,7 +106,7 @@ export function mapPrRow(row: PrEventWithAvatarRow): PullRequest {
     const user: GitHubUser = {
         login: row.author_login ?? "unknown",
         avatar_url: row.author_avatar_url ?? "",
-        html_url: row.author_login ? `https://github.com/${row.author_login}` : "",
+        html_url: row.author_login ? `https://github.com/${row.author_login}` : ""
     };
 
     return {
@@ -116,7 +125,7 @@ export function mapPrRow(row: PrEventWithAvatarRow): PullRequest {
         deletions: row.deletions,
         changed_files: row.changed_files,
         base: { ref: row.base_ref ?? "" },
-        head: { ref: row.head_ref ?? "" },
+        head: { ref: row.head_ref ?? "" }
     };
 }
 
@@ -128,7 +137,7 @@ export function mapContribSnapshotToContributor(row: ContributorSnapshotRow): Co
         login: row.contributor_login,
         avatar_url: row.avatar_url ?? "",
         html_url: row.html_url ?? `https://github.com/${row.contributor_login}`,
-        contributions: row.total_commits,
+        contributions: row.total_commits
     };
 }
 
@@ -142,7 +151,7 @@ export function mapContribSnapshotToOverview(row: ContributorSnapshotRow): Contr
         totalAdditions: row.total_additions,
         totalDeletions: row.total_deletions,
         totalPRs: row.total_prs,
-        repos: row.repos,
+        repos: row.repos
     };
 }
 
@@ -169,9 +178,9 @@ export function mapOwnerSnapshotToStats(snap: OwnerSnapshotRow): OverviewStats {
             login: tc.login,
             avatar_url: tc.avatar_url,
             html_url: `https://github.com/${tc.login}`,
-            contributions: tc.commits,
+            contributions: tc.commits
         })),
-        languageBreakdown: snap.language_breakdown,
+        languageBreakdown: snap.language_breakdown
     };
 }
 
@@ -191,6 +200,6 @@ export function emptyOverviewStats(): OverviewStats {
         currentStreak: 0,
         avgCommitsPerDay: 0,
         topContributors: [],
-        languageBreakdown: [],
+        languageBreakdown: []
     };
 }

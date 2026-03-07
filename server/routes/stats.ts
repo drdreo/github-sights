@@ -36,7 +36,7 @@ stats.get("/api/stats/:owner", async (c) => {
                 totalDeletions: Number(agg.total_deletions),
                 totalPRs: agg.total_pr_opened + agg.total_pr_merged + agg.total_pr_closed,
                 openPRs: agg.total_pr_opened,
-                mergedPRs: agg.total_pr_merged,
+                mergedPRs: agg.total_pr_merged
             });
         }
 

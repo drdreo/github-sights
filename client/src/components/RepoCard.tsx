@@ -1,7 +1,15 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
-import { Code, ExternalLink, GitBranch, GitCommit, GitFork, GitPullRequest, Star } from "lucide-react";
+import {
+    Code,
+    ExternalLink,
+    GitBranch,
+    GitCommit,
+    GitFork,
+    GitPullRequest,
+    Star
+} from "lucide-react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import type { Repository } from "../types";
 import type { RepoSnapshotStats } from "./RepoGrid";
@@ -115,16 +123,29 @@ export function RepoCard({ repo, owner, totalCommits, snapshot }: RepoCardProps)
                         </div>
                     </IconTooltip>
                     <span className="mx-1.5 text-gray-700">&middot;</span>
-                    <IconTooltip label={snapshot ? `+${formatCompact(snapshot.totalAdditions)} / -${formatCompact(snapshot.totalDeletions)} lines` : "Lines changed"}>
+                    <IconTooltip
+                        label={
+                            snapshot
+                                ? `+${formatCompact(snapshot.totalAdditions)} / -${formatCompact(snapshot.totalDeletions)} lines`
+                                : "Lines changed"
+                        }
+                    >
                         <div className="flex items-center gap-1">
                             <Code className="w-3.5 h-3.5 text-gray-500" />
-                            <span>{formatCompact((snapshot?.totalAdditions ?? 0) - (snapshot?.totalDeletions ?? 0))}</span>
+                            <span>
+                                {formatCompact(
+                                    (snapshot?.totalAdditions ?? 0) -
+                                        (snapshot?.totalDeletions ?? 0)
+                                )}
+                            </span>
                         </div>
                     </IconTooltip>
 
                     {repo.updated_at && (
                         <IconTooltip
-                            label={"Last updated on " + format(new Date(repo.updated_at), "dd.MM.yyyy")}
+                            label={
+                                "Last updated on " + format(new Date(repo.updated_at), "dd.MM.yyyy")
+                            }
                         >
                             <span className="ml-auto text-gray-600">
                                 {format(new Date(repo.updated_at), "MMM d")}

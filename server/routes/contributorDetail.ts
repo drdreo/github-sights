@@ -4,7 +4,7 @@ import { errorResponse, notFound } from "../errors.ts";
 import { getContributorSnapshot } from "../db/queries/snapshots.ts";
 import {
     getContributorDailyActivity,
-    getContributorRepoBreakdown,
+    getContributorRepoBreakdown
 } from "../db/queries/activity.ts";
 import type { ContributorDetail } from "../types.ts";
 
@@ -22,16 +22,19 @@ contributorDetail.get("/api/contributors/:owner/:login", async (c) => {
 
         const [dailyRows, repoBreakdown] = await Promise.all([
             getContributorDailyActivity(owner, login),
-            getContributorRepoBreakdown(owner, login),
+            getContributorRepoBreakdown(owner, login)
         ]);
+
+        const totalAdditions = repoBreakdown.reduce((sum, r) => sum + Number(r.additions), 0);
+        const totalDeletions = repoBreakdown.reduce((sum, r) => sum + Number(r.deletions), 0);
 
         const result: ContributorDetail = {
             login: snapshot.contributor_login,
             avatar_url: snapshot.avatar_url ?? "",
             html_url: snapshot.html_url ?? `https://github.com/${snapshot.contributor_login}`,
             totalCommits: snapshot.total_commits,
-            totalAdditions: snapshot.total_additions,
-            totalDeletions: snapshot.total_deletions,
+            totalAdditions,
+            totalDeletions,
             totalPRs: snapshot.total_prs,
             totalPRsMerged: snapshot.total_prs_merged,
             activeDays: snapshot.active_days,
@@ -47,7 +50,7 @@ contributorDetail.get("/api/contributors/:owner/:login", async (c) => {
                 additions: Number(r.additions),
                 deletions: Number(r.deletions),
                 prs: Number(r.prs),
-                prsMerged: Number(r.prs_merged),
+                prsMerged: Number(r.prs_merged)
             })),
             dailyActivity: dailyRows.map((r) => ({
                 date: r.date,
@@ -55,8 +58,8 @@ contributorDetail.get("/api/contributors/:owner/:login", async (c) => {
                 additions: r.additions,
                 deletions: r.deletions,
                 prsOpened: r.pr_opened,
-                prsMerged: r.pr_merged,
-            })),
+                prsMerged: r.pr_merged
+            }))
         };
 
         return c.json(result);

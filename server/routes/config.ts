@@ -14,7 +14,8 @@ config.get("/api/config/:owner", (c) => {
         return c.json({
             configured: true,
             owner: current.owner,
-            ownerType: current.ownerType
+            ownerType: current.ownerType,
+            syncSince: current.syncSince ?? null
         });
     }
     return c.json({ configured: false });
@@ -98,7 +99,7 @@ config.post("/api/config", async (c) => {
             token,
             owner,
             ownerType: ownerType as "user" | "org",
-            syncSince,
+            syncSince
         });
 
         console.log(

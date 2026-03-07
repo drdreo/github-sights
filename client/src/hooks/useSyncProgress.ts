@@ -13,7 +13,7 @@ export function useSyncProgress(owner: string) {
             // Poll every second while a sync is active, stop when idle
             return query.state.data?.active ? 1000 : false;
         },
-        enabled: !!owner,
+        enabled: !!owner
     });
 
     return query;

@@ -1,6 +1,17 @@
 import React from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Star, GitBranch, ExternalLink, Clock, AlertCircle, GitCommit, GitPullRequest, GitMerge, Users, Code } from "lucide-react";
+import {
+    Star,
+    GitBranch,
+    ExternalLink,
+    Clock,
+    AlertCircle,
+    GitCommit,
+    GitPullRequest,
+    GitMerge,
+    Users,
+    Code
+} from "lucide-react";
 import type { Repository, Commit, PullRequest, RepoContributorStat } from "../types";
 import { getLanguageColor } from "../lib/languageColors";
 
@@ -73,44 +84,62 @@ export function RepoHeader({ repository, commits, pulls, contributors }: RepoHea
                     )}
                     <div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
                         <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                        <span className="font-semibold text-gray-100">{formatCompact(repository.stargazers_count)}</span>
+                        <span className="font-semibold text-gray-100">
+                            {formatCompact(repository.stargazers_count)}
+                        </span>
                         <span className="text-gray-500">stars</span>
                     </div>
                     <div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
                         <GitBranch className="w-4 h-4 text-purple-500" />
-                        <span className="font-semibold text-gray-100">{formatCompact(repository.forks_count)}</span>
+                        <span className="font-semibold text-gray-100">
+                            {formatCompact(repository.forks_count)}
+                        </span>
                         <span className="text-gray-500">forks</span>
                     </div>
                     <div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
                         <AlertCircle className="w-4 h-4 text-green-500" />
-                        <span className="font-semibold text-gray-100">{formatCompact(repository.open_issues_count)}</span>
+                        <span className="font-semibold text-gray-100">
+                            {formatCompact(repository.open_issues_count)}
+                        </span>
                         <span className="text-gray-500">issues</span>
                     </div>
                     <div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
                         <GitCommit className="w-4 h-4 text-blue-400" />
-                        <span className="font-semibold text-gray-100">{formatCompact(totalCommits)}</span>
+                        <span className="font-semibold text-gray-100">
+                            {formatCompact(totalCommits)}
+                        </span>
                         <span className="text-gray-500">commits</span>
                     </div>
                     <div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
                         <GitPullRequest className="w-4 h-4 text-cyan-400" />
-                        <span className="font-semibold text-gray-100">{formatCompact(totalPRs)}</span>
+                        <span className="font-semibold text-gray-100">
+                            {formatCompact(totalPRs)}
+                        </span>
                         <span className="text-gray-500">PRs</span>
                     </div>
                     <div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
                         <GitMerge className="w-4 h-4 text-purple-400" />
-                        <span className="font-semibold text-gray-100">{formatCompact(mergedPRs)}</span>
+                        <span className="font-semibold text-gray-100">
+                            {formatCompact(mergedPRs)}
+                        </span>
                         <span className="text-gray-500">merged</span>
                     </div>
                     <div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
                         <Users className="w-4 h-4 text-orange-400" />
-                        <span className="font-semibold text-gray-100">{formatCompact(totalContributors)}</span>
+                        <span className="font-semibold text-gray-100">
+                            {formatCompact(totalContributors)}
+                        </span>
                         <span className="text-gray-500">contributors</span>
                     </div>
                     <div className="flex items-center gap-1.5 bg-gray-800 px-3 py-1.5 rounded-md border border-gray-700">
                         <Code className="w-4 h-4 text-green-400" />
-                        <span className="font-semibold text-green-400">+{formatCompact(totalAdditions)}</span>
+                        <span className="font-semibold text-green-400">
+                            +{formatCompact(totalAdditions)}
+                        </span>
                         <span className="text-gray-600">/</span>
-                        <span className="font-semibold text-red-400">-{formatCompact(totalDeletions)}</span>
+                        <span className="font-semibold text-red-400">
+                            -{formatCompact(totalDeletions)}
+                        </span>
                     </div>
                     <div className="ml-auto text-gray-500 flex items-center gap-1.5">
                         <Clock className="w-4 h-4" />

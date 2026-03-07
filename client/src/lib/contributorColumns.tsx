@@ -16,7 +16,9 @@ interface ContributorColumnOptions {
  * Consumers can spread these and append extra columns.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getContributorColumns<T extends RepoContributorStat>(options?: ContributorColumnOptions): ColumnDef<T, any>[] {
+export function getContributorColumns<T extends RepoContributorStat>(
+    options?: ContributorColumnOptions
+): ColumnDef<T, any>[] {
     const col = createColumnHelper<T>();
 
     return [

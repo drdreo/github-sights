@@ -21,7 +21,7 @@ export function useSetConfig() {
             queryClient.setQueryData(["config", variables.owner], {
                 configured: true,
                 owner: variables.owner,
-                ownerType: variables.ownerType,
+                ownerType: variables.ownerType
             });
         }
     });

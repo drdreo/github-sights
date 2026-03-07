@@ -9,7 +9,7 @@ import {
     getConfig as dbGetConfig,
     getAllConfigs,
     upsertConfig as dbUpsertConfig,
-    deleteConfig as dbDeleteConfig,
+    deleteConfig as dbDeleteConfig
 } from "./db/queries/config.ts";
 import { isPoolAvailable } from "./db/pool.ts";
 import { notConfigured } from "./errors.ts";
@@ -29,7 +29,7 @@ export async function loadConfig(): Promise<void> {
             token: row.token,
             owner: row.owner,
             ownerType: row.owner_type,
-            syncSince: row.sync_since?.toISOString(),
+            syncSince: row.sync_since?.toISOString()
         };
         configStore.set(row.owner.toLowerCase(), config);
         console.log(`[config] Loaded from database: ${config.ownerType}:${config.owner}`);
