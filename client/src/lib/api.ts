@@ -27,6 +27,7 @@ export interface SyncProgressResponse {
     currentRepo?: string | null;
     totalEvents?: number;
     elapsedMs?: number;
+    lastSyncedAt?: string | null;
 }
 
 const API_BASE = `${import.meta.env.VITE_API_BASE_URL ?? ""}/api`;

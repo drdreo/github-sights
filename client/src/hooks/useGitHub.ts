@@ -128,6 +128,7 @@ export function useSync(owner: string, since?: string) {
     const syncMutation = useMutation({
         mutationFn: () => api.sync(owner, since),
         onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["syncProgress", owner] });
             queryClient.invalidateQueries({ queryKey: ["stats", owner] });
             queryClient.invalidateQueries({ queryKey: ["timelines", owner] });
             queryClient.invalidateQueries({ queryKey: ["repo-snapshots", owner] });

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { clearConfig } from "../config.ts";
 import { requireConfig } from "../config.ts";
 import { errorResponse } from "../errors.ts";
-import { deleteOwnerData } from "../db/queries/identity.ts";
+import { deleteOwnerData, getOwner } from "../db/queries/identity.ts";
 import { updateSyncSince } from "../db/queries/config.ts";
 import {
     syncOwner,
@@ -75,11 +75,13 @@ sync.post("/api/sync/:owner/:repo", async (c) => {
 });
 
 // ── GET /api/sync/progress/:owner — Poll sync progress ──────────────────────
-sync.get("/api/sync/progress/:owner", (c) => {
+sync.get("/api/sync/progress/:owner", async (c) => {
     const { owner } = c.req.param();
+    const ownerRow = await getOwner(owner);
+    const lastSyncedAt = ownerRow?.last_synced_at?.toISOString() ?? null;
     const progress = getProgress(owner);
     if (!progress) {
-        return c.json({ active: false });
+        return c.json({ active: false, lastSyncedAt });
     }
     return c.json({
         active: true,
@@ -88,7 +90,8 @@ sync.get("/api/sync/progress/:owner", (c) => {
         syncedRepos: progress.syncedRepos,
         currentRepo: progress.currentRepo,
         totalEvents: progress.totalEvents,
-        elapsedMs: Date.now() - progress.startedAt
+        elapsedMs: Date.now() - progress.startedAt,
+        lastSyncedAt
     });
 });
 

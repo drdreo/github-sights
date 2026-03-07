@@ -20,7 +20,7 @@ import {
     type IngestOwnerResult
 } from "./ingest.ts";
 import { aggregateOwner, aggregateRepo, type AggregateResult } from "./aggregate.ts";
-import { getOwner, getRepoByName } from "../db/queries/identity.ts";
+import { getOwner, getRepoByName, updateOwnerSyncedAt } from "../db/queries/identity.ts";
 import { getSyncSince } from "../db/queries/config.ts";
 import type { RepositoryMetaRow } from "../db/types.ts";
 import { initProgress, updateProgress, clearProgress } from "./progress.ts";
@@ -272,6 +272,9 @@ async function doSync(
                 `${aggregation.dailyActivityRows} daily activity rows`
         );
     }
+
+    // Update last_synced_at timestamp on the owner row
+    await updateOwnerSyncedAt(owner);
 
     const durationMs = Date.now() - start;
     console.log(`[sync] Completed sync for ${owner} in ${durationMs}ms`);

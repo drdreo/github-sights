@@ -1,6 +1,7 @@
 import React from "react";
 import { RefreshCw, Trash2 } from "lucide-react";
 import { TimeRangeSelector } from "./TimeRangeSelector";
+import { SyncProgressBar } from "./SyncProgressBar";
 import type { SyncProgressResponse } from "../lib/api";
 
 interface DateRange {
@@ -17,44 +18,19 @@ interface DashboardHeaderProps {
     onDelete?: () => void;
 }
 
-function formatEvents(n: number): string {
-    return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
-}
+function formatLastSynced(iso: string): string {
+    const date = new Date(iso);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
 
-function SyncProgressIndicator({ progress }: { progress?: SyncProgressResponse }) {
-    if (!progress?.active) {
-        return <span className="text-sm text-gray-400">Syncing…</span>;
-    }
-
-    const { status, totalRepos, syncedRepos, totalEvents } = progress;
-
-    if (status === "fetching_repos") {
-        return <span className="text-sm text-gray-400">Discovering repositories…</span>;
-    }
-
-    if (status === "aggregating") {
-        return <span className="text-sm text-gray-400">Building snapshots…</span>;
-    }
-
-    if (status === "syncing_repos" && totalRepos && totalRepos > 0) {
-        const pct = Math.round(((syncedRepos ?? 0) / totalRepos) * 100);
-        return (
-            <div className="flex items-center gap-2">
-                <div className="w-32 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                    <div
-                        className="h-full bg-blue-400 rounded-full transition-all duration-500 ease-out"
-                        style={{ width: `${pct}%` }}
-                    />
-                </div>
-                <span className="text-sm text-gray-400">
-                    {syncedRepos}/{totalRepos} repos
-                    {totalEvents ? ` · ${formatEvents(totalEvents)} events` : ""}
-                </span>
-            </div>
-        );
-    }
-
-    return <span className="text-sm text-gray-400">Syncing…</span>;
+    if (diffMins < 1) return "just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
 }
 
 export function DashboardHeader({
@@ -65,19 +41,24 @@ export function DashboardHeader({
     onDateRangeChange,
     onDelete
 }: DashboardHeaderProps) {
+    const lastSyncedAt = syncProgress?.lastSyncedAt;
+
     return (
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
                 <h1 className="text-3xl font-bold text-gray-100 tracking-tight flex items-center gap-2">
                     {owner}
                     <span className="text-gray-500 font-normal text-xl">/ Dashboard</span>
-                    {isSyncing && <RefreshCw className="text-blue-400 animate-spin ml-1" />}
                 </h1>
-                {isSyncing && (
+                {isSyncing && syncProgress ? (
                     <div className="mt-1">
-                        <SyncProgressIndicator progress={syncProgress} />
+                        <SyncProgressBar progress={syncProgress} />
                     </div>
-                )}
+                ) : lastSyncedAt ? (
+                    <p className="mt-1 text-sm text-gray-500">
+                        Last synced {formatLastSynced(lastSyncedAt)}
+                    </p>
+                ) : null}
             </div>
             <div className="flex items-center gap-3">
                 <TimeRangeSelector
