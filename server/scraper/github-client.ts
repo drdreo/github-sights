@@ -190,9 +190,12 @@ export function getRateLimitState(octokit: Octokit): RateLimitState {
 
 // ── Client Factory ───────────────────────────────────────────────────────────────
 
+const REQUEST_TIMEOUT_MS = 30_000; // 30s per HTTP request
+
 export function createOctokit(token: string): Octokit {
     const octokit = new Octokit({
         auth: token,
+        request: { timeout: REQUEST_TIMEOUT_MS },
         throttle: {
             onRateLimit: (
                 retryAfter: number,
