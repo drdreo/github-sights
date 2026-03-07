@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, AlertCircle, ExternalLink } from "lucide-react";
 import {
@@ -17,6 +17,7 @@ import { useContributorDetail } from "../hooks/useGitHub";
 import { useOwner } from "../hooks/useOwner";
 import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { DataTable } from "../components/DataTable";
+import { TimeRangeSelector } from "../components/TimeRangeSelector";
 import { formatLoc } from "../lib/format";
 import type { ContributorDetail } from "../types";
 
@@ -130,7 +131,15 @@ export default function ContributorDetailPage() {
     const { login: paramLogin } = useParams<{ login: string }>();
     const login = paramLogin || "";
 
-    const { data: contributor, isLoading } = useContributorDetail(owner, login);
+    const [dateRange, setDateRange] = useState<{
+        startDate: Date | null;
+        endDate: Date | null;
+    }>({ startDate: null, endDate: null });
+
+    const since = dateRange.startDate?.toISOString() ?? undefined;
+    const until = dateRange.endDate?.toISOString() ?? undefined;
+
+    const { data: contributor, isLoading } = useContributorDetail(owner, login, since, until);
 
     const columns = useRepoBreakdownColumns(owner);
 
@@ -190,26 +199,34 @@ export default function ContributorDetailPage() {
                 </Link>
 
                 {/* Header */}
-                <div className="flex items-center gap-6">
-                    <img
-                        src={contributor.avatar_url}
-                        alt={contributor.login}
-                        className="w-20 h-20 rounded-full ring-4 ring-gray-800"
-                    />
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-100 tracking-tight">
-                            {contributor.login}
-                        </h1>
-                        <a
-                            href={contributor.html_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-blue-400 transition-colors mt-1"
-                        >
-                            View on GitHub
-                            <ExternalLink className="w-3 h-3" />
-                        </a>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-6">
+                        <img
+                            src={contributor.avatar_url}
+                            alt={contributor.login}
+                            className="w-20 h-20 rounded-full ring-4 ring-gray-800"
+                        />
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-100 tracking-tight">
+                                {contributor.login}
+                            </h1>
+                            <a
+                                href={contributor.html_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-blue-400 transition-colors mt-1"
+                            >
+                                View on GitHub
+                                <ExternalLink className="w-3 h-3" />
+                            </a>
+                        </div>
                     </div>
+                    <TimeRangeSelector
+                        startDate={dateRange.startDate}
+                        endDate={dateRange.endDate}
+                        onChange={setDateRange}
+                        showAllTime
+                    />
                 </div>
 
                 {/* Stat Badges */}

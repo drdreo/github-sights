@@ -131,10 +131,15 @@ export const api = {
     getRepoContributorStats: (owner: string, repo: string) =>
         fetchApi<RepoContributorStat[]>(`/repos/${owner}/${repo}/contributor-stats`),
 
-    getContributorDetail: (owner: string, login: string) =>
-        fetchApi<ContributorDetail>(
-            `/contributors/${encodeURIComponent(owner)}/${encodeURIComponent(login)}`
-        ),
+    getContributorDetail: (owner: string, login: string, since?: string, until?: string) => {
+        const params = new URLSearchParams();
+        if (since) params.append("since", since);
+        if (until) params.append("until", until);
+        const qs = params.toString();
+        return fetchApi<ContributorDetail>(
+            `/contributors/${encodeURIComponent(owner)}/${encodeURIComponent(login)}${qs ? `?${qs}` : ""}`
+        );
+    },
 
     getContributorOverview: (owner: string, since?: string, until?: string) => {
         const params = new URLSearchParams();

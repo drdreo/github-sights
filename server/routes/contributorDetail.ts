@@ -15,29 +15,48 @@ contributorDetail.get("/api/contributors/:owner/:login", async (c) => {
         const { owner, login } = c.req.param();
         requireConfig(owner);
 
+        const since = c.req.query("since");
+        const until = c.req.query("until");
+        const dateFilter = since || until ? { since, until } : undefined;
+        const isFiltered = !!dateFilter;
+
         const snapshot = await getContributorSnapshot(owner, login);
         if (!snapshot) {
             throw notFound("Contributor", login);
         }
 
         const [dailyRows, repoBreakdown] = await Promise.all([
-            getContributorDailyActivity(owner, login),
-            getContributorRepoBreakdown(owner, login)
+            getContributorDailyActivity(owner, login, dateFilter),
+            getContributorRepoBreakdown(owner, login, dateFilter)
         ]);
 
         const totalAdditions = repoBreakdown.reduce((sum, r) => sum + Number(r.additions), 0);
         const totalDeletions = repoBreakdown.reduce((sum, r) => sum + Number(r.deletions), 0);
 
+        // When date-filtered, compute summary stats from filtered breakdown data
+        const totalCommits = isFiltered
+            ? repoBreakdown.reduce((sum, r) => sum + Number(r.commits), 0)
+            : snapshot.total_commits;
+        const totalPRs = isFiltered
+            ? repoBreakdown.reduce((sum, r) => sum + Number(r.prs), 0)
+            : snapshot.total_prs;
+        const totalPRsMerged = isFiltered
+            ? repoBreakdown.reduce((sum, r) => sum + Number(r.prs_merged), 0)
+            : snapshot.total_prs_merged;
+        const activeDays = isFiltered
+            ? dailyRows.filter((r) => r.commit_count > 0 || r.pr_opened > 0 || r.pr_merged > 0).length
+            : snapshot.active_days;
+
         const result: ContributorDetail = {
             login: snapshot.contributor_login,
             avatar_url: snapshot.avatar_url ?? "",
             html_url: snapshot.html_url ?? `https://github.com/${snapshot.contributor_login}`,
-            totalCommits: snapshot.total_commits,
+            totalCommits,
             totalAdditions,
             totalDeletions,
-            totalPRs: snapshot.total_prs,
-            totalPRsMerged: snapshot.total_prs_merged,
-            activeDays: snapshot.active_days,
+            totalPRs,
+            totalPRsMerged,
+            activeDays,
             firstCommitAt: snapshot.first_commit_at
                 ? new Date(snapshot.first_commit_at).toISOString()
                 : null,

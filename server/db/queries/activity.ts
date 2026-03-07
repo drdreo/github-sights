@@ -267,15 +267,29 @@ export async function aggregateContributorActivity(
 /** Get daily activity time-series for a specific contributor. */
 export async function getContributorDailyActivity(
     ownerLogin: string,
-    contributorLogin: string
+    contributorLogin: string,
+    options?: { since?: string; until?: string }
 ): Promise<DailyActivityRow[]> {
+    const conditions = ["owner_login = $1", "contributor_login = $2", "repo_id IS NULL"];
+    const params: unknown[] = [ownerLogin, contributorLogin];
+    let idx = 3;
+
+    if (options?.since) {
+        conditions.push(`date >= $${idx}`);
+        params.push(options.since);
+        idx++;
+    }
+    if (options?.until) {
+        conditions.push(`date <= $${idx}`);
+        params.push(options.until);
+        idx++;
+    }
+
     return query<DailyActivityRow>(
         `SELECT * FROM daily_activity
-         WHERE owner_login = $1
-           AND contributor_login = $2
-           AND repo_id IS NULL
+         WHERE ${conditions.join(" AND ")}
          ORDER BY date`,
-        [ownerLogin, contributorLogin]
+        params
     );
 }
 
@@ -292,8 +306,28 @@ export interface ContributorRepoBreakdownRow {
  *  LoC is sourced from non-merge commits (is_merge = false). */
 export async function getContributorRepoBreakdown(
     ownerLogin: string,
-    contributorLogin: string
+    contributorLogin: string,
+    options?: { since?: string; until?: string }
 ): Promise<ContributorRepoBreakdownRow[]> {
+    const params: unknown[] = [ownerLogin, contributorLogin];
+    let idx = 3;
+
+    let commitDateFilter = "";
+    let prDateFilter = "";
+
+    if (options?.since) {
+        commitDateFilter += ` AND ce.committed_at >= $${idx}::TIMESTAMPTZ`;
+        prDateFilter += ` AND pe.created_at >= $${idx}::TIMESTAMPTZ`;
+        params.push(options.since);
+        idx++;
+    }
+    if (options?.until) {
+        commitDateFilter += ` AND ce.committed_at < ($${idx}::TIMESTAMPTZ + INTERVAL '1 day')`;
+        prDateFilter += ` AND pe.created_at < ($${idx}::TIMESTAMPTZ + INTERVAL '1 day')`;
+        params.push(options.until);
+        idx++;
+    }
+
     return query<ContributorRepoBreakdownRow>(
         `WITH commit_stats AS (
             SELECT
@@ -305,7 +339,7 @@ export async function getContributorRepoBreakdown(
             JOIN repository_meta rm ON rm.id = ce.repo_id
             WHERE rm.owner_login = $1
               AND ce.author_login = $2
-              AND ce.is_merge = false
+              AND ce.is_merge = false${commitDateFilter}
             GROUP BY rm.name
         ),
         pr_stats AS (
@@ -316,7 +350,7 @@ export async function getContributorRepoBreakdown(
             FROM pr_event pe
             JOIN repository_meta rm ON rm.id = pe.repo_id
             WHERE rm.owner_login = $1
-              AND pe.author_login = $2
+              AND pe.author_login = $2${prDateFilter}
             GROUP BY rm.name
         )
         SELECT
@@ -329,7 +363,7 @@ export async function getContributorRepoBreakdown(
         FROM commit_stats c
         FULL OUTER JOIN pr_stats p ON c.repo = p.repo
         ORDER BY COALESCE(c.commits, 0) DESC`,
-        [ownerLogin, contributorLogin]
+        params
     );
 }
 
