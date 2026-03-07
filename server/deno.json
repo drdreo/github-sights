@@ -1,6 +1,6 @@
 {
     "tasks": {
-        "dev": "deno run --tunnel --allow-net --allow-env --allow-read --watch main.ts"
+        "dev": "deno run --tunnel --allow-net --allow-env --allow-read --env-file --watch main.ts"
     },
     "imports": {
         "@github-sights/shared": "../shared/src/index.ts",
