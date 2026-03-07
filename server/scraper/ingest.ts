@@ -211,19 +211,17 @@ export async function ingestCommitsForRepo(
         await advanceSyncState(owner, repoId, "commits", fetchUntil);
     } else {
         console.log(
-            `[ingest] ${owner}/${repoName}: fetched ${totalFetched} commits${fetchSince ? ` (since ${fetchSince.split("T")[0]})` : " (full history)"}`
+            `[ingest] ${owner}/${repoName}: fetched ${totalFetched} commits${fetchSince ? ` (since ${fetchSince.split("T")[0]})` : " (full history)"}, upserting contributors…`
         );
 
-        // Upsert contributor profiles
         await upsertContributors(Array.from(seenContributors.values()));
-
-        // Only advance high-water mark forward, never backward (protects backfills)
         await advanceSyncState(owner, repoId, "commits", fetchUntil);
     }
 
     // Track what the forward pass covered
     const earliestCovered = fetchSince ?? "1970-01-01T00:00:00Z";
     await retreatEarliestSynced(owner, repoId, "commits", earliestCovered);
+    console.log(`[ingest] ${owner}/${repoName}: commit sync state updated`);
 
     // ── Backward gap detection ───────────────────────────────────────────────
     const desiredSince = options?.desiredSince;
@@ -324,12 +322,13 @@ export async function ingestPRsForRepo(
         return { repoName, repoId, upserted: 0 };
     }
 
-    console.log(`[ingest] ${owner}/${repoName}: fetched ${totalFetched} PRs`);
+    console.log(`[ingest] ${owner}/${repoName}: fetched ${totalFetched} PRs, upserting contributors…`);
 
-    // Upsert contributor profiles
     await upsertContributors(Array.from(seenContributors.values()));
+    console.log(`[ingest] ${owner}/${repoName}: contributors done, advancing sync state…`);
 
     await advanceSyncState(owner, repoId, "pulls", new Date().toISOString());
+    console.log(`[ingest] ${owner}/${repoName}: PR ingestion complete`);
 
     return { repoName, repoId, upserted: totalUpserted };
 }
