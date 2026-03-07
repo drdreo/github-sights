@@ -28,9 +28,7 @@ export function SyncProgressBar({ progress, barWidth = "w-32" }: SyncProgressBar
             {status === "fetching_repos" && (
                 <span className="text-gray-400">Discovering repositories…</span>
             )}
-            {status === "aggregating" && (
-                <span className="text-gray-400">Building snapshots…</span>
-            )}
+            {status === "aggregating" && <span className="text-gray-400">Building snapshots…</span>}
             {status === "syncing_repos" && totalRepos && totalRepos > 0 ? (
                 <>
                     <div className={`${barWidth} h-1.5 bg-gray-800 rounded-full overflow-hidden`}>

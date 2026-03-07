@@ -324,15 +324,7 @@ async function rebuildOwnerDailyActivity(
 
     // PR counts (no LoC)
     for (const repo of repos) {
-        const commits = await getCommitsByRepo(repo.id);
         const prs = await getPrsByRepo(repo.id);
-
-        for (const c of commits) {
-            const entry = ensureOwnerDate(toDateString(c.committed_at));
-            entry.commit_count++;
-            entry.additions += c.additions;
-            entry.deletions += c.deletions;
-        }
 
         // PR counts only (no LoC from PRs)
         for (const pr of prs) {

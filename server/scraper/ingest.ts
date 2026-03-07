@@ -14,9 +14,7 @@ import {
     fetchPullRequests,
     isRepoExcluded,
     getRateLimitState,
-    type GitHubRepo,
-    type GitHubCommit,
-    type GitHubPR
+    type GitHubRepo
 } from "./github-client.ts";
 import {
     upsertOwner,
@@ -77,6 +75,40 @@ export interface IngestOwnerResult {
 // ── Constants ────────────────────────────────────────────────────────────────────
 
 const CONCURRENCY = 3;
+
+// ── Helpers ──────────────────────────────────────────────────────────────────────
+
+function toCommitInput(c: import("./github-client.ts").GitHubCommit, repoId: number): InsertCommitInput {
+    return {
+        sha: c.sha,
+        repo_id: repoId,
+        author_login: c.author_login,
+        committer_login: c.committer_login,
+        message: c.message,
+        html_url: c.html_url,
+        committed_at: c.committed_at,
+        additions: c.additions,
+        deletions: c.deletions,
+        is_merge: c.is_merge
+    };
+}
+
+function collectContributors(
+    page: import("./github-client.ts").GitHubCommit[],
+    seen: Map<string, UpsertContributorInput>
+): void {
+    for (const c of page) {
+        if (c.author_login && !seen.has(c.author_login)) {
+            seen.set(c.author_login, {
+                login: c.author_login,
+                avatar_url: c.author_avatar_url,
+                html_url: `https://github.com/${c.author_login}`,
+                name: c.author_name !== "Unknown" ? c.author_name : null,
+                email: c.author_email || null
+            });
+        }
+    }
+}
 
 // ── Repo Ingestion ───────────────────────────────────────────────────────────────
 
@@ -159,41 +191,31 @@ export async function ingestCommitsForRepo(
         }
     }
 
-    // Fetch from GitHub
-    const ghCommits = await fetchCommits(octokit, owner, repoName, {
+    // Fetch from GitHub — stream page-by-page to avoid accumulating all commits in memory
+    let totalInserted = 0;
+    let totalFetched = 0;
+    const seenContributors = new Map<string, UpsertContributorInput>();
+
+    await fetchCommits(octokit, owner, repoName, {
         since: fetchSince ?? undefined,
-        until: fetchUntil
+        until: fetchUntil,
+        onPage: async (page) => {
+            totalFetched += page.length;
+            totalInserted += await insertCommits(page.map((c) => toCommitInput(c, repoId)));
+            collectContributors(page, seenContributors);
+        }
     });
 
-    let totalInserted = 0;
-
-    if (ghCommits.length === 0) {
+    if (totalFetched === 0) {
         // Only advance high-water mark forward, never backward (protects backfills)
         await advanceSyncState(owner, repoId, "commits", fetchUntil);
     } else {
         console.log(
-            `[ingest] ${owner}/${repoName}: fetched ${ghCommits.length} commits${fetchSince ? ` (since ${fetchSince.split("T")[0]})` : " (full history)"}`
+            `[ingest] ${owner}/${repoName}: fetched ${totalFetched} commits${fetchSince ? ` (since ${fetchSince.split("T")[0]})` : " (full history)"}`
         );
 
-        // Map to DB shape
-        const commitInputs: InsertCommitInput[] = ghCommits.map((c) => ({
-            sha: c.sha,
-            repo_id: repoId,
-            author_login: c.author_login,
-            committer_login: c.committer_login,
-            message: c.message,
-            html_url: c.html_url,
-            committed_at: c.committed_at,
-            additions: c.additions,
-            deletions: c.deletions,
-            is_merge: c.is_merge
-        }));
-
-        totalInserted += await insertCommits(commitInputs);
-
-        // Extract and upsert contributor profiles from commit authors
-        const contributors = extractContributorsFromCommits(ghCommits);
-        await upsertContributors(contributors);
+        // Upsert contributor profiles
+        await upsertContributors(Array.from(seenContributors.values()));
 
         // Only advance high-water mark forward, never backward (protects backfills)
         await advanceSyncState(owner, repoId, "commits", fetchUntil);
@@ -215,33 +237,24 @@ export async function ingestCommitsForRepo(
                 `[ingest] ${owner}/${repoName}: backfilling commits ${desiredSince.split("T")[0]} → ${backfillUntil.split("T")[0]}`
             );
 
-            const backfillCommits = await fetchCommits(octokit, owner, repoName, {
+            let backfillFetched = 0;
+
+            await fetchCommits(octokit, owner, repoName, {
                 since: desiredSince,
-                until: backfillUntil
+                until: backfillUntil,
+                onPage: async (page) => {
+                    backfillFetched += page.length;
+                    totalInserted += await insertCommits(page.map((c) => toCommitInput(c, repoId)));
+                    collectContributors(page, seenContributors);
+                }
             });
 
-            if (backfillCommits.length > 0) {
+            if (backfillFetched > 0) {
                 console.log(
-                    `[ingest] ${owner}/${repoName}: backfill fetched ${backfillCommits.length} commits`
+                    `[ingest] ${owner}/${repoName}: backfill fetched ${backfillFetched} commits`
                 );
 
-                const backfillInputs: InsertCommitInput[] = backfillCommits.map((c) => ({
-                    sha: c.sha,
-                    repo_id: repoId,
-                    author_login: c.author_login,
-                    committer_login: c.committer_login,
-                    message: c.message,
-                    html_url: c.html_url,
-                    committed_at: c.committed_at,
-                    additions: c.additions,
-                    deletions: c.deletions,
-                    is_merge: c.is_merge
-                }));
-
-                totalInserted += await insertCommits(backfillInputs);
-
-                const contributors = extractContributorsFromCommits(backfillCommits);
-                await upsertContributors(contributors);
+                await upsertContributors(Array.from(seenContributors.values()));
             }
 
             await retreatEarliestSynced(owner, repoId, "commits", desiredSince);
@@ -263,47 +276,63 @@ export async function ingestPRsForRepo(
     const repoId = repo.id;
     const repoName = repo.name;
 
-    // Fetch all PRs — the since filter was never actually applied to the GraphQL query,
-    // and PRs are upserted (idempotent), so fetching all is correct and uses one API call
-    // instead of two parallel calls that together fetch the same set.
-    const ghPRs = await fetchPullRequests(octokit, owner, repoName, "all");
+    // Fetch all PRs — stream page-by-page to avoid accumulating all PRs in memory.
+    // PRs are upserted (idempotent), so fetching all is correct.
+    let totalUpserted = 0;
+    let totalFetched = 0;
+    const seenContributors = new Map<string, UpsertContributorInput>();
 
-    if (ghPRs.length === 0) {
+    await fetchPullRequests(octokit, owner, repoName, "all", {
+        onPage: async (page) => {
+            totalFetched += page.length;
+
+            const prInputs: InsertPrInput[] = page.map((pr) => ({
+                id: pr.id,
+                repo_id: repoId,
+                number: pr.number,
+                author_login: pr.author_login,
+                title: pr.title,
+                state: pr.state,
+                is_draft: pr.is_draft,
+                html_url: pr.html_url,
+                base_ref: pr.base_ref,
+                head_ref: pr.head_ref,
+                additions: pr.additions,
+                deletions: pr.deletions,
+                changed_files: pr.changed_files,
+                created_at: pr.created_at,
+                closed_at: pr.closed_at,
+                merged_at: pr.merged_at
+            }));
+
+            totalUpserted += await upsertPrs(prInputs);
+
+            // Deduplicate contributors as we go
+            for (const pr of page) {
+                if (pr.author_login && !seenContributors.has(pr.author_login)) {
+                    seenContributors.set(pr.author_login, {
+                        login: pr.author_login,
+                        avatar_url: pr.author_avatar_url,
+                        html_url: `https://github.com/${pr.author_login}`
+                    });
+                }
+            }
+        }
+    });
+
+    if (totalFetched === 0) {
         await advanceSyncState(owner, repoId, "pulls", new Date().toISOString());
         return { repoName, repoId, upserted: 0 };
     }
 
-    console.log(`[ingest] ${owner}/${repoName}: fetched ${ghPRs.length} PRs`);
+    console.log(`[ingest] ${owner}/${repoName}: fetched ${totalFetched} PRs`);
 
-    // Map to DB shape
-    const prInputs: InsertPrInput[] = ghPRs.map((pr) => ({
-        id: pr.id,
-        repo_id: repoId,
-        number: pr.number,
-        author_login: pr.author_login,
-        title: pr.title,
-        state: pr.state,
-        is_draft: pr.is_draft,
-        html_url: pr.html_url,
-        base_ref: pr.base_ref,
-        head_ref: pr.head_ref,
-        additions: pr.additions,
-        deletions: pr.deletions,
-        changed_files: pr.changed_files,
-        created_at: pr.created_at,
-        closed_at: pr.closed_at,
-        merged_at: pr.merged_at
-    }));
-
-    const upserted = await upsertPrs(prInputs);
-
-    // Extract and upsert contributor profiles from PR authors
-    const contributors = extractContributorsFromPRs(ghPRs);
-    await upsertContributors(contributors);
+    // Upsert contributor profiles
+    await upsertContributors(Array.from(seenContributors.values()));
 
     await advanceSyncState(owner, repoId, "pulls", new Date().toISOString());
 
-    return { repoName, repoId, upserted };
+    return { repoName, repoId, upserted: totalUpserted };
 }
 
 // ── Full Owner Ingestion ─────────────────────────────────────────────────────────
@@ -444,40 +473,4 @@ export async function ingestOwner(
         repos: results,
         errors
     };
-}
-
-// ── Contributor Extraction ───────────────────────────────────────────────────────
-
-function extractContributorsFromCommits(commits: GitHubCommit[]): UpsertContributorInput[] {
-    const seen = new Map<string, UpsertContributorInput>();
-
-    for (const c of commits) {
-        if (c.author_login && !seen.has(c.author_login)) {
-            seen.set(c.author_login, {
-                login: c.author_login,
-                avatar_url: c.author_avatar_url,
-                html_url: `https://github.com/${c.author_login}`,
-                name: c.author_name !== "Unknown" ? c.author_name : null,
-                email: c.author_email || null
-            });
-        }
-    }
-
-    return Array.from(seen.values());
-}
-
-function extractContributorsFromPRs(prs: GitHubPR[]): UpsertContributorInput[] {
-    const seen = new Map<string, UpsertContributorInput>();
-
-    for (const pr of prs) {
-        if (pr.author_login && !seen.has(pr.author_login)) {
-            seen.set(pr.author_login, {
-                login: pr.author_login,
-                avatar_url: pr.author_avatar_url,
-                html_url: `https://github.com/${pr.author_login}`
-            });
-        }
-    }
-
-    return Array.from(seen.values());
 }

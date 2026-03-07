@@ -403,17 +403,19 @@ export async function fetchRepos(
 /**
  * Fetch commits for a single repo via GraphQL API.
  * Unlike REST, GraphQL returns additions/deletions per commit, fixing LOC=0.
+ * When `onPage` is provided, commits stream to the callback and the return value is `[]`.
  */
 export async function fetchCommits(
     octokit: Octokit,
     owner: string,
     repo: string,
-    options?: { since?: string; until?: string }
+    options?: { since?: string; until?: string; onPage?: (page: GitHubCommit[]) => Promise<void> }
 ): Promise<GitHubCommit[]> {
     try {
         await guardRateLimit(octokit);
 
         const allCommits: GitHubCommit[] = [];
+        let totalCount = 0;
         let cursor: string | null = null;
         let hasNextPage = true;
 
@@ -432,9 +434,10 @@ export async function fetchCommits(
             const history = response.repository?.defaultBranchRef?.target?.history;
             if (!history) break; // Empty repo or no default branch
 
+            const page: GitHubCommit[] = [];
             // deno-lint-ignore no-explicit-any
             for (const node of history.nodes) {
-                allCommits.push({
+                page.push({
                     sha: node.oid,
                     message: node.message,
                     html_url: node.url,
@@ -451,12 +454,20 @@ export async function fetchCommits(
                 });
             }
 
+            if (options?.onPage) {
+                await options.onPage(page);
+                totalCount += page.length;
+            } else {
+                allCommits.push(...page);
+            }
+
             hasNextPage = history.pageInfo.hasNextPage;
             cursor = history.pageInfo.endCursor;
         }
 
+        const count = options?.onPage ? totalCount : allCommits.length;
         console.log(
-            `[github] GET commits for ${owner}/${repo} → ${allCommits.length} commits (via GraphQL)` +
+            `[github] GET commits for ${owner}/${repo} → ${count} commits (via GraphQL)` +
                 (options?.since ? ` (since ${options.since.split("T")[0]})` : "")
         );
 
@@ -470,12 +481,14 @@ export async function fetchCommits(
  * Fetch pull requests for a repo via GraphQL API.
  * Returns additions/deletions/changedFiles inline per PR, eliminating
  * the N+1 REST enrichment pattern.
+ * When `onPage` is provided, PRs stream to the callback and the return value is `[]`.
  */
 export async function fetchPullRequests(
     octokit: Octokit,
     owner: string,
     repo: string,
-    state: "all" | "open" | "closed" = "all"
+    state: "all" | "open" | "closed" = "all",
+    options?: { onPage?: (page: GitHubPR[]) => Promise<void> }
 ): Promise<GitHubPR[]> {
     try {
         await guardRateLimit(octokit);
@@ -489,6 +502,7 @@ export async function fetchPullRequests(
         const states = stateMap[state];
 
         const allPulls: GitHubPR[] = [];
+        let totalCount = 0;
         let cursor: string | null = null;
         let hasNextPage = true;
 
@@ -508,12 +522,13 @@ export async function fetchPullRequests(
             const pullRequests = response.repository?.pullRequests;
             if (!pullRequests) break;
 
+            const page: GitHubPR[] = [];
             // deno-lint-ignore no-explicit-any
             for (const node of pullRequests.nodes) {
                 // GraphQL state is OPEN, CLOSED, or MERGED — normalize to "open" | "closed"
                 const prState: "open" | "closed" = node.state === "OPEN" ? "open" : "closed";
 
-                allPulls.push({
+                page.push({
                     id: node.id,
                     number: node.number,
                     title: node.title,
@@ -534,12 +549,20 @@ export async function fetchPullRequests(
                 });
             }
 
+            if (options?.onPage) {
+                await options.onPage(page);
+                totalCount += page.length;
+            } else {
+                allPulls.push(...page);
+            }
+
             hasNextPage = pullRequests.pageInfo.hasNextPage;
             cursor = pullRequests.pageInfo.endCursor;
         }
 
+        const count = options?.onPage ? totalCount : allPulls.length;
         console.log(
-            `[github] GET pulls for ${owner}/${repo} (state=${state}) → ${allPulls.length} PRs (via GraphQL)`
+            `[github] GET pulls for ${owner}/${repo} (state=${state}) → ${count} PRs (via GraphQL)`
         );
 
         return allPulls;
