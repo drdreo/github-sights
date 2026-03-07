@@ -273,6 +273,14 @@ export async function ingestPRsForRepo(
     const repoId = repo.id;
     const repoName = repo.name;
 
+    // Skip if PRs were synced recently (allows resuming after isolate restart)
+    const pullState = await getSyncState(owner, repoId, "pulls");
+    const PR_STALE_MS = 60 * 60 * 1000; // 1 hour
+    if (pullState?.last_synced_at &&
+        Date.now() - pullState.last_synced_at.getTime() < PR_STALE_MS) {
+        return { repoName, repoId, upserted: 0 };
+    }
+
     // Fetch all PRs — stream page-by-page to avoid accumulating all PRs in memory.
     // PRs are upserted (idempotent), so fetching all is correct.
     let totalUpserted = 0;
