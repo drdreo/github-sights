@@ -222,9 +222,8 @@ export async function ingestCommitsForRepo(
     }
 
     // Track what the forward pass covered
-    if (fetchSince) {
-        await retreatEarliestSynced(owner, repoId, "commits", fetchSince);
-    }
+    const earliestCovered = fetchSince ?? "1970-01-01T00:00:00Z";
+    await retreatEarliestSynced(owner, repoId, "commits", earliestCovered);
 
     // ── Backward gap detection ───────────────────────────────────────────────
     const desiredSince = options?.desiredSince;

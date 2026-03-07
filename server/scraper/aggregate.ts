@@ -402,8 +402,6 @@ async function rebuildContributorSnapshots(
             if (!c.author_login) continue;
             const entry = ensureContrib(c.author_login);
             entry.totalCommits++;
-            entry.totalAdditions += c.additions;
-            entry.totalDeletions += c.deletions;
             entry.repos.add(repo.name);
             entry.commitDates.add(toDateString(c.committed_at));
 
