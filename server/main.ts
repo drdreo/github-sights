@@ -32,7 +32,7 @@ app.route("/", repos);
 app.route("/", stats);
 app.route("/", sync);
 
-// ── Crash diagnostics ──────────────────────────────────────────────────────────
+// ── Crash / shutdown diagnostics ──────────────────────────────────────────────
 
 globalThis.addEventListener("unhandledrejection", (e) => {
     const mem = Math.round(Deno.memoryUsage().heapUsed / 1024 / 1024);
@@ -43,6 +43,17 @@ globalThis.addEventListener("error", (e) => {
     const mem = Math.round(Deno.memoryUsage().heapUsed / 1024 / 1024);
     console.error(`[CRASH] Uncaught error (heap: ${mem}MB):`, e.error ?? e.message);
 });
+
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    try {
+        Deno.addSignalListener(signal, () => {
+            const mem = Math.round(Deno.memoryUsage().heapUsed / 1024 / 1024);
+            console.warn(`[SHUTDOWN] Received ${signal} (heap: ${mem}MB) — isolate shutting down`);
+        });
+    } catch {
+        // Signal listeners may not be supported on all platforms
+    }
+}
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 
