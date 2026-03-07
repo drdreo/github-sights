@@ -32,6 +32,18 @@ app.route("/", repos);
 app.route("/", stats);
 app.route("/", sync);
 
+// ── Crash diagnostics ──────────────────────────────────────────────────────────
+
+globalThis.addEventListener("unhandledrejection", (e) => {
+    const mem = Math.round(Deno.memoryUsage().heapUsed / 1024 / 1024);
+    console.error(`[CRASH] Unhandled rejection (heap: ${mem}MB):`, e.reason);
+});
+
+globalThis.addEventListener("error", (e) => {
+    const mem = Math.round(Deno.memoryUsage().heapUsed / 1024 / 1024);
+    console.error(`[CRASH] Uncaught error (heap: ${mem}MB):`, e.error ?? e.message);
+});
+
 // ── Start ──────────────────────────────────────────────────────────────────────
 
 const port = parseInt(Deno.env.get("PORT") || "3001", 10);

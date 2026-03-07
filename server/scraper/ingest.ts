@@ -376,7 +376,8 @@ export async function ingestOwner(
         }
         const batch = repos.slice(i, i + CONCURRENCY);
         const batchNames = batch.map((r) => r.name).join(", ");
-        console.log(`[ingest] ${owner}: batch ${Math.floor(i / CONCURRENCY) + 1}/${Math.ceil(repos.length / CONCURRENCY)} starting (${batchNames})`);
+        const memStart = Math.round(Deno.memoryUsage().heapUsed / 1024 / 1024);
+        console.log(`[ingest] ${owner}: batch ${Math.floor(i / CONCURRENCY) + 1}/${Math.ceil(repos.length / CONCURRENCY)} starting [heap: ${memStart}MB] (${batchNames})`);
         const batchResults = await Promise.allSettled(
             batch.map(async (repo) => {
                 const [commits, prs] = await Promise.all([
@@ -410,8 +411,9 @@ export async function ingestOwner(
         }
 
         const budget = getRateLimitState(octokit);
+        const mem = Math.round(Deno.memoryUsage().heapUsed / 1024 / 1024);
         console.log(
-            `[ingest] ${owner}: batch ${Math.floor(i / CONCURRENCY) + 1}/${Math.ceil(repos.length / CONCURRENCY)} complete (API budget: ${budget.remaining}/${budget.limit})`
+            `[ingest] ${owner}: batch ${Math.floor(i / CONCURRENCY) + 1}/${Math.ceil(repos.length / CONCURRENCY)} complete (API budget: ${budget.remaining}/${budget.limit}, heap: ${mem}MB)`
         );
 
         // Report progress to caller
