@@ -74,7 +74,7 @@ export interface IngestOwnerResult {
 
 // ── Constants ────────────────────────────────────────────────────────────────────
 
-const CONCURRENCY = 1;
+const CONCURRENCY = 2;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────
 
@@ -428,11 +428,14 @@ export async function ingestOwner(
         }
 
         // Run progressive per-repo aggregation so snapshots are available immediately
+        // Skip repos with no new data — snapshot hasn't changed, no need to reload from DB
         if (!options?.skipAggregation) {
             for (let j = 0; j < batchResults.length; j++) {
                 const result = batchResults[j];
                 const repo = batch[j];
                 if (result.status === "fulfilled") {
+                    const { commits, prs } = result.value;
+                    if (commits.inserted === 0 && prs.upserted === 0) continue;
                     try {
                         const repoMeta: RepositoryMetaRow = {
                             id: repo.id,

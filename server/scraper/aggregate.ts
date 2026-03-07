@@ -13,7 +13,6 @@
 import { query } from "../db/pool.ts";
 import { getReposByOwner } from "../db/queries/identity.ts";
 import {
-    getCommitsByOwner,
     getCommitsByRepo,
     getPrsByRepo,
     getContributorStatsByRepo
@@ -96,34 +95,31 @@ export async function aggregateOwner(ownerLogin: string): Promise<AggregateResul
         `[aggregate] ${ownerLogin}: starting full aggregation for ${nonForkRepos.length} repos`
     );
 
-    // Step 1: Rebuild per-repo daily_activity + repo snapshots
+    // Step 1: Rebuild per-repo daily_activity via SQL (INSERT INTO ... SELECT)
     let dailyActivityRows = 0;
     for (const repo of nonForkRepos) {
-        const commits = await getCommitsByRepo(repo.id);
-        const prs = await getPrsByRepo(repo.id);
-
         await clearRepoDailyActivity(repo.id);
-        const dailyRows = buildRepoDailyActivity(ownerLogin, repo.id, commits, prs);
-        if (dailyRows.length > 0) {
-            await upsertDailyActivity(dailyRows);
-            dailyActivityRows += dailyRows.length;
-        }
+        const inserted = await rebuildRepoDailyActivitySQL(ownerLogin, repo.id);
+        dailyActivityRows += inserted;
+    }
 
-        await buildAndUpsertRepoSnapshot(ownerLogin, repo, commits, prs);
+    // Rebuild repo snapshots via SQL aggregation (no raw event rows in JS)
+    for (const repo of nonForkRepos) {
+        await rebuildRepoSnapshotSQL(ownerLogin, repo);
     }
     console.log(
         `[aggregate] ${ownerLogin}: rebuilt ${nonForkRepos.length} repo snapshots + ${dailyActivityRows} repo daily activity rows`
     );
 
     // Step 2: Rebuild owner-level daily_activity (aggregated across all repos)
-    const ownerDailyRows = await rebuildOwnerDailyActivity(ownerLogin, nonForkRepos);
+    const ownerDailyRows = await rebuildOwnerDailyActivity(ownerLogin);
     dailyActivityRows += ownerDailyRows;
     console.log(
         `[aggregate] ${ownerLogin}: rebuilt ${ownerDailyRows} owner-level daily activity rows`
     );
 
     // Step 3: Rebuild contributor_snapshot
-    const contributorSnapshots = await rebuildContributorSnapshots(ownerLogin, nonForkRepos);
+    const contributorSnapshots = await rebuildContributorSnapshots(ownerLogin);
     console.log(`[aggregate] ${ownerLogin}: rebuilt ${contributorSnapshots} contributor snapshots`);
 
     // Step 4: Rebuild owner_snapshot
@@ -142,8 +138,137 @@ export async function aggregateOwner(ownerLogin: string): Promise<AggregateResul
 // ── Shared: Per-Repo Daily Activity Builder ─────────────────────────────────────
 
 /**
+ * Rebuild daily_activity for a single repo using SQL aggregation.
+ * Combines commit and PR stats per date without loading raw events into JS.
+ */
+async function rebuildRepoDailyActivitySQL(ownerLogin: string, repoId: number): Promise<number> {
+    // Aggregate commits by date (LoC from non-merge only) and PR events by date,
+    // then merge them into daily_activity rows.
+    const rows = await query<UpsertDailyActivityInput>(
+        `WITH commit_daily AS (
+            SELECT
+                ce.committed_at::DATE::TEXT AS date,
+                COUNT(*)::INTEGER AS commit_count,
+                COALESCE(SUM(ce.additions) FILTER (WHERE ce.is_merge = false), 0)::INTEGER AS additions,
+                COALESCE(SUM(ce.deletions) FILTER (WHERE ce.is_merge = false), 0)::INTEGER AS deletions
+            FROM commit_event ce
+            WHERE ce.repo_id = $2
+            GROUP BY ce.committed_at::DATE
+        ),
+        pr_opened AS (
+            SELECT pe.created_at::DATE::TEXT AS date, COUNT(*)::INTEGER AS cnt
+            FROM pr_event pe WHERE pe.repo_id = $2
+            GROUP BY pe.created_at::DATE
+        ),
+        pr_merged AS (
+            SELECT pe.merged_at::DATE::TEXT AS date, COUNT(*)::INTEGER AS cnt
+            FROM pr_event pe WHERE pe.repo_id = $2 AND pe.merged_at IS NOT NULL
+            GROUP BY pe.merged_at::DATE
+        ),
+        pr_closed AS (
+            SELECT pe.closed_at::DATE::TEXT AS date, COUNT(*)::INTEGER AS cnt
+            FROM pr_event pe WHERE pe.repo_id = $2 AND pe.closed_at IS NOT NULL AND pe.merged_at IS NULL
+            GROUP BY pe.closed_at::DATE
+        ),
+        all_dates AS (
+            SELECT date FROM commit_daily
+            UNION SELECT date FROM pr_opened
+            UNION SELECT date FROM pr_merged
+            UNION SELECT date FROM pr_closed
+        )
+        SELECT
+            $1::TEXT AS owner_login,
+            $2::INTEGER AS repo_id,
+            NULL::TEXT AS contributor_login,
+            d.date,
+            COALESCE(cd.commit_count, 0) AS commit_count,
+            COALESCE(cd.additions, 0) AS additions,
+            COALESCE(cd.deletions, 0) AS deletions,
+            COALESCE(po.cnt, 0) AS pr_opened,
+            COALESCE(pm.cnt, 0) AS pr_merged,
+            COALESCE(pc.cnt, 0) AS pr_closed,
+            0 AS workflow_runs,
+            0 AS workflow_failures
+        FROM all_dates d
+        LEFT JOIN commit_daily cd ON cd.date = d.date
+        LEFT JOIN pr_opened po ON po.date = d.date
+        LEFT JOIN pr_merged pm ON pm.date = d.date
+        LEFT JOIN pr_closed pc ON pc.date = d.date`,
+        [ownerLogin, repoId]
+    );
+
+    if (rows.length > 0) {
+        await upsertDailyActivity(rows);
+    }
+    return rows.length;
+}
+
+/**
+ * Rebuild a repo_snapshot using SQL aggregation.
+ * Avoids loading all raw commit/PR rows into JS memory.
+ */
+async function rebuildRepoSnapshotSQL(ownerLogin: string, repo: RepositoryMetaRow): Promise<void> {
+    // Get aggregate stats from SQL
+    const [stats] = await query<{
+        total_commits: number;
+        total_prs: number;
+        open_prs: number;
+        merged_prs: number;
+        total_additions: number;
+        total_deletions: number;
+    }>(
+        `SELECT
+            (SELECT COUNT(*)::INTEGER FROM commit_event WHERE repo_id = $1) AS total_commits,
+            (SELECT COUNT(*)::INTEGER FROM pr_event WHERE repo_id = $1) AS total_prs,
+            (SELECT COUNT(*)::INTEGER FROM pr_event WHERE repo_id = $1 AND state = 'open') AS open_prs,
+            (SELECT COUNT(*)::INTEGER FROM pr_event WHERE repo_id = $1 AND merged_at IS NOT NULL) AS merged_prs,
+            COALESCE((SELECT SUM(additions)::INTEGER FROM commit_event WHERE repo_id = $1 AND is_merge = false), 0) AS total_additions,
+            COALESCE((SELECT SUM(deletions)::INTEGER FROM commit_event WHERE repo_id = $1 AND is_merge = false), 0) AS total_deletions`,
+        [repo.id]
+    );
+
+    // Get contributor stats (already SQL-based)
+    const contribStats = await getContributorStatsByRepo(repo.id);
+
+    const topContributors: SnapshotContributor[] = contribStats.slice(0, 10).map((cs) => ({
+        login: cs.login,
+        avatar_url: cs.avatar_url ?? "",
+        commits: cs.commits,
+        additions: cs.additions,
+        deletions: cs.deletions
+    }));
+
+    const snap: UpsertRepoSnapshotInput = {
+        repo_id: repo.id,
+        owner_login: ownerLogin,
+        name: repo.name,
+        description: repo.description,
+        language: repo.language,
+        stargazers_count: repo.stargazers_count,
+        forks_count: repo.forks_count,
+        open_issues_count: repo.open_issues_count,
+        updated_at: repo.updated_at,
+        pushed_at: repo.pushed_at,
+        total_commits: stats.total_commits,
+        total_prs: stats.total_prs,
+        open_prs: stats.open_prs,
+        merged_prs: stats.merged_prs,
+        total_additions: stats.total_additions,
+        total_deletions: stats.total_deletions,
+        contributor_count: contribStats.length,
+        ci_success_rate: 0,
+        ci_avg_duration_seconds: 0,
+        last_ci_conclusion: null,
+        top_contributors: topContributors
+    };
+
+    await upsertRepoSnapshot(snap);
+}
+
+/**
  * Build daily_activity rows for a single repo from its commits and PRs.
  * Pure function — does not touch the database.
+ * Used by aggregateRepo() for progressive single-repo aggregation during ingestion.
  */
 function buildRepoDailyActivity(
     ownerLogin: string,
@@ -277,200 +402,148 @@ async function buildAndUpsertRepoSnapshot(
 
 /**
  * Rebuild owner-level daily_activity rows (repo_id IS NULL).
- * Aggregates across all repos per date.
+ * Aggregates from per-repo daily_activity rows in SQL to avoid loading all events into memory.
  */
-async function rebuildOwnerDailyActivity(
-    ownerLogin: string,
-    repos: RepositoryMetaRow[]
-): Promise<number> {
+async function rebuildOwnerDailyActivity(ownerLogin: string): Promise<number> {
     // Clear existing owner-level rows (repo_id IS NULL)
     await query("DELETE FROM daily_activity WHERE owner_login = $1 AND repo_id IS NULL", [
         ownerLogin
     ]);
 
-    const ownerDateMap = new Map<string, UpsertDailyActivityInput>();
+    // Aggregate per-repo daily_activity rows into owner-level rows via SQL
+    const rows = await query<UpsertDailyActivityInput>(
+        `SELECT
+            owner_login,
+            NULL::INTEGER AS repo_id,
+            NULL::TEXT AS contributor_login,
+            date,
+            SUM(commit_count)::INTEGER AS commit_count,
+            SUM(additions)::INTEGER AS additions,
+            SUM(deletions)::INTEGER AS deletions,
+            SUM(pr_opened)::INTEGER AS pr_opened,
+            SUM(pr_merged)::INTEGER AS pr_merged,
+            SUM(pr_closed)::INTEGER AS pr_closed,
+            SUM(workflow_runs)::INTEGER AS workflow_runs,
+            SUM(workflow_failures)::INTEGER AS workflow_failures
+         FROM daily_activity
+         WHERE owner_login = $1 AND repo_id IS NOT NULL AND contributor_login IS NULL
+         GROUP BY owner_login, date`,
+        [ownerLogin]
+    );
 
-    const ensureDate = (date: string) => {
-        if (!ownerDateMap.has(date)) {
-            ownerDateMap.set(date, {
-                owner_login: ownerLogin,
-                repo_id: null,
-                contributor_login: null,
-                date,
-                commit_count: 0,
-                additions: 0,
-                deletions: 0,
-                pr_opened: 0,
-                pr_merged: 0,
-                pr_closed: 0,
-                workflow_runs: 0,
-                workflow_failures: 0
-            });
-        }
-        return ownerDateMap.get(date)!;
-    };
-
-    // Commits: count all, LoC from non-merge only
-    const allCommits = await getCommitsByOwner(ownerLogin);
-    for (const c of allCommits) {
-        const date = toDateString(c.committed_at);
-        const entry = ensureDate(date);
-        entry.commit_count++;
-        if (!c.is_merge) {
-            entry.additions += c.additions;
-            entry.deletions += c.deletions;
-        }
+    if (rows.length > 0) {
+        await upsertDailyActivity(rows);
     }
 
-    // PR counts (no LoC)
-    for (const repo of repos) {
-        const prs = await getPrsByRepo(repo.id);
-
-        // PR counts only (no LoC from PRs)
-        for (const pr of prs) {
-            ensureDate(toDateString(pr.created_at)).pr_opened++;
-
-            if (pr.merged_at) {
-                ensureDate(toDateString(pr.merged_at)).pr_merged++;
-            } else if (pr.closed_at) {
-                ensureDate(toDateString(pr.closed_at)).pr_closed++;
-            }
-        }
-    }
-
-    const ownerRows = Array.from(ownerDateMap.values());
-    if (ownerRows.length > 0) {
-        await upsertDailyActivity(ownerRows);
-    }
-
-    return ownerRows.length;
+    return rows.length;
 }
 
 // ── Contributor Snapshots ────────────────────────────────────────────────────────
 
 /**
  * Rebuild contributor_snapshot for all contributors across an owner's repos.
- * Groups commits and PRs by author login across all repos.
+ * Uses SQL aggregation to avoid loading all events into memory.
  */
-async function rebuildContributorSnapshots(
-    ownerLogin: string,
-    repos: RepositoryMetaRow[]
-): Promise<number> {
-    // Accumulate per-contributor data across all repos
-    const contribMap = new Map<
-        string,
-        {
-            avatar_url: string | null;
-            html_url: string | null;
-            totalCommits: number;
-            totalAdditions: number;
-            totalDeletions: number;
-            totalPRs: number;
-            totalPRsMerged: number;
-            repos: Set<string>;
-            commitDates: Set<string>;
-            firstCommitAt: Date | null;
-            lastCommitAt: Date | null;
-        }
-    >();
+async function rebuildContributorSnapshots(ownerLogin: string): Promise<number> {
+    const rows = await query<{
+        login: string;
+        avatar_url: string | null;
+        html_url: string | null;
+        total_commits: number;
+        total_additions: number;
+        total_deletions: number;
+        total_prs: number;
+        total_prs_merged: number;
+        repos: string[];
+        repo_count: number;
+        first_commit_at: Date | null;
+        last_commit_at: Date | null;
+        active_days: number;
+    }>(
+        `WITH commit_stats AS (
+            SELECT
+                ce.author_login AS login,
+                COUNT(*)::INTEGER AS total_commits,
+                COALESCE(SUM(ce.additions) FILTER (WHERE ce.is_merge = false), 0)::INTEGER AS total_additions,
+                COALESCE(SUM(ce.deletions) FILTER (WHERE ce.is_merge = false), 0)::INTEGER AS total_deletions,
+                ARRAY_AGG(DISTINCT rm.name) AS commit_repos,
+                MIN(ce.committed_at) AS first_commit_at,
+                MAX(ce.committed_at) AS last_commit_at,
+                COUNT(DISTINCT ce.committed_at::DATE)::INTEGER AS active_days
+            FROM commit_event ce
+            JOIN repository_meta rm ON rm.id = ce.repo_id
+            WHERE rm.owner_login = $1 AND ce.author_login IS NOT NULL
+            GROUP BY ce.author_login
+        ),
+        pr_stats AS (
+            SELECT
+                pe.author_login AS login,
+                COUNT(*)::INTEGER AS total_prs,
+                COUNT(*) FILTER (WHERE pe.merged_at IS NOT NULL)::INTEGER AS total_prs_merged,
+                ARRAY_AGG(DISTINCT rm.name) AS pr_repos
+            FROM pr_event pe
+            JOIN repository_meta rm ON rm.id = pe.repo_id
+            WHERE rm.owner_login = $1 AND pe.author_login IS NOT NULL
+            GROUP BY pe.author_login
+        ),
+        combined AS (
+            SELECT
+                COALESCE(c.login, p.login) AS login,
+                COALESCE(c.total_commits, 0) AS total_commits,
+                COALESCE(c.total_additions, 0) AS total_additions,
+                COALESCE(c.total_deletions, 0) AS total_deletions,
+                COALESCE(p.total_prs, 0) AS total_prs,
+                COALESCE(p.total_prs_merged, 0) AS total_prs_merged,
+                c.commit_repos,
+                p.pr_repos,
+                c.first_commit_at,
+                c.last_commit_at,
+                COALESCE(c.active_days, 0) AS active_days
+            FROM commit_stats c
+            FULL OUTER JOIN pr_stats p ON c.login = p.login
+        )
+        SELECT
+            combined.login,
+            cp.avatar_url,
+            COALESCE(cp.html_url, 'https://github.com/' || combined.login) AS html_url,
+            combined.total_commits,
+            combined.total_additions,
+            combined.total_deletions,
+            combined.total_prs,
+            combined.total_prs_merged,
+            (SELECT ARRAY_AGG(DISTINCT r) FROM UNNEST(
+                COALESCE(combined.commit_repos, '{}') || COALESCE(combined.pr_repos, '{}')
+            ) AS r) AS repos,
+            (SELECT COUNT(DISTINCT r) FROM UNNEST(
+                COALESCE(combined.commit_repos, '{}') || COALESCE(combined.pr_repos, '{}')
+            ) AS r)::INTEGER AS repo_count,
+            combined.first_commit_at,
+            combined.last_commit_at,
+            combined.active_days
+        FROM combined
+        LEFT JOIN contributor_profile cp ON cp.login = combined.login`,
+        [ownerLogin]
+    );
 
-    const ensureContrib = (login: string) => {
-        if (!contribMap.has(login)) {
-            contribMap.set(login, {
-                avatar_url: null,
-                html_url: `https://github.com/${login}`,
-                totalCommits: 0,
-                totalAdditions: 0,
-                totalDeletions: 0,
-                totalPRs: 0,
-                totalPRsMerged: 0,
-                repos: new Set(),
-                commitDates: new Set(),
-                firstCommitAt: null,
-                lastCommitAt: null
-            });
-        }
-        return contribMap.get(login)!;
-    };
-
-    for (const repo of repos) {
-        const commits = await getCommitsByRepo(repo.id);
-        const prs = await getPrsByRepo(repo.id);
-
-        // Process commits — count all, LoC from non-merge only
-        for (const c of commits) {
-            if (!c.author_login) continue;
-            const entry = ensureContrib(c.author_login);
-            entry.totalCommits++;
-            entry.repos.add(repo.name);
-            entry.commitDates.add(toDateString(c.committed_at));
-
-            if (!c.is_merge) {
-                entry.totalAdditions += c.additions;
-                entry.totalDeletions += c.deletions;
-            }
-
-            // Track first/last commit
-            if (!entry.firstCommitAt || c.committed_at < entry.firstCommitAt) {
-                entry.firstCommitAt = c.committed_at;
-            }
-            if (!entry.lastCommitAt || c.committed_at > entry.lastCommitAt) {
-                entry.lastCommitAt = c.committed_at;
-            }
-        }
-
-        // Process PRs (counts only, no LoC)
-        for (const pr of prs) {
-            if (!pr.author_login) continue;
-            const entry = ensureContrib(pr.author_login);
-            entry.totalPRs++;
-            if (pr.merged_at) {
-                entry.totalPRsMerged++;
-            }
-            entry.repos.add(repo.name);
-        }
-    }
-
-    // Enrich avatar URLs from contributor_profile table
-    if (contribMap.size > 0) {
-        const profileRows = await query<{
-            login: string;
-            avatar_url: string | null;
-            html_url: string | null;
-        }>(
-            `SELECT login, avatar_url, html_url FROM contributor_profile
-             WHERE login = ANY($1)`,
-            [Array.from(contribMap.keys())]
-        );
-        for (const p of profileRows) {
-            const entry = contribMap.get(p.login);
-            if (entry) {
-                entry.avatar_url = p.avatar_url;
-                if (p.html_url) entry.html_url = p.html_url;
-            }
-        }
-    }
-
-    // Upsert contributor snapshots
     let count = 0;
-    for (const [login, data] of contribMap) {
+    for (const row of rows) {
         const snap: UpsertContributorSnapshotInput = {
             owner_login: ownerLogin,
-            contributor_login: login,
-            avatar_url: data.avatar_url,
-            html_url: data.html_url,
-            total_commits: data.totalCommits,
-            total_additions: data.totalAdditions,
-            total_deletions: data.totalDeletions,
-            total_prs: data.totalPRs,
-            total_prs_merged: data.totalPRsMerged,
-            repos: Array.from(data.repos),
-            repo_count: data.repos.size,
-            workflow_runs_triggered: 0, // Deferred: workflow ingestion
+            contributor_login: row.login,
+            avatar_url: row.avatar_url,
+            html_url: row.html_url,
+            total_commits: row.total_commits,
+            total_additions: row.total_additions,
+            total_deletions: row.total_deletions,
+            total_prs: row.total_prs,
+            total_prs_merged: row.total_prs_merged,
+            repos: row.repos ?? [],
+            repo_count: row.repo_count,
+            workflow_runs_triggered: 0,
             workflow_failure_rate: 0,
-            first_commit_at: data.firstCommitAt,
-            last_commit_at: data.lastCommitAt,
-            active_days: data.commitDates.size
+            first_commit_at: row.first_commit_at,
+            last_commit_at: row.last_commit_at,
+            active_days: row.active_days
         };
 
         await upsertContributorSnapshot(snap);
@@ -530,9 +603,17 @@ async function rebuildOwnerSnapshot(ownerLogin: string, repos: RepositoryMetaRow
     // Build language breakdown
     const languageBreakdown = buildLanguageBreakdown(repos);
 
-    // Calculate streaks from all commits
-    const allCommits = await getCommitsByOwner(ownerLogin);
-    const { longestStreak, currentStreak, avgCommitsPerDay } = calculateStreaks(allCommits);
+    // Calculate streaks from commit dates (lightweight — only fetches dates + count)
+    const commitDateRows = await query<{ date: string; count: number }>(
+        `SELECT ce.committed_at::DATE::TEXT AS date, COUNT(*)::INTEGER AS count
+         FROM commit_event ce
+         JOIN repository_meta rm ON rm.id = ce.repo_id
+         WHERE rm.owner_login = $1 AND ce.author_login IS NOT NULL
+         GROUP BY ce.committed_at::DATE
+         ORDER BY date`,
+        [ownerLogin]
+    );
+    const { longestStreak, currentStreak, avgCommitsPerDay } = calculateStreaks(commitDateRows);
 
     // Build top contributors (top 10 by commits across all repos)
     const topContribRows = await query<{
@@ -607,26 +688,18 @@ function buildLanguageBreakdown(repos: RepositoryMetaRow[]): LanguageBreakdownEn
 // ── Helper: Streak Calculation ───────────────────────────────────────────────────
 // Port of the streak logic from the old github.ts (lines 1072-1123)
 
-function calculateStreaks(commits: CommitEventRow[]): {
+function calculateStreaks(dateCounts: Array<{ date: string; count: number }>): {
     longestStreak: number;
     currentStreak: number;
     avgCommitsPerDay: number;
 } {
-    if (commits.length === 0) {
+    if (dateCounts.length === 0) {
         return { longestStreak: 0, currentStreak: 0, avgCommitsPerDay: 0 };
     }
 
-    // Count commits per date
-    const dateCounts = new Map<string, number>();
-    for (const commit of commits) {
-        const date = toDateString(commit.committed_at);
-        dateCounts.set(date, (dateCounts.get(date) ?? 0) + 1);
-    }
-
-    const sortedDates = Array.from(dateCounts.keys()).sort();
-    if (sortedDates.length === 0) {
-        return { longestStreak: 0, currentStreak: 0, avgCommitsPerDay: 0 };
-    }
+    // dateCounts is already sorted by date from SQL
+    const sortedDates = dateCounts.map((r) => r.date);
+    const totalCommits = dateCounts.reduce((sum, r) => sum + r.count, 0);
 
     let longestStreak = 1;
     let tempStreak = 1;
@@ -662,7 +735,7 @@ function calculateStreaks(commits: CommitEventRow[]): {
         1,
         Math.ceil((lastDateObj.getTime() - firstDate.getTime()) / 86400000) + 1
     );
-    const avgCommitsPerDay = Math.round((commits.length / daysDiff) * 100) / 100;
+    const avgCommitsPerDay = Math.round((totalCommits / daysDiff) * 100) / 100;
 
     return { longestStreak, currentStreak, avgCommitsPerDay };
 }
