@@ -70,9 +70,6 @@ export async function aggregateRepo(ownerLogin: string, repo: RepositoryMetaRow)
     const commits = await getCommitsByRepo(repo.id);
     const prs = await getPrsByRepo(repo.id);
 
-    console.log(
-        `[aggregate] ${ownerLogin}/${repo.name}: building repo snapshot`
-    );
     await buildAndUpsertRepoSnapshot(ownerLogin, repo, commits, prs);
 
     console.log(

@@ -2,6 +2,7 @@ import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import React from "react";
 import { Link } from "react-router-dom";
 import type { RepoContributorStat } from "../types";
+import { LocCell } from "../components/LocCell";
 import { formatLoc } from "./format";
 
 interface ContributorColumnOptions {
@@ -73,16 +74,16 @@ export function getContributorColumns<T extends RepoContributorStat>(
         col.accessor((row) => row.totalAdditions, {
             id: "totalAdditions",
             header: "Lines Added",
-            cell: (info) => `+${formatLoc(info.getValue())}`,
+            cell: (info) => <LocCell value={info.getValue()} type="addition" />,
             sortingFn: "basic",
-            meta: { align: "right" as const, cellClassName: "text-green-400" }
+            meta: { align: "right" as const }
         }),
         col.accessor((row) => row.totalDeletions, {
             id: "totalDeletions",
             header: "Lines Deleted",
-            cell: (info) => `-${formatLoc(info.getValue())}`,
+            cell: (info) => <LocCell value={info.getValue()} type="deletion" />,
             sortingFn: "basic",
-            meta: { align: "right" as const, cellClassName: "text-red-400" }
+            meta: { align: "right" as const }
         }),
         col.accessor((row) => row.totalAdditions - row.totalDeletions, {
             id: "delta",

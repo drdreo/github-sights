@@ -19,6 +19,7 @@ import { LoadingSkeleton } from "../components/LoadingSkeleton";
 import { DataTable } from "../components/DataTable";
 import { TimeRangeSelector } from "../components/TimeRangeSelector";
 import { formatLoc } from "../lib/format";
+import { LocCell } from "../components/LocCell";
 import type { ContributorDetail } from "../types";
 
 type RepoBreakdownRow = ContributorDetail["repoBreakdown"][number];
@@ -61,33 +62,13 @@ function useRepoBreakdownColumns(owner: string): ColumnDef<RepoBreakdownRow, unk
                 }),
                 columnHelper.accessor("additions", {
                     header: "Lines Added",
-                    cell: (info) => {
-                        const v = info.getValue();
-                        return (
-                            <span
-                                className="text-green-400 cursor-default"
-                                title={`+${v.toLocaleString()}`}
-                            >
-                                +{formatLoc(v)}
-                            </span>
-                        );
-                    },
+                    cell: (info) => <LocCell value={info.getValue()} type="addition" />,
                     sortingFn: "basic",
                     meta: { align: "right" as const }
                 }),
                 columnHelper.accessor("deletions", {
                     header: "Lines Deleted",
-                    cell: (info) => {
-                        const v = info.getValue();
-                        return (
-                            <span
-                                className="text-red-400 cursor-default"
-                                title={`-${v.toLocaleString()}`}
-                            >
-                                -{formatLoc(v)}
-                            </span>
-                        );
-                    },
+                    cell: (info) => <LocCell value={info.getValue()} type="deletion" />,
                     sortingFn: "basic",
                     meta: { align: "right" as const }
                 })
