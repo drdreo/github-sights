@@ -1,16 +1,18 @@
 import { Hono } from "hono";
 import { cors } from "jsr:@hono/hono@^4/cors";
+import { loadConfig } from "./config.ts";
 
 import { initPool } from "./db/pool.ts";
 import { runMigrations } from "./db/schema.ts";
-import { loadConfig } from "./config.ts";
 import { config } from "./routes/config.ts";
-import { health } from "./routes/health.ts";
+import { contributorDetail } from "./routes/contributorDetail.ts";
+import "./signals.ts";
 import { contributors } from "./routes/contributors.ts";
+import { health } from "./routes/health.ts";
 import { repos } from "./routes/repos.ts";
 import { stats } from "./routes/stats.ts";
 import { sync } from "./routes/sync.ts";
-import { contributorDetail } from "./routes/contributorDetail.ts";
+import "./crons.ts";
 
 // ── App ────────────────────────────────────────────────────────────────────────
 
@@ -31,29 +33,6 @@ app.route("/", contributors);
 app.route("/", repos);
 app.route("/", stats);
 app.route("/", sync);
-
-// ── Crash / shutdown diagnostics ──────────────────────────────────────────────
-
-globalThis.addEventListener("unhandledrejection", (e) => {
-    const mem = Math.round(Deno.memoryUsage().heapUsed / 1024 / 1024);
-    console.error(`[CRASH] Unhandled rejection (heap: ${mem}MB):`, e.reason);
-});
-
-globalThis.addEventListener("error", (e) => {
-    const mem = Math.round(Deno.memoryUsage().heapUsed / 1024 / 1024);
-    console.error(`[CRASH] Uncaught error (heap: ${mem}MB):`, e.error ?? e.message);
-});
-
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-    try {
-        Deno.addSignalListener(signal, () => {
-            const mem = Math.round(Deno.memoryUsage().heapUsed / 1024 / 1024);
-            console.warn(`[SHUTDOWN] Received ${signal} (heap: ${mem}MB) — isolate shutting down`);
-        });
-    } catch {
-        // Signal listeners may not be supported on all platforms
-    }
-}
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 

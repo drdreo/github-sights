@@ -12,11 +12,7 @@
 
 import { query } from "../db/pool.ts";
 import { getReposByOwner } from "../db/queries/identity.ts";
-import {
-    getCommitsByRepo,
-    getPrsByRepo,
-    getContributorStatsByRepo
-} from "../db/queries/events.ts";
+import { getCommitsByRepo, getPrsByRepo, getContributorStatsByRepo } from "../db/queries/events.ts";
 import {
     upsertOwnerSnapshot,
     upsertRepoSnapshot,
@@ -103,7 +99,9 @@ export async function aggregateOwner(ownerLogin: string): Promise<AggregateResul
         const inserted = await rebuildRepoDailyActivitySQL(ownerLogin, repo.id);
         dailyActivityRows += inserted;
         if ((i + 1) % 50 === 0) {
-            console.log(`[aggregate] ${ownerLogin}: daily activity ${i + 1}/${nonForkRepos.length} repos done`);
+            console.log(
+                `[aggregate] ${ownerLogin}: daily activity ${i + 1}/${nonForkRepos.length} repos done`
+            );
         }
     }
 
@@ -112,7 +110,9 @@ export async function aggregateOwner(ownerLogin: string): Promise<AggregateResul
         const repo = nonForkRepos[i];
         await rebuildRepoSnapshotSQL(ownerLogin, repo);
         if ((i + 1) % 50 === 0) {
-            console.log(`[aggregate] ${ownerLogin}: repo snapshots ${i + 1}/${nonForkRepos.length} done`);
+            console.log(
+                `[aggregate] ${ownerLogin}: repo snapshots ${i + 1}/${nonForkRepos.length} done`
+            );
         }
     }
     console.log(

@@ -45,13 +45,17 @@ repos.get("/api/repos/:owner", async (c) => {
 repos.get("/api/repos/:owner/:repo", async (c) => {
     try {
         const { owner, repo } = c.req.param();
-        const config = requireConfig(owner);
+        requireConfig(owner);
 
-        // Fire-and-forget: trigger deep sync (commits + PRs) for this repo
-        syncRepo(owner, repo, config.token, config.ownerType).catch(() => {});
+        // Fire-and-forget: enqueue deep sync (commits + PRs) for this repo
+        syncRepo(owner, repo).catch((e) => {
+            console.error(`[sync] Failed to enqueue deep sync for ${owner}/${repo}:`, e);
+        });
 
         const repoRow = await getRepoByName(owner, repo);
-        if (!repoRow) throw notFound("Repository", `${owner}/${repo}`);
+        if (!repoRow) {
+            throw notFound("Repository", `${owner}/${repo}`);
+        }
 
         const ownerRow = await getOwner(owner);
         const ownerInfo = ownerRow
