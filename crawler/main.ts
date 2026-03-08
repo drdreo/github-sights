@@ -1,9 +1,10 @@
 // ── Crawler Service ─────────────────────────────────────────────────────────
 //
-// Replaces Deno.cron with a persistent polling loop.
-// Processes sync_job queue tick-by-tick, runs cleanup daily.
-// Shares the same Postgres DB as the API server.
+// HTTP-based crawler that scales to zero on Railway.
+// Exposes a /wake endpoint that the API server calls when new jobs are enqueued.
+// Processes all pending jobs, then goes idle (Railway scales to zero).
 
+import { Hono } from "hono";
 import { initPool } from "../shared/db/pool.ts";
 import { runMigrations } from "../shared/db/schema.ts";
 import { loadConfig } from "../shared/config.ts";
@@ -12,11 +13,12 @@ import "../shared/signals.ts";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
-/** How often to poll for new jobs (ms). */
-const POLL_INTERVAL_MS = parseInt(Deno.env.get("POLL_INTERVAL_MS") || "10000", 10);
+const port = parseInt(Deno.env.get("PORT") || "3002", 10);
 
-/** How often to run cleanup of old jobs (ms). Default: 24 hours. */
-const CLEANUP_INTERVAL_MS = parseInt(Deno.env.get("CLEANUP_INTERVAL_MS") || "86400000", 10);
+// ── State ───────────────────────────────────────────────────────────────────
+
+/** Whether a drain loop is currently running. Prevents duplicate concurrent drains. */
+let draining = false;
 
 // ── Startup ─────────────────────────────────────────────────────────────────
 
@@ -31,54 +33,76 @@ if (!dbReady) {
 await runMigrations();
 await loadConfig();
 
-console.log(`[crawler] Ready. Polling every ${POLL_INTERVAL_MS / 1000}s`);
+// ── Drain Loop ──────────────────────────────────────────────────────────────
 
-// ── Poll Loop ───────────────────────────────────────────────────────────────
-
-let running = true;
-
-async function pollLoop(): Promise<void> {
-    while (running) {
-        try {
-            // Refresh config each tick (new owners may have been added via API)
-            await loadConfig();
-            await tick();
-        } catch (err) {
-            console.error("[crawler] Tick failed:", err);
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+/**
+ * Process all pending jobs until the queue is empty.
+ * Called on /wake — runs in the background so the HTTP response returns immediately.
+ * The `draining` flag prevents overlapping drains if /wake is called multiple times.
+ */
+async function drain(): Promise<void> {
+    if (draining) {
+        console.log("[crawler] Already draining, skipping");
+        return;
     }
-}
 
-// ── Cleanup Loop ────────────────────────────────────────────────────────────
+    draining = true;
+    console.log("[crawler] Drain started");
 
-async function cleanupLoop(): Promise<void> {
-    while (running) {
-        await new Promise((resolve) => setTimeout(resolve, CLEANUP_INTERVAL_MS));
-
-        try {
-            await cleanup();
-        } catch (err) {
-            console.error("[crawler] Cleanup failed:", err);
-        }
-    }
-}
-
-// ── Graceful Shutdown ───────────────────────────────────────────────────────
-
-for (const signal of ["SIGINT", "SIGTERM"] as Deno.Signal[]) {
     try {
-        Deno.addSignalListener(signal, () => {
-            console.log(`[crawler] Received ${signal}, shutting down...`);
-            running = false;
-        });
-    } catch {
-        // Signal listeners may not be supported on all platforms
+        let tickCount = 0;
+        while (true) {
+            await loadConfig();
+            const hasMore = await tick();
+            tickCount++;
+
+            if (!hasMore) {
+                console.log(`[crawler] Queue drained after ${tickCount} tick(s)`);
+                break;
+            }
+        }
+    } catch (err) {
+        console.error("[crawler] Drain failed:", err);
+    } finally {
+        draining = false;
     }
 }
 
-// Start both loops concurrently
-await Promise.all([pollLoop(), cleanupLoop()]);
+// ── HTTP Server ─────────────────────────────────────────────────────────────
 
-console.log("[crawler] Stopped.");
+const app = new Hono();
+
+/** Health check — Railway uses this to know the service is alive. */
+app.get("/health", (c) => c.json({ status: "ok", draining }));
+
+/**
+ * Wake endpoint — called by the API server when a job is enqueued.
+ * Kicks off the drain loop in the background and returns immediately.
+ */
+app.post("/wake", (c) => {
+    // Fire-and-forget — don't await, let the HTTP response return fast
+    void drain();
+    return c.json({ woken: true, alreadyDraining: draining });
+});
+
+/**
+ * Manual cleanup endpoint — can also be triggered via Railway cron or external scheduler.
+ */
+app.post("/cleanup", async (c) => {
+    try {
+        await cleanup();
+        return c.json({ cleaned: true });
+    } catch (err) {
+        console.error("[crawler] Cleanup failed:", err);
+        return c.json({ error: String(err) }, 500);
+    }
+});
+
+// ── Start ───────────────────────────────────────────────────────────────────
+
+console.log(`[crawler] Ready. Listening on port ${port}`);
+
+// Drain any leftover jobs from before a restart
+void drain();
+
+Deno.serve({ port }, app.fetch);

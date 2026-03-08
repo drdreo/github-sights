@@ -1,8 +1,14 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@hono/hono@4": "4.11.9",
     "npm:octokit@^4.1.2": "4.1.4_@octokit+core@6.1.6",
     "npm:pg@8": "8.18.0"
+  },
+  "jsr": {
+    "@hono/hono@4.11.9": {
+      "integrity": "c82c6b846abc3c1879d921d8365287d77cdef8073019f509ff80bf53033bdcba"
+    }
   },
   "npm": {
     "@octokit/app@15.1.6_@octokit+core@6.1.6": {
@@ -305,6 +311,7 @@
   },
   "workspace": {
     "dependencies": [
+      "jsr:@hono/hono@4",
       "npm:octokit@^4.1.2",
       "npm:pg@8"
     ]

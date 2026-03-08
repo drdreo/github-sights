@@ -1,14 +1,12 @@
 // ── Sync Queue Processor ────────────────────────────────────────────────────────
 //
-// Tick-based job processor for the sync_job queue.
-// Each tick is a short-lived unit of work (~5-50s).
-// Called by the crawler service's polling loop.
+// Job processor for the sync_job queue. Called by the crawler's drain loop.
+// Each tick() call claims and processes a single job. For multi-repo full_sync
+// jobs, a tick processes a batch of repos within TICK_BUDGET_MS, then yields
+// the job back to the queue. The drain loop calls tick() again to continue.
 //
 // Phases (full_sync):
-//   queued → fetching_repos → syncing_repos → aggregating → complete
-//
-// Each tick in syncing_repos processes repos until a time budget is exhausted,
-// then yields. The next cron tick picks up where it left off.
+//   queued → syncing_repos → aggregating → complete
 
 import {Octokit} from "octokit";
 import {
@@ -39,68 +37,56 @@ import type { RepositoryMetaRow } from "../db/types.ts";
 /** Max time a single tick can spend processing repos before yielding. */
 const TICK_BUDGET_MS = 60_000;
 
-/** Max time a single tick() call can run before returning control to the
- *  crawler poll loop. Keeps the process responsive to shutdown signals
- *  and prevents a single job from monopolising the event loop. */
-const INVOCATION_BUDGET_MS = 4 * 60_000;
-
 /** Number of repos to process in parallel within each tick. */
 const REPO_CONCURRENCY = 2;
 
 // ── Public API ───────────────────────────────────────────────────────────────────
 
 /**
- * Process sync jobs in a loop until the invocation budget is exhausted.
- * Each iteration claims a job and processes it within TICK_BUDGET_MS,
- * then immediately re-claims to keep working. Returns control to the
- * crawler poll loop when the budget runs out or no jobs remain.
+ * Claim and process a single job from the queue.
+ * The crawler's drain loop calls this repeatedly until the queue is empty.
+ *
+ * @returns `true` if a job was processed (more work may remain),
+ *          `false` if the queue is empty.
  */
-export async function tick(): Promise<void> {
-    const invocationStart = Date.now();
+export async function tick(): Promise<boolean> {
+    const job = await claimJob();
+    if (!job) return false;
 
-    while (Date.now() - invocationStart < INVOCATION_BUDGET_MS) {
-        const job = await claimJob();
-        if (!job) return; // No work — done
+    const tickStart = Date.now();
+    console.log(
+        `[queue] Tick: claimed job #${job.id} for ${job.owner_login} ` +
+            `(phase=${job.phase}, type=${job.job_type})`
+    );
 
-        const tickStart = Date.now();
-        console.log(
-            `[queue] Tick: claimed job #${job.id} for ${job.owner_login} ` +
-                `(phase=${job.phase}, type=${job.job_type})`
-        );
-
-        try {
-            const config = getConfig(job.owner_login);
-            if (!config) {
-                await failJob(job.id, `No config found for ${job.owner_login}`);
-                continue;
-            }
-
-            const octokit = createOctokit(config.token);
-
-            switch (job.job_type) {
-                case "full_sync":
-                    await processFullSync(job, octokit, config.ownerType, tickStart);
-                    break;
-                case "repo_sync":
-                    await processRepoSync(job, octokit);
-                    break;
-            }
-        } catch (err) {
-            console.error(`[queue] Job #${job.id} tick failed:`, err);
-            await failJob(job.id, String(err));
+    try {
+        const config = getConfig(job.owner_login);
+        if (!config) {
+            await failJob(job.id, `No config found for ${job.owner_login}`);
+            return true; // Job failed but queue may have more
         }
 
-        // Check if we have enough budget left for another tick
-        if (Date.now() - invocationStart > INVOCATION_BUDGET_MS - TICK_BUDGET_MS) {
-            console.log(`[queue] Invocation budget nearly exhausted, stopping`);
-            break;
+        const octokit = createOctokit(config.token);
+
+        switch (job.job_type) {
+            case "full_sync":
+                await processFullSync(job, octokit, config.ownerType, tickStart);
+                break;
+            case "repo_sync":
+                await processRepoSync(job, octokit);
+                break;
         }
+    } catch (err) {
+        console.error(`[queue] Job #${job.id} tick failed:`, err);
+        await failJob(job.id, String(err));
     }
+
+    return true;
 }
 
 /**
  * Periodic cleanup of old completed/failed jobs.
- * Call from a less frequent cron (e.g., daily).
+ * Trigger via the crawler's POST /cleanup endpoint or an external scheduler.
  */
 export async function cleanup(): Promise<void> {
     const deleted = await cleanupOldJobs(10);
@@ -113,8 +99,7 @@ export async function cleanup(): Promise<void> {
 
 /**
  * Drive a full_sync job through its phases. Chains phases within the same
- * tick when budget allows — no need to wait for the next cron invocation
- * between fetch_repos → syncing_repos → aggregating.
+ * tick when budget allows (e.g. fetch_repos → syncing_repos → aggregating).
  */
 async function processFullSync(
     job: SyncJobRow,
@@ -124,7 +109,7 @@ async function processFullSync(
 ): Promise<void> {
     let phase = job.phase;
 
-    // Phase 1: Fetch repos (fast, ~2-5s)
+    // Phase 1: Fetch repos
     if (phase === "queued") {
         const nextPhase = await phaseFetchRepos(job, octokit, ownerType);
         if (!nextPhase) return; // 0 repos → already completed
@@ -132,7 +117,7 @@ async function processFullSync(
         // Fall through to syncing_repos within the same tick
     }
 
-    // Phase 2: Sync repos (bounded by tick budget)
+    // Phase 2: Sync repos
     if (phase === "syncing_repos") {
         const nextPhase = await phaseSyncRepos(job, octokit, tickStart);
         if (!nextPhase) return; // Budget exhausted, yielded for next tick
@@ -140,7 +125,7 @@ async function processFullSync(
         // Fall through to aggregating
     }
 
-    // Phase 3: Aggregate (usually fast, ~5-15s)
+    // Phase 3: Aggregate
     if (phase === "aggregating") {
         await phaseAggregate(job);
     }
@@ -191,11 +176,11 @@ async function phaseFetchRepos(
 
 /**
  * Phase 2: Process repos in batches of REPO_CONCURRENCY until tick budget
- * is exhausted. Picks up from repos_done index. Survives isolate crashes —
- * all state is in Postgres.
+ * is exhausted. Picks up from repos_done index. All state is in Postgres,
+ * so the job survives crawler restarts.
  *
  * Returns "aggregating" when all repos are done (so processFullSync can chain),
- * or null when budget is exhausted (job yielded for next poll tick).
+ * or null when budget is exhausted (job yielded for the next drain tick).
  */
 async function phaseSyncRepos(
     job: SyncJobRow,
@@ -306,7 +291,7 @@ async function phaseSyncRepos(
         return "aggregating";
     }
 
-    // Budget exhausted, more repos remain — yield for next cron tick.
+    // Budget exhausted, more repos remain — yield for next drain tick.
     // Clear claimed_at so claimJob() picks this up immediately.
     await yieldJob(job.id);
     console.log(`[queue] Job #${job.id}: yielded (${repos_done}/${repoIds.length} repos done)`);

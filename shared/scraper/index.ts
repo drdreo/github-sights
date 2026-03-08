@@ -14,6 +14,26 @@ import {
 
 const STALE_REPO_THRESHOLD_MS = 6 * 60 * 60 * 1000;
 
+/** URL of the crawler service. Set via CRAWLER_URL env var. */
+const CRAWLER_URL = Deno.env.get("CRAWLER_URL") || "http://localhost:3002";
+
+/**
+ * Wake the crawler service so it starts draining the job queue.
+ * Fire-and-forget — failures are logged but never block the caller.
+ */
+async function wakeCrawler(): Promise<void> {
+    try {
+        const res = await fetch(`${CRAWLER_URL}/wake`, { method: "POST" });
+        if (!res.ok) {
+            console.warn(`[sync] Failed to wake crawler: ${res.status}`);
+        } else {
+            console.log("[sync] Crawler woken");
+        }
+    } catch (err) {
+        console.warn("[sync] Could not reach crawler:", err);
+    }
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────────
 
 export interface SyncProgress {
@@ -68,6 +88,7 @@ export async function syncOwner(
     }
 
     console.log(`[sync] Enqueued full_sync job #${job.id} for ${owner}`);
+    wakeCrawler();
     return { enqueued: true, jobId: job.id, alreadyRunning: false };
 }
 
@@ -87,6 +108,7 @@ export async function syncRepo(owner: string, repoName: string): Promise<Enqueue
     }
 
     console.log(`[sync] Enqueued repo_sync job #${job.id} for ${owner}/${repoName}`);
+    wakeCrawler();
     return { enqueued: true, jobId: job.id, alreadyRunning: false };
 }
 
@@ -125,7 +147,7 @@ export async function ensureFresh(
 
 /**
  * Get sync progress for an owner. Reads from the sync_job table instead
- * of in-memory state — survives isolate restarts.
+ * of in-memory state — survives crawler restarts.
  */
 export async function getProgress(owner: string): Promise<SyncProgress> {
     const ownerRow = await getOwner(owner);

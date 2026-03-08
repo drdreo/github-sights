@@ -2,7 +2,7 @@
 //
 // CRUD for the sync_job table — a Postgres-backed job queue that replaces
 // in-memory orchestration. Each job tracks its own progress, surviving
-// isolate restarts.
+// crawler restarts.
 
 import { queryOne, execute } from "../pool.ts";
 
@@ -113,7 +113,7 @@ export async function claimJob(): Promise<SyncJobRow | null> {
 
 /**
  * Signal that a tick finished normally but there's more work to do.
- * Clears claimed_at so the next cron tick picks it up immediately
+ * Clears claimed_at so the next drain tick picks it up immediately
  * (rather than waiting for the stale threshold).
  */
 export async function yieldJob(jobId: number): Promise<void> {
@@ -195,7 +195,7 @@ const MAX_ATTEMPTS = 3;
 
 /**
  * Mark a job as failed. Retries up to MAX_ATTEMPTS by resetting to 'pending'
- * so the next cron tick re-claims it. After exhausting retries, permanently
+ * so the next drain tick re-claims it. After exhausting retries, permanently
  * marks as 'failed'.
  */
 export async function failJob(jobId: number, error: string): Promise<void> {
