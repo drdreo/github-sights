@@ -1,7 +1,7 @@
 // ── Database Module Barrel Export ─────────────────────────────────────────────────
 //
 // Single entry point for all database functionality.
-// Import from "server/db/index.ts" (or "server/db/") everywhere.
+// Import from "shared/db/index.ts" (or "shared/db/") everywhere.
 
 // Pool & query infrastructure
 export {

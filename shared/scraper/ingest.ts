@@ -283,8 +283,12 @@ export async function ingestPRsForRepo(
         pullState?.last_synced_at &&
         Date.now() - pullState.last_synced_at.getTime() < PR_STALE_MS
     ) {
+        const agoMin = Math.round((Date.now() - pullState.last_synced_at.getTime()) / 60_000);
+        console.log(`[ingest] ${owner}/${repoName}: PRs synced ${agoMin}min ago, skipping (stale after 60min)`);
         return { repoName, repoId, upserted: 0 };
     }
+
+    console.log(`[ingest] ${owner}/${repoName}: fetching PRs…`);
 
     // Fetch all PRs — stream page-by-page to avoid accumulating all PRs in memory.
     // PRs are upserted (idempotent), so fetching all is correct.

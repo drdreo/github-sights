@@ -1,11 +1,11 @@
 import { Hono } from "hono";
-import { requireConfig } from "../config.ts";
+import { requireConfig } from "../../shared/config.ts";
 import { errorResponse, notFound } from "../errors.ts";
-import { getContributorSnapshot } from "../db/queries/snapshots.ts";
+import { getContributorSnapshot } from "../../shared/db/queries/snapshots.ts";
 import {
     getContributorDailyActivity,
     getContributorRepoBreakdown
-} from "../db/queries/activity.ts";
+} from "../../shared/db/queries/activity.ts";
 import type { ContributorDetail } from "../types.ts";
 
 const contributorDetail = new Hono();

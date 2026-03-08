@@ -1,7 +1,7 @@
 // ── Sync Service (Queue-Based) ──────────────────────────────────────────────────
 //
 // Public API for triggering syncs. Jobs are enqueued into the sync_job table
-// and processed tick-by-tick via Deno.cron (see queue.ts).
+// and processed tick-by-tick by the crawler service (see queue.ts).
 
 import { getOwner } from "../db/queries/identity.ts";
 import {

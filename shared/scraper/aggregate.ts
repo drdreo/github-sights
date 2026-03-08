@@ -64,9 +64,15 @@ export interface AggregateResult {
  * uses it. Owner-level daily_activity is rebuilt in aggregateOwner().
  */
 export async function aggregateRepo(ownerLogin: string, repo: RepositoryMetaRow): Promise<void> {
+    console.log(
+        `[aggregate] ${ownerLogin}/${repo.name}: aggregating repo`
+    );
     const commits = await getCommitsByRepo(repo.id);
     const prs = await getPrsByRepo(repo.id);
 
+    console.log(
+        `[aggregate] ${ownerLogin}/${repo.name}: building repo snapshot`
+    );
     await buildAndUpsertRepoSnapshot(ownerLogin, repo, commits, prs);
 
     console.log(

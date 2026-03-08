@@ -1,17 +1,17 @@
 import { Hono } from "hono";
-import { requireConfig } from "../config.ts";
+import { requireConfig } from "../../shared/config.ts";
 import { errorResponse, notFound } from "../errors.ts";
-import { getReposByOwner, getRepoByName, getOwner } from "../db/queries/identity.ts";
+import { getReposByOwner, getRepoByName, getOwner } from "../../shared/db/queries/identity.ts";
 import {
     getCommitsByOwner,
     getCommitsByRepo,
     getPrsByRepo,
     getContributorStatsByRepo
-} from "../db/queries/events.ts";
-import { getContributorSnapshotsByRepo, getRepoSnapshotsByOwner } from "../db/queries/snapshots.ts";
+} from "../../shared/db/queries/events.ts";
+import { getContributorSnapshotsByRepo, getRepoSnapshotsByOwner } from "../../shared/db/queries/snapshots.ts";
 import { mapRepoRow, mapCommitRow, mapPrRow, mapContribSnapshotToContributor } from "../mappers.ts";
-import type { RepositoryMetaRow } from "../db/index.ts";
-import { syncRepo } from "../scraper/index.ts";
+import type { RepositoryMetaRow } from "../../shared/db/index.ts";
+import { syncRepo } from "../../shared/scraper/index.ts";
 
 const repos = new Hono();
 

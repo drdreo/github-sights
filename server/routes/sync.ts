@@ -1,9 +1,8 @@
 import { Hono } from "hono";
-import { clearConfig } from "../config.ts";
-import { requireConfig } from "../config.ts";
+import { clearConfig, requireConfig } from "../../shared/config.ts";
 import { errorResponse } from "../errors.ts";
-import { deleteOwnerData } from "../db/queries/identity.ts";
-import { updateSyncSince } from "../db/queries/config.ts";
+import { deleteOwnerData } from "../../shared/db/queries/identity.ts";
+import { updateSyncSince } from "../../shared/db/queries/config.ts";
 import {
     syncOwner,
     syncRepo,
@@ -11,9 +10,8 @@ import {
     getProgress,
     isSyncing,
     abortSync
-} from "../scraper/index.ts";
-import { aggregateOwner } from "../scraper/aggregate.ts";
-import { tick } from "../scraper/queue.ts";
+} from "../../shared/scraper/index.ts";
+import { aggregateOwner } from "../../shared/scraper/aggregate.ts";
 
 const sync = new Hono();
 
@@ -38,10 +36,6 @@ sync.post("/api/sync/:owner", async (c) => {
         if (since || until) {
             const result = await syncOwner(owner, { since, until });
 
-            // Run an immediate tick so the job starts processing now
-            // (don't await — let it run in the background of this response)
-            tick().catch((err) => console.error("[queue] Immediate tick failed:", err));
-
             return c.json({
                 enqueued: result.enqueued,
                 jobId: result.jobId,
@@ -49,14 +43,7 @@ sync.post("/api/sync/:owner", async (c) => {
             });
         }
 
-        // Normal dashboard sync: debounce to once per hour
-        const ONE_HOUR = 60 * 60 * 1000;
-        const triggered = await ensureFresh(owner, ONE_HOUR);
-
-        // If we just enqueued, kick off an immediate tick
-        if (triggered) {
-            tick().catch((err) => console.error("[queue] Immediate tick failed:", err));
-        }
+        const triggered = await ensureFresh(owner);
 
         return c.json({ triggered });
     } catch (error) {
@@ -73,9 +60,6 @@ sync.post("/api/sync/:owner/:repo", async (c) => {
         const { owner, repo } = c.req.param();
         requireConfig(owner);
         const result = await syncRepo(owner, repo);
-
-        // Immediate tick for responsiveness
-        tick().catch((err) => console.error("[queue] Immediate tick failed:", err));
 
         return c.json({
             enqueued: result.enqueued,

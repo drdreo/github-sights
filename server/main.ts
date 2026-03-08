@@ -1,18 +1,17 @@
 import { Hono } from "hono";
 import { cors } from "jsr:@hono/hono@^4/cors";
-import { loadConfig } from "./config.ts";
+import { loadConfig } from "../shared/config.ts";
 
-import { initPool } from "./db/pool.ts";
-import { runMigrations } from "./db/schema.ts";
+import { initPool } from "../shared/db/pool.ts";
+import { runMigrations } from "../shared/db/schema.ts";
 import { config } from "./routes/config.ts";
 import { contributorDetail } from "./routes/contributorDetail.ts";
-import "./signals.ts";
+import "../shared/signals.ts";
 import { contributors } from "./routes/contributors.ts";
 import { health } from "./routes/health.ts";
 import { repos } from "./routes/repos.ts";
 import { stats } from "./routes/stats.ts";
 import { sync } from "./routes/sync.ts";
-import "./crons.ts";
 
 // ── App ────────────────────────────────────────────────────────────────────────
 

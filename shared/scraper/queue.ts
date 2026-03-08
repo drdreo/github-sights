@@ -1,8 +1,8 @@
 // ── Sync Queue Processor ────────────────────────────────────────────────────────
 //
 // Tick-based job processor for the sync_job queue.
-// Each tick is a short-lived unit of work (~5-50s) that fits within Deno Deploy
-// isolate lifetimes. Called by Deno.cron every minute.
+// Each tick is a short-lived unit of work (~5-50s).
+// Called by the crawler service's polling loop.
 //
 // Phases (full_sync):
 //   queued → fetching_repos → syncing_repos → aggregating → complete
@@ -39,8 +39,9 @@ import type { RepositoryMetaRow } from "../db/types.ts";
 /** Max time a single tick can spend processing repos before yielding. */
 const TICK_BUDGET_MS = 60_000;
 
-/** Max time the entire cron invocation can run before stopping.
- *  Deno Deploy isolates live ~4-5 min; leave margin for cleanup. */
+/** Max time a single tick() call can run before returning control to the
+ *  crawler poll loop. Keeps the process responsive to shutdown signals
+ *  and prevents a single job from monopolising the event loop. */
 const INVOCATION_BUDGET_MS = 4 * 60_000;
 
 /** Number of repos to process in parallel within each tick. */
@@ -51,9 +52,8 @@ const REPO_CONCURRENCY = 2;
 /**
  * Process sync jobs in a loop until the invocation budget is exhausted.
  * Each iteration claims a job and processes it within TICK_BUDGET_MS,
- * then immediately re-claims to keep working — no need to wait for
- * the next cron invocation. This lets a single cron call process
- * for the full ~4 min Deploy budget instead of just 60s.
+ * then immediately re-claims to keep working. Returns control to the
+ * crawler poll loop when the budget runs out or no jobs remain.
  */
 export async function tick(): Promise<void> {
     const invocationStart = Date.now();
@@ -195,7 +195,7 @@ async function phaseFetchRepos(
  * all state is in Postgres.
  *
  * Returns "aggregating" when all repos are done (so processFullSync can chain),
- * or null when budget is exhausted (job yielded for next cron tick).
+ * or null when budget is exhausted (job yielded for next poll tick).
  */
 async function phaseSyncRepos(
     job: SyncJobRow,

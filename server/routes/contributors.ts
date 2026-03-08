@@ -1,9 +1,9 @@
 import { Hono } from "hono";
-import { requireConfig } from "../config.ts";
+import { requireConfig } from "../../shared/config.ts";
 import { errorResponse } from "../errors.ts";
-import { getContributorSnapshotsByOwner } from "../db/queries/snapshots.ts";
-import { aggregateContributorActivity } from "../db/queries/activity.ts";
-import { getOwner } from "../db/queries/identity.ts";
+import { getContributorSnapshotsByOwner } from "../../shared/db/queries/snapshots.ts";
+import { aggregateContributorActivity } from "../../shared/db/queries/activity.ts";
+import { getOwner } from "../../shared/db/queries/identity.ts";
 import { mapContribSnapshotToOverview } from "../mappers.ts";
 import type { ContributorOverview } from "../types.ts";
 
