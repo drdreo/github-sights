@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { poolStats, isPoolAvailable } from "../db/pool.ts";
+import { poolStats, isPoolAvailable } from "../../shared/db/pool.ts";
 
 const health = new Hono();
 

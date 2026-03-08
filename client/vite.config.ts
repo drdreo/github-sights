@@ -14,9 +14,8 @@ export default defineConfig({
         port: 5173,
         proxy: {
             "/api": {
-                target: "https://github-sights--local.drdreo.deno.net",
-                changeOrigin: true,
-                secure: true
+                target: "http://localhost:3001",
+                changeOrigin: true
             }
         }
     }

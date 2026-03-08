@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { getConfig, setConfig, clearConfig } from "../config.ts";
-import { createOctokit, verifyToken } from "../scraper/index.ts";
+import { getConfig, setConfig, clearConfig } from "../../shared/config.ts";
+import { createOctokit, verifyToken } from "../../shared/scraper/index.ts";
 import { badCredentials, tokenMissingScopes, validationError, errorResponse } from "../errors.ts";
 
 const config = new Hono();

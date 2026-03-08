@@ -78,7 +78,10 @@ const CONCURRENCY = 2;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────
 
-function toCommitInput(c: import("./github-client.ts").GitHubCommit, repoId: number): InsertCommitInput {
+function toCommitInput(
+    c: import("./github-client.ts").GitHubCommit,
+    repoId: number
+): InsertCommitInput {
     return {
         sha: c.sha,
         repo_id: repoId,
@@ -276,10 +279,16 @@ export async function ingestPRsForRepo(
     // Skip if PRs were synced recently (allows resuming after isolate restart)
     const pullState = await getSyncState(owner, repoId, "pulls");
     const PR_STALE_MS = 60 * 60 * 1000; // 1 hour
-    if (pullState?.last_synced_at &&
-        Date.now() - pullState.last_synced_at.getTime() < PR_STALE_MS) {
+    if (
+        pullState?.last_synced_at &&
+        Date.now() - pullState.last_synced_at.getTime() < PR_STALE_MS
+    ) {
+        const agoMin = Math.round((Date.now() - pullState.last_synced_at.getTime()) / 60_000);
+        console.log(`[ingest] ${owner}/${repoName}: PRs synced ${agoMin}min ago, skipping (stale after 60min)`);
         return { repoName, repoId, upserted: 0 };
     }
+
+    console.log(`[ingest] ${owner}/${repoName}: fetching PRs…`);
 
     // Fetch all PRs — stream page-by-page to avoid accumulating all PRs in memory.
     // PRs are upserted (idempotent), so fetching all is correct.
@@ -330,7 +339,9 @@ export async function ingestPRsForRepo(
         return { repoName, repoId, upserted: 0 };
     }
 
-    console.log(`[ingest] ${owner}/${repoName}: fetched ${totalFetched} PRs, upserting contributors…`);
+    console.log(
+        `[ingest] ${owner}/${repoName}: fetched ${totalFetched} PRs, upserting contributors…`
+    );
 
     await upsertContributors(Array.from(seenContributors.values()));
     console.log(`[ingest] ${owner}/${repoName}: contributors done, advancing sync state…`);
@@ -341,149 +352,3 @@ export async function ingestPRsForRepo(
     return { repoName, repoId, upserted: totalUpserted };
 }
 
-// ── Full Owner Ingestion ─────────────────────────────────────────────────────────
-
-/**
- * Ingest all data for an owner: repos → PRs per repo.
- * Processes repos in batches with controlled concurrency.
- * Commits are fetched on-demand per repo via syncRepo().
- */
-export async function ingestOwner(
-    octokit: Octokit,
-    owner: string,
-    ownerType: "user" | "org",
-    options?: {
-        since?: string;
-        until?: string;
-        desiredSince?: string;
-        skipAggregation?: boolean;
-        signal?: AbortSignal;
-        onProgress?: (update: {
-            syncedRepos: number;
-            totalRepos: number;
-            currentRepo: string;
-            totalEvents: number;
-        }) => void;
-    }
-): Promise<IngestOwnerResult> {
-    // Step 1: Ingest repos
-    const { repos } = await ingestRepos(octokit, owner, ownerType);
-    console.log(
-        `[ingest] ${owner}: starting ingestion for ${repos.length} repos (concurrency=${CONCURRENCY})`
-    );
-
-    const results: IngestOwnerResult["repos"] = [];
-    const errors: string[] = [];
-
-    // Step 2: Ingest commits + PRs per repo in batches
-    for (let i = 0; i < repos.length; i += CONCURRENCY) {
-        if (options?.signal?.aborted) {
-            console.log(`[ingest] ${owner}: sync aborted, stopping ingestion`);
-            break;
-        }
-        const batch = repos.slice(i, i + CONCURRENCY);
-        const batchNames = batch.map((r) => r.name).join(", ");
-        const memStart = Math.round(Deno.memoryUsage().heapUsed / 1024 / 1024);
-        console.log(`[ingest] ${owner}: batch ${Math.floor(i / CONCURRENCY) + 1}/${Math.ceil(repos.length / CONCURRENCY)} starting [heap: ${memStart}MB] (${batchNames})`);
-        const batchResults = await Promise.allSettled(
-            batch.map(async (repo) => {
-                const [commits, prs] = await Promise.all([
-                    ingestCommitsForRepo(octokit, owner, repo, {
-                        since: options?.since,
-                        until: options?.until,
-                        desiredSince: options?.desiredSince
-                    }),
-                    ingestPRsForRepo(octokit, owner, repo)
-                ]);
-                return { name: repo.name, repoGh: repo, commits, prs };
-            })
-        );
-
-        for (let j = 0; j < batchResults.length; j++) {
-            const result = batchResults[j];
-            const repo = batch[j];
-            if (result.status === "fulfilled") {
-                results.push({
-                    name: result.value.name,
-                    commits: result.value.commits,
-                    prs: result.value.prs
-                });
-            } else {
-                const errMsg = `${repo.name}: ${String(result.reason)}`;
-                errors.push(errMsg);
-                console.warn(`[ingest] Failed repo ${owner}/${repo.name}:`, result.reason);
-                // Record error in sync_state
-                await recordSyncError(owner, repo.id, "commits", String(result.reason));
-            }
-        }
-
-        const budget = getRateLimitState(octokit);
-        const mem = Math.round(Deno.memoryUsage().heapUsed / 1024 / 1024);
-        console.log(
-            `[ingest] ${owner}: batch ${Math.floor(i / CONCURRENCY) + 1}/${Math.ceil(repos.length / CONCURRENCY)} complete (API budget: ${budget.remaining}/${budget.limit}, heap: ${mem}MB)`
-        );
-
-        // Report progress to caller
-        if (options?.onProgress) {
-            const totalEvents = results.reduce(
-                (sum, r) => sum + r.commits.inserted + r.prs.upserted,
-                0
-            );
-            const lastRepo = batch[batch.length - 1];
-            options.onProgress({
-                syncedRepos: Math.min(i + CONCURRENCY, repos.length),
-                totalRepos: repos.length,
-                currentRepo: lastRepo?.name ?? "",
-                totalEvents
-            });
-        }
-
-        // Run progressive per-repo aggregation so snapshots are available immediately
-        // Skip repos with no new data — snapshot hasn't changed, no need to reload from DB
-        if (!options?.skipAggregation) {
-            for (let j = 0; j < batchResults.length; j++) {
-                const result = batchResults[j];
-                const repo = batch[j];
-                if (result.status === "fulfilled") {
-                    const { commits, prs } = result.value;
-                    if (commits.inserted === 0 && prs.upserted === 0) continue;
-                    try {
-                        const repoMeta: RepositoryMetaRow = {
-                            id: repo.id,
-                            owner_login: owner,
-                            name: repo.name,
-                            full_name: repo.full_name,
-                            description: repo.description,
-                            html_url: repo.html_url,
-                            is_private: repo.private,
-                            is_fork: repo.fork,
-                            language: repo.language,
-                            default_branch: repo.default_branch,
-                            stargazers_count: repo.stargazers_count,
-                            forks_count: repo.forks_count,
-                            open_issues_count: repo.open_issues_count,
-                            created_at: repo.created_at ? new Date(repo.created_at) : null,
-                            updated_at: repo.updated_at ? new Date(repo.updated_at) : null,
-                            pushed_at: repo.pushed_at ? new Date(repo.pushed_at) : null
-                        };
-                        await aggregateRepo(owner, repoMeta);
-                    } catch (err) {
-                        console.warn(
-                            `[ingest] ${owner}/${repo.name}: progressive aggregation failed (non-fatal):`,
-                            err
-                        );
-                    }
-                }
-            }
-        }
-    }
-    // Update owner's last_synced_at timestamp
-    await updateOwnerSyncedAt(owner);
-
-    return {
-        owner,
-        repoCount: repos.length,
-        repos: results,
-        errors
-    };
-}

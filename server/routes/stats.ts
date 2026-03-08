@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import { requireConfig } from "../config.ts";
+import { requireConfig } from "../../shared/config.ts";
 import { errorResponse } from "../errors.ts";
-import { getOwnerSnapshot } from "../db/queries/snapshots.ts";
-import { aggregateOwnerActivity } from "../db/queries/activity.ts";
+import { getOwnerSnapshot } from "../../shared/db/queries/snapshots.ts";
+import { aggregateOwnerActivity } from "../../shared/db/queries/activity.ts";
 import { mapOwnerSnapshotToStats, emptyOverviewStats } from "../mappers.ts";
 
 const stats = new Hono();

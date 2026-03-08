@@ -1,22 +1,21 @@
 import { Hono } from "hono";
-import { clearConfig } from "../config.ts";
-import { requireConfig } from "../config.ts";
+import { clearConfig, requireConfig } from "../../shared/config.ts";
 import { errorResponse } from "../errors.ts";
-import { deleteOwnerData, getOwner } from "../db/queries/identity.ts";
-import { updateSyncSince } from "../db/queries/config.ts";
+import { deleteOwnerData } from "../../shared/db/queries/identity.ts";
+import { updateSyncSince } from "../../shared/db/queries/config.ts";
 import {
     syncOwner,
     syncRepo,
     ensureFresh,
     getProgress,
     isSyncing,
-    abortInflight
-} from "../scraper/index.ts";
-import { aggregateOwner } from "../scraper/aggregate.ts";
+    abortSync
+} from "../../shared/scraper/index.ts";
+import { aggregateOwner } from "../../shared/scraper/aggregate.ts";
 
 const sync = new Hono();
 
-// ── POST /api/sync — Trigger full sync pipeline ────────────────────────────
+// ── POST /api/sync — Enqueue full sync pipeline ─────────────────────────────
 //
 // Query params (optional):
 //   since — ISO date string (only when explicitly provided, e.g. initial sync)
@@ -24,7 +23,7 @@ const sync = new Hono();
 sync.post("/api/sync/:owner", async (c) => {
     try {
         const { owner } = c.req.param();
-        const config = requireConfig(owner);
+        requireConfig(owner);
         const since = c.req.query("since") || undefined;
         const until = c.req.query("until") || undefined;
 
@@ -33,19 +32,18 @@ sync.post("/api/sync/:owner", async (c) => {
             await updateSyncSince(owner, since);
         }
 
-        // Explicit backfill (since/until provided): always run full sync
+        // Explicit backfill (since/until provided): always enqueue
         if (since || until) {
-            const result = await syncOwner(owner, config.token, config.ownerType, { since, until });
+            const result = await syncOwner(owner, { since, until });
+
             return c.json({
-                synced: result.synced,
-                repos: result.repos,
-                errors: result.errors
+                enqueued: result.enqueued,
+                jobId: result.jobId,
+                alreadyRunning: result.alreadyRunning
             });
         }
 
-        // Normal dashboard sync: debounce to once per hour
-        const ONE_HOUR = 60 * 60 * 1000;
-        const triggered = await ensureFresh(owner, config.token, config.ownerType, ONE_HOUR);
+        const triggered = await ensureFresh(owner);
 
         return c.json({ triggered });
     } catch (error) {
@@ -53,21 +51,20 @@ sync.post("/api/sync/:owner", async (c) => {
     }
 });
 
-// ── POST /api/sync/:owner/:repo — Deep-sync a single repo ───────────────────
+// ── POST /api/sync/:owner/:repo — Enqueue single repo sync ──────────────────
 //
 // Fetches commits + PRs for a specific repo and rebuilds its snapshot.
 // Used by repo detail pages to trigger on-demand deep sync.
 sync.post("/api/sync/:owner/:repo", async (c) => {
     try {
         const { owner, repo } = c.req.param();
-        const config = requireConfig(owner);
-        const result = await syncRepo(owner, repo, config.token, config.ownerType);
+        requireConfig(owner);
+        const result = await syncRepo(owner, repo);
 
         return c.json({
-            repo: result.repo,
-            commits: result.commits,
-            prs: result.prs,
-            errors: result.errors
+            enqueued: result.enqueued,
+            jobId: result.jobId,
+            alreadyRunning: result.alreadyRunning
         });
     } catch (error) {
         return errorResponse(c, error);
@@ -77,22 +74,8 @@ sync.post("/api/sync/:owner/:repo", async (c) => {
 // ── GET /api/sync/progress/:owner — Poll sync progress ──────────────────────
 sync.get("/api/sync/progress/:owner", async (c) => {
     const { owner } = c.req.param();
-    const ownerRow = await getOwner(owner);
-    const lastSyncedAt = ownerRow?.last_synced_at?.toISOString() ?? null;
-    const progress = getProgress(owner);
-    if (!progress) {
-        return c.json({ active: false, lastSyncedAt });
-    }
-    return c.json({
-        active: true,
-        status: progress.status,
-        totalRepos: progress.totalRepos,
-        syncedRepos: progress.syncedRepos,
-        currentRepo: progress.currentRepo,
-        totalEvents: progress.totalEvents,
-        elapsedMs: Date.now() - progress.startedAt,
-        lastSyncedAt
-    });
+    const progress = await getProgress(owner);
+    return c.json(progress);
 });
 
 // ── POST /api/aggregate/:owner — Re-aggregate snapshots from existing events ──
@@ -116,9 +99,9 @@ sync.delete("/api/owner/:owner", async (c) => {
     try {
         const { owner } = c.req.param();
 
-        // Abort any in-flight sync before deleting to avoid FK violations
-        if (isSyncing(owner)) {
-            await abortInflight(owner);
+        // Cancel any active sync before deleting to avoid FK violations
+        if (await isSyncing(owner)) {
+            await abortSync(owner);
         }
 
         const deleted = await deleteOwnerData(owner);

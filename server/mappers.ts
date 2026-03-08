@@ -10,7 +10,7 @@ import type {
     PrEventWithAvatarRow,
     ContributorSnapshotRow,
     OwnerSnapshotRow
-} from "./db/index.ts";
+} from "../shared/db/index.ts";
 
 import type {
     Repository,
