@@ -325,6 +325,45 @@ query ($owner: String!, $repo: String!, $states: [PullRequestState!], $after: St
     }
 }`;
 
+const PRS_UPDATED_GRAPHQL_QUERY = `
+query ($owner: String!, $repo: String!, $states: [PullRequestState!], $after: String) {
+    repository(owner: $owner, name: $repo) {
+        pullRequests(first: 100, states: $states, orderBy: {field: UPDATED_AT, direction: DESC}, after: $after) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            nodes {
+                id: databaseId
+                number
+                title
+                state
+                url
+                createdAt
+                updatedAt
+                closedAt
+                mergedAt
+                isDraft
+                additions
+                deletions
+                changedFiles
+                baseRefName
+                headRefName
+                author {
+                    login
+                    avatarUrl
+                    url
+                }
+            }
+        }
+    }
+    rateLimit {
+        remaining
+        limit
+        resetAt
+    }
+}`;
+
 // deno-lint-ignore no-explicit-any
 function logGraphQLRateLimit(response: any): void {
     const rl = response?.rateLimit;
@@ -491,7 +530,7 @@ export async function fetchPullRequests(
     owner: string,
     repo: string,
     state: "all" | "open" | "closed" = "all",
-    options?: { onPage?: (page: GitHubPR[]) => Promise<void> }
+    options?: { onPage?: (page: GitHubPR[]) => Promise<void>; updatedSince?: string }
 ): Promise<GitHubPR[]> {
     try {
         await guardRateLimit(octokit);
@@ -512,13 +551,17 @@ export async function fetchPullRequests(
         while (hasNextPage) {
             await guardRateLimit(octokit);
 
+            const useUpdatedOrder = !!options?.updatedSince;
             // deno-lint-ignore no-explicit-any
-            const response: any = await octokit.graphql(PRS_GRAPHQL_QUERY, {
-                owner,
-                repo,
-                states,
-                after: cursor
-            });
+            const response: any = await octokit.graphql(
+                useUpdatedOrder ? PRS_UPDATED_GRAPHQL_QUERY : PRS_GRAPHQL_QUERY,
+                {
+                    owner,
+                    repo,
+                    states,
+                    after: cursor
+                }
+            );
 
             logGraphQLRateLimit(response);
 
@@ -552,14 +595,31 @@ export async function fetchPullRequests(
                 });
             }
 
-            if (options?.onPage) {
+            // When doing incremental sync, filter out PRs not updated since threshold
+            // and stop pagination when we hit old PRs
+            let stopEarly = false;
+            if (options?.updatedSince) {
+                const threshold = new Date(options.updatedSince).getTime();
+                const freshPRs = page.filter(
+                    (pr) => new Date(pr.updated_at).getTime() >= threshold
+                );
+                if (freshPRs.length < page.length) {
+                    stopEarly = true;
+                }
+                if (options?.onPage && freshPRs.length > 0) {
+                    await options.onPage(freshPRs);
+                    totalCount += freshPRs.length;
+                } else if (!options?.onPage) {
+                    allPulls.push(...freshPRs);
+                }
+            } else if (options?.onPage) {
                 await options.onPage(page);
                 totalCount += page.length;
             } else {
                 allPulls.push(...page);
             }
 
-            hasNextPage = pullRequests.pageInfo.hasNextPage;
+            hasNextPage = pullRequests.pageInfo.hasNextPage && !stopEarly;
             cursor = pullRequests.pageInfo.endCursor;
         }
 

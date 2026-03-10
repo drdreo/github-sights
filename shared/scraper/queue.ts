@@ -38,7 +38,7 @@ import type { RepositoryMetaRow } from "../db/types.ts";
 const TICK_BUDGET_MS = 60_000;
 
 /** Number of repos to process in parallel within each tick. */
-const REPO_CONCURRENCY = 2;
+const REPO_CONCURRENCY = 5;
 
 // ── Public API ───────────────────────────────────────────────────────────────────
 
@@ -204,10 +204,18 @@ async function phaseSyncRepos(
             break;
         }
 
-        const batch: { name: string; row: RepositoryMetaRow; ghRepo: GitHubRepo }[] = [];
+        const batchSlice: string[] = [];
         for (let i = 0; i < REPO_CONCURRENCY && repos_done + i < repoIds.length; i++) {
-            const name = repoNames[repos_done + i];
-            const row = await getRepoByName(job.owner_login, name);
+            batchSlice.push(repoNames[repos_done + i]);
+        }
+        const batchRows = await Promise.all(
+            batchSlice.map(async (name) => {
+                const row = await getRepoByName(job.owner_login, name);
+                return { name, row };
+            })
+        );
+        const batch: { name: string; row: RepositoryMetaRow; ghRepo: GitHubRepo }[] = [];
+        for (const { name, row } of batchRows) {
             if (!row) {
                 await recordJobError(job.id, `${name}: not found in DB`);
                 continue;

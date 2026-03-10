@@ -13,7 +13,6 @@ import {
     fetchCommits,
     fetchPullRequests,
     isRepoExcluded,
-    getRateLimitState,
     type GitHubRepo
 } from "./github-client.ts";
 import {
@@ -288,15 +287,23 @@ export async function ingestPRsForRepo(
         return { repoName, repoId, upserted: 0 };
     }
 
-    console.log(`[ingest] ${owner}/${repoName}: fetching PRs…`);
+    const updatedSince = pullState?.last_synced_at
+        ? pullState.last_synced_at.toISOString()
+        : undefined;
 
-    // Fetch all PRs — stream page-by-page to avoid accumulating all PRs in memory.
-    // PRs are upserted (idempotent), so fetching all is correct.
+    console.log(
+        `[ingest] ${owner}/${repoName}: fetching PRs…` +
+            (updatedSince ? ` (incremental since ${updatedSince.split("T")[0]})` : " (full)")
+    );
+
+    // Fetch PRs — on consecutive syncs, only fetch PRs updated since last sync.
+    // PRs are upserted (idempotent), so re-fetching updated ones is correct.
     let totalUpserted = 0;
     let totalFetched = 0;
     const seenContributors = new Map<string, UpsertContributorInput>();
 
     await fetchPullRequests(octokit, owner, repoName, "all", {
+        updatedSince,
         onPage: async (page) => {
             totalFetched += page.length;
 
