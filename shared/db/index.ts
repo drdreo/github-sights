@@ -40,5 +40,6 @@ export type {
     ContributorSnapshotRow,
     DailyActivityRow,
     SyncStateRow,
+    SessionRow,
     SchemaMigrationRow
 } from "./types.ts";

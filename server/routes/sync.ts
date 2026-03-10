@@ -1,6 +1,7 @@
 import { Hono } from "hono";
-import { clearConfig, requireConfig } from "../../shared/config.ts";
-import { errorResponse } from "../errors.ts";
+import { clearConfig, getConfig } from "../../shared/config.ts";
+import { errorResponse, notConfigured } from "../errors.ts";
+import { requireAuth } from "../middleware/session.ts";
 import { deleteOwnerData } from "../../shared/db/queries/identity.ts";
 import { updateSyncSince } from "../../shared/db/queries/config.ts";
 import {
@@ -15,15 +16,18 @@ import { aggregateOwner } from "../../shared/scraper/aggregate.ts";
 
 const sync = new Hono();
 
-// ── POST /api/sync — Enqueue full sync pipeline ─────────────────────────────
+// ── POST /api/sync/:owner — Enqueue full sync pipeline ──────────────────────
 //
 // Query params (optional):
 //   since — ISO date string (only when explicitly provided, e.g. initial sync)
 //   until — ISO date string (only when explicitly provided)
-sync.post("/api/sync/:owner", async (c) => {
+sync.post("/api/sync/:owner", requireAuth, async (c) => {
     try {
         const { owner } = c.req.param();
-        requireConfig(owner);
+
+        // Ensure owner config exists (populated during OAuth callback)
+        if (!getConfig(owner)) throw notConfigured();
+
         const since = c.req.query("since") || undefined;
         const until = c.req.query("until") || undefined;
 
@@ -55,10 +59,13 @@ sync.post("/api/sync/:owner", async (c) => {
 //
 // Fetches commits + PRs for a specific repo and rebuilds its snapshot.
 // Used by repo detail pages to trigger on-demand deep sync.
-sync.post("/api/sync/:owner/:repo", async (c) => {
+sync.post("/api/sync/:owner/:repo", requireAuth, async (c) => {
     try {
         const { owner, repo } = c.req.param();
-        requireConfig(owner);
+
+        // Ensure owner config exists (populated during OAuth callback)
+        if (!getConfig(owner)) throw notConfigured();
+
         const result = await syncRepo(owner, repo);
 
         return c.json({
@@ -82,10 +89,11 @@ sync.get("/api/sync/progress/:owner", async (c) => {
 //
 // Rebuilds all snapshots + daily_activity without re-fetching from GitHub.
 // Useful after changing aggregation logic.
-sync.post("/api/aggregate/:owner", async (c) => {
+sync.post("/api/aggregate/:owner", requireAuth, async (c) => {
     try {
         const { owner } = c.req.param();
-        requireConfig(owner);
+
+        if (!getConfig(owner)) throw notConfigured();
 
         const result = await aggregateOwner(owner);
         return c.json(result);
@@ -95,7 +103,7 @@ sync.post("/api/aggregate/:owner", async (c) => {
 });
 
 // ── DELETE /api/owner/:owner — Purge all owner data (GDPR / reset) ───────────
-sync.delete("/api/owner/:owner", async (c) => {
+sync.delete("/api/owner/:owner", requireAuth, async (c) => {
     try {
         const { owner } = c.req.param();
 

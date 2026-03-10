@@ -1,12 +1,15 @@
 import { Suspense } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { Github, BarChart3, Settings, Users, FolderGit2 } from "lucide-react";
+import { Github, BarChart3, Settings, Users, FolderGit2, LogOut, LogIn } from "lucide-react";
 import { useOwner } from "../hooks/useOwner";
+import { useAuth, useLogout } from "../hooks/useAuth";
 
 export default function Layout() {
     const location = useLocation();
     const owner = useOwner();
     const isActive = (path: string) => location.pathname === `/${owner}${path}`;
+    const { user, isAuthenticated } = useAuth();
+    const logout = useLogout();
 
     return (
         <div className="min-h-screen bg-gray-950 font-sans text-gray-100 selection:bg-blue-500/30 selection:text-white">
@@ -87,6 +90,39 @@ export default function Layout() {
                                 Settings
                             </Link>
                         </nav>
+
+                        {/* Auth */}
+                        <div className="flex items-center gap-2 ml-4 pl-4 border-l border-gray-800">
+                            {isAuthenticated && user ? (
+                                <>
+                                    <img
+                                        src={user.avatar_url}
+                                        alt={user.login}
+                                        className="w-7 h-7 rounded-full ring-1 ring-gray-700"
+                                    />
+                                    <span className="text-sm text-gray-300 hidden sm:block">
+                                        {user.login}
+                                    </span>
+                                    <button
+                                        onClick={() => logout.mutate()}
+                                        disabled={logout.isPending}
+                                        title="Sign out"
+                                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm text-gray-400 hover:text-gray-100 hover:bg-gray-800/50 transition-all duration-200 disabled:opacity-50"
+                                    >
+                                        <LogOut className="h-4 w-4" />
+                                        <span className="hidden sm:block">Sign out</span>
+                                    </button>
+                                </>
+                            ) : (
+                                <Link
+                                    to="/setup"
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm text-gray-400 hover:text-gray-100 hover:bg-gray-800/50 transition-all duration-200"
+                                >
+                                    <LogIn className="h-4 w-4" />
+                                    <span className="hidden sm:block">Sign in</span>
+                                </Link>
+                            )}
+                        </div>
                     </div>
                 </div>
             </header>

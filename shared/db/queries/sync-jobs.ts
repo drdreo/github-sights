@@ -117,10 +117,9 @@ export async function claimJob(): Promise<SyncJobRow | null> {
  * (rather than waiting for the stale threshold).
  */
 export async function yieldJob(jobId: number): Promise<void> {
-    await execute(
-        `UPDATE sync_job SET claimed_at = NULL WHERE id = $1 AND status = 'running'`,
-        [jobId]
-    );
+    await execute(`UPDATE sync_job SET claimed_at = NULL WHERE id = $1 AND status = 'running'`, [
+        jobId
+    ]);
 }
 
 // ── Update ───────────────────────────────────────────────────────────────────────

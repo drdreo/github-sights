@@ -15,11 +15,9 @@ export function LocCell({ value, type }: LocCellProps) {
     const color = type === "addition" ? "text-green-400" : "text-red-400";
 
     return (
-        <span
-            className={`${color} cursor-default`}
-            title={`${prefix}${value.toLocaleString()}`}
-        >
-            {prefix}{formatLoc(value)}
+        <span className={`${color} cursor-default`} title={`${prefix}${value.toLocaleString()}`}>
+            {prefix}
+            {formatLoc(value)}
         </span>
     );
 }

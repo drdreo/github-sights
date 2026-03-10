@@ -234,6 +234,19 @@ export interface SyncStateRow {
     last_error: string | null;
 }
 
+// ── OAuth Sessions ────────────────────────────────────────────────────────────────
+
+export interface SessionRow {
+    id: string;
+    github_id: number;
+    github_login: string;
+    avatar_url: string | null;
+    access_token: string;
+    scopes: string | null;
+    created_at: Date;
+    expires_at: Date;
+}
+
 // ── Schema Migrations ────────────────────────────────────────────────────────────
 
 export interface SchemaMigrationRow {

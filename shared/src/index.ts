@@ -121,7 +121,7 @@ export interface ContributorOverview extends RepoContributorStat {
 }
 
 export interface ApiConfig {
-    token: string;
+    token?: string;
     owner: string;
     ownerType: "user" | "org";
     syncSince?: string;
