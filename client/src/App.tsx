@@ -1,11 +1,11 @@
-import { lazy } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
 import * as Tooltip from "@radix-ui/react-tooltip";
+import {lazy} from "react";
+import {Navigate, Route, Routes} from "react-router-dom";
 import Layout from "./components/Layout";
 import OwnerGuard from "./components/OwnerGuard";
-import LandingPage from "./pages/LandingPage";
-import SetupPage from "./pages/SetupPage";
 
+const SetupPage = lazy(() => import("./pages/SetupPage"));
+const LandingPage = lazy(() => import("./pages/LandingPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const RepoDetailPage = lazy(() => import("./pages/RepoDetailPage"));
 const ContributorsPage = lazy(() => import("./pages/ContributorsPage"));
