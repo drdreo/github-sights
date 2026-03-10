@@ -45,12 +45,12 @@ export function notConfigured(): ApiError {
     );
 }
 
-export function badCredentials(ghMessage?: string): ApiError {
+export function badCredentials(ghMessage: string): ApiError {
     return new ApiError(
         401,
         ErrorCode.BAD_CREDENTIALS,
         "GitHub authentication failed",
-        ghMessage || "The provided token was rejected by GitHub.",
+        ghMessage,
         "Ensure your token starts with 'ghp_' (classic) or 'github_pat_' (fine-grained) and hasn't expired. You can generate a new one at https://github.com/settings/tokens"
     );
 }
@@ -65,7 +65,7 @@ export function tokenMissingScopes(required: string[]): ApiError {
     );
 }
 
-export function validationError(message: string, hint?: string): ApiError {
+export function validationError(message: string, hint: string): ApiError {
     return new ApiError(400, ErrorCode.VALIDATION_ERROR, message, undefined, hint);
 }
 

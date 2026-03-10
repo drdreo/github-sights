@@ -181,12 +181,12 @@ export async function advanceJob(
 // ── Complete / Fail ──────────────────────────────────────────────────────────────
 
 /** Mark a job as successfully completed. */
-export async function completeJob(jobId: number, result?: unknown): Promise<void> {
+export async function completeJob(jobId: number, result: unknown): Promise<void> {
     await execute(
         `UPDATE sync_job
          SET status = 'complete', phase = 'complete', completed_at = NOW(), result = $2
          WHERE id = $1`,
-        [jobId, result ? JSON.stringify(result) : null]
+        [jobId, JSON.stringify(result)]
     );
 }
 
@@ -278,7 +278,7 @@ export async function getLatestJob(ownerLogin: string): Promise<SyncJobRow | nul
 // ── Cleanup ──────────────────────────────────────────────────────────────────────
 
 /** Delete old completed/failed/cancelled jobs, keeping the most recent N per owner. */
-export async function cleanupOldJobs(keepPerOwner: number = 10): Promise<number> {
+export async function cleanupOldJobs(keepPerOwner: number): Promise<number> {
     const result = await execute(
         `DELETE FROM sync_job
          WHERE id NOT IN (

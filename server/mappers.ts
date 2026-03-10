@@ -31,15 +31,13 @@ import type {
  */
 export function mapRepoRow(
     row: RepositoryMetaRow,
-    ownerInfo?: { login: string; avatar_url: string; html_url: string }
+    ownerInfo: { login: string; avatar_url: string; html_url: string }
 ): Repository {
-    const owner: GitHubUser = ownerInfo
-        ? { login: ownerInfo.login, avatar_url: ownerInfo.avatar_url, html_url: ownerInfo.html_url }
-        : {
-              login: row.owner_login,
-              avatar_url: "",
-              html_url: `https://github.com/${row.owner_login}`
-          };
+    const owner: GitHubUser = {
+        login: ownerInfo.login,
+        avatar_url: ownerInfo.avatar_url,
+        html_url: ownerInfo.html_url
+    };
 
     return {
         id: row.id,
@@ -64,7 +62,7 @@ export function mapRepoRow(
 // ── Commit ──────────────────────────────────────────────────────────────────────
 
 /** Map a commit_event row (with JOINed avatar) to the client's Commit shape. */
-export function mapCommitRow(row: CommitEventWithAvatarRow, repoName?: string): Commit {
+export function mapCommitRow(row: CommitEventWithAvatarRow, repoName: string): Commit {
     const author: CommitAuthor = {
         name: row.author_login ?? "Unknown",
         email: "",
@@ -95,7 +93,7 @@ export function mapCommitRow(row: CommitEventWithAvatarRow, repoName?: string): 
                       total: row.additions + row.deletions
                   }
                 : undefined,
-        ...(repoName ? { repo_name: repoName } : {})
+        repo_name: repoName
     };
 }
 

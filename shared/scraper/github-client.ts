@@ -451,12 +451,11 @@ export async function fetchCommits(
     octokit: Octokit,
     owner: string,
     repo: string,
-    options?: { since?: string; until?: string; onPage?: (page: GitHubCommit[]) => Promise<void> }
-): Promise<GitHubCommit[]> {
+    options: { since?: string; until?: string; onPage: (page: GitHubCommit[]) => Promise<void> }
+): Promise<void> {
     try {
         await guardRateLimit(octokit);
 
-        const allCommits: GitHubCommit[] = [];
         let totalCount = 0;
         let cursor: string | null = null;
         let hasNextPage = true;
@@ -466,8 +465,8 @@ export async function fetchCommits(
             const response: any = await octokit.graphql(COMMITS_GRAPHQL_QUERY, {
                 owner,
                 repo,
-                since: toGitTimestamp(options?.since),
-                until: toGitTimestamp(options?.until),
+                since: toGitTimestamp(options.since),
+                until: toGitTimestamp(options.until),
                 after: cursor
             });
 
@@ -496,24 +495,17 @@ export async function fetchCommits(
                 });
             }
 
-            if (options?.onPage) {
-                await options.onPage(page);
-                totalCount += page.length;
-            } else {
-                allCommits.push(...page);
-            }
+            await options.onPage(page);
+            totalCount += page.length;
 
             hasNextPage = history.pageInfo.hasNextPage;
             cursor = history.pageInfo.endCursor;
         }
 
-        const count = options?.onPage ? totalCount : allCommits.length;
         console.log(
-            `[github] GET commits for ${owner}/${repo} → ${count} commits (via GraphQL)` +
-                (options?.since ? ` (since ${options.since.split("T")[0]})` : "")
+            `[github] GET commits for ${owner}/${repo} → ${totalCount} commits (via GraphQL)` +
+                (options.since ? ` (since ${options.since.split("T")[0]})` : "")
         );
-
-        return allCommits;
     } catch (error) {
         throw githubApiError(`list commits for ${owner}/${repo}`, error);
     }
