@@ -49,8 +49,6 @@ if (dbReady) {
 }
 await loadConfig();
 
-// Clean up expired sessions on startup, then periodically (every 6 hours)
 deleteExpiredSessions().catch(() => {});
-setInterval(() => deleteExpiredSessions().catch(() => {}), 6 * 60 * 60 * 1000);
 
 Deno.serve({ port }, app.fetch);
