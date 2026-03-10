@@ -1,15 +1,46 @@
-import { Suspense } from "react";
-import { Outlet, Link, useLocation } from "react-router-dom";
-import { Github, BarChart3, Settings, Users, FolderGit2, LogOut, LogIn } from "lucide-react";
-import { useOwner } from "../hooks/useOwner";
+import {
+    BarChart3,
+    FolderGit2,
+    Github,
+    LogIn,
+    LogOut,
+    Settings,
+    Trash2,
+    Users
+} from "lucide-react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth, useLogout } from "../hooks/useAuth";
+import { useOwner } from "../hooks/useOwner";
+import { api } from "../lib/api";
 
 export default function Layout() {
     const location = useLocation();
     const owner = useOwner();
+    const navigate = useNavigate();
     const isActive = (path: string) => location.pathname === `/${owner}${path}`;
     const { user, isAuthenticated } = useAuth();
     const logout = useLogout();
+    const [menuOpen, setMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setMenuOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const handleDelete = async () => {
+        if (!owner) return;
+        if (!window.confirm(`Delete ALL data for "${owner}"? This cannot be undone.`)) return;
+        await api.deleteOwnerData(owner);
+        setMenuOpen(false);
+        navigate("/");
+    };
 
     return (
         <div className="min-h-screen bg-gray-950 font-sans text-gray-100 selection:bg-blue-500/30 selection:text-white">
@@ -78,41 +109,62 @@ export default function Layout() {
                                 />
                                 Repositories
                             </Link>
-
-                            <Link
-                                to="/setup"
-                                className={`
-                  flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200
-                  text-gray-400 hover:text-gray-100 hover:bg-gray-800/50
-                `}
-                            >
-                                <Settings className="h-4 w-4 text-gray-500" />
-                                Settings
-                            </Link>
                         </nav>
 
                         {/* Auth */}
-                        <div className="flex items-center gap-2 ml-4 pl-4 border-l border-gray-800">
+                        <div className="flex items-center ml-4 pl-4 border-l border-gray-800">
                             {isAuthenticated && user ? (
-                                <>
-                                    <img
-                                        src={user.avatar_url}
-                                        alt={user.login}
-                                        className="w-7 h-7 rounded-full ring-1 ring-gray-700"
-                                    />
-                                    <span className="text-sm text-gray-300 hidden sm:block">
-                                        {user.login}
-                                    </span>
+                                <div className="relative" ref={menuRef}>
                                     <button
-                                        onClick={() => logout.mutate()}
-                                        disabled={logout.isPending}
-                                        title="Sign out"
-                                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm text-gray-400 hover:text-gray-100 hover:bg-gray-800/50 transition-all duration-200 disabled:opacity-50"
+                                        onClick={() => setMenuOpen((v) => !v)}
+                                        className="rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900"
                                     >
-                                        <LogOut className="h-4 w-4" />
-                                        <span className="hidden sm:block">Sign out</span>
+                                        <img
+                                            src={user.avatar_url}
+                                            alt={user.login}
+                                            className="w-8 h-8 rounded-full ring-1 ring-gray-700 hover:ring-gray-500 transition-all"
+                                        />
                                     </button>
-                                </>
+                                    {menuOpen && (
+                                        <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-700 rounded-xl shadow-xl shadow-black/40 py-1 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                                            <div className="px-3 py-2 border-b border-gray-800">
+                                                <p className="text-sm font-medium text-gray-200 truncate">
+                                                    {user.login}
+                                                </p>
+                                            </div>
+                                            <Link
+                                                to="/setup"
+                                                onClick={() => setMenuOpen(false)}
+                                                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-gray-100 transition-colors"
+                                            >
+                                                <Settings className="w-4 h-4 text-gray-500" />
+                                                Settings
+                                            </Link>
+                                            {owner && (
+                                                <button
+                                                    onClick={handleDelete}
+                                                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-red-400 transition-colors"
+                                                >
+                                                    <Trash2 className="w-4 h-4 text-gray-500" />
+                                                    Delete Data
+                                                </button>
+                                            )}
+                                            <div className="border-t border-gray-800 mt-1 pt-1">
+                                                <button
+                                                    onClick={() => {
+                                                        setMenuOpen(false);
+                                                        logout.mutate();
+                                                    }}
+                                                    disabled={logout.isPending}
+                                                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-gray-100 transition-colors disabled:opacity-50"
+                                                >
+                                                    <LogOut className="w-4 h-4 text-gray-500" />
+                                                    Sign out
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             ) : (
                                 <Link
                                     to="/setup"
