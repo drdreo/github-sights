@@ -9,7 +9,6 @@ import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { createSession, getSession, deleteSession } from "../../shared/db/queries/sessions.ts";
 import { errorResponse } from "../errors.ts";
-import { setConfig } from "../../shared/config.ts";
 
 const auth = new Hono();
 
@@ -162,19 +161,12 @@ auth.get("/api/auth/callback", async (c) => {
             scopes
         });
 
-        // Persist owner config so the crawler can use the OAuth token
-        await setConfig({
-            token: accessToken,
-            owner: ghUser.login,
-            ownerType: ghUser.type === "Organization" ? "org" : "user"
-        });
-
         // Set session cookie
         setCookie(c, COOKIE_SESSION, sessionId, cookieOptions());
 
         console.log(`[auth] Session created for ${ghUser.login} (github_id=${ghUser.id})`);
 
-        return c.redirect(`/${ghUser.login}/dashboard`);
+        return c.redirect("/setup");
     } catch (error) {
         return errorResponse(c, error);
     }
