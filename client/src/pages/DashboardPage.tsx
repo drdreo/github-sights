@@ -1,13 +1,11 @@
 import { differenceInDays, subDays } from "date-fns";
 import React, { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { CommitActivity } from "../components/CommitActivity";
 import { CommitTrends } from "../components/CommitTrends";
 import { DashboardHeader } from "../components/DashboardHeader";
 import { LanguageDistribution } from "../components/LanguageDistribution";
 import { StatCards } from "../components/StatCards";
-import { api } from "../lib/api";
-
 import { useCommitTimelines, useOwnerConfig, useStats, useSync } from "../hooks/useGitHub";
 import { useOwner } from "../hooks/useOwner";
 import { useSyncProgress } from "../hooks/useSyncProgress";
@@ -19,13 +17,6 @@ export default function DashboardPage() {
     });
 
     const owner = useOwner();
-    const navigate = useNavigate();
-
-    const handleDelete = async () => {
-        if (!window.confirm(`Delete ALL data for "${owner}"? This cannot be undone.`)) return;
-        await api.deleteOwnerData(owner);
-        navigate("/");
-    };
 
     const since = dateRange.startDate.toISOString();
     const until = dateRange.endDate.toISOString();
@@ -57,7 +48,6 @@ export default function DashboardPage() {
                     syncProgress={syncProgress}
                     dateRange={dateRange}
                     onDateRangeChange={setDateRange}
-                    onDelete={handleDelete}
                 />
                 <div className="grid grid-cols-1 gap-6">
                     <StatCards

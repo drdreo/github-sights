@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { getConfig, setConfig, clearConfig } from "../../shared/config.ts";
 import { createOctokit, verifyToken } from "../../shared/scraper/index.ts";
 import { badCredentials, tokenMissingScopes, validationError, errorResponse } from "../errors.ts";
+import { requireAuth } from "../middleware/session.ts";
 
 const config = new Hono();
 
@@ -21,26 +22,21 @@ config.get("/api/config/:owner", (c) => {
     return c.json({ configured: false });
 });
 
-// ── POST /api/config — Set up GitHub credentials ────────────────────────────
+// ── POST /api/config — Set up owner config using the session OAuth token ─────
 
-config.post("/api/config", async (c) => {
+config.post("/api/config", requireAuth, async (c) => {
     try {
+        const session = c.get("session")!;
+        const token = session.access_token;
+
         const body = await c.req.json<{
-            token?: string;
             owner?: string;
             ownerType?: string;
             syncSince?: string;
         }>();
-        const { token, owner, ownerType, syncSince } = body;
+        const { owner, ownerType, syncSince } = body;
 
         // ── Validation ──────────────────────────────────────────────
-        if (!token) {
-            throw validationError(
-                "Missing required field: token",
-                "Provide a GitHub personal access token (starts with 'ghp_' or 'github_pat_')."
-            );
-        }
-
         if (!owner) {
             throw validationError(
                 "Missing required field: owner",
@@ -52,19 +48,6 @@ config.post("/api/config", async (c) => {
             throw validationError(
                 'Invalid ownerType — must be "user" or "org"',
                 'Set ownerType to "user" for personal accounts or "org" for GitHub organizations.'
-            );
-        }
-
-        // Quick format check on token prefix
-        if (
-            !token.startsWith("ghp_") &&
-            !token.startsWith("github_pat_") &&
-            !token.startsWith("gho_") &&
-            !token.startsWith("ghs_")
-        ) {
-            throw validationError(
-                "Token format not recognized",
-                "GitHub tokens typically start with 'ghp_' (classic PAT) or 'github_pat_' (fine-grained). Check that you copied the full token."
             );
         }
 
@@ -119,7 +102,7 @@ config.post("/api/config", async (c) => {
 
 // ── DELETE /api/config/:owner — Clear stored config for an owner ────────────
 
-config.delete("/api/config/:owner", async (c) => {
+config.delete("/api/config/:owner", requireAuth, async (c) => {
     const { owner } = c.req.param();
     await clearConfig(owner);
     console.log(`[config] Configuration cleared for ${owner}`);

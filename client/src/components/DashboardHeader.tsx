@@ -1,8 +1,7 @@
 import React from "react";
-import { RefreshCw, Trash2 } from "lucide-react";
-import { TimeRangeSelector } from "./TimeRangeSelector";
-import { SyncProgressBar } from "./SyncProgressBar";
 import type { SyncProgressResponse } from "../lib/api";
+import { SyncProgressBar } from "./SyncProgressBar";
+import { TimeRangeSelector } from "./TimeRangeSelector";
 
 interface DateRange {
     startDate: Date;
@@ -15,7 +14,6 @@ interface DashboardHeaderProps {
     syncProgress?: SyncProgressResponse;
     dateRange: DateRange;
     onDateRangeChange: (range: DateRange) => void;
-    onDelete?: () => void;
 }
 
 function formatLastSynced(iso: string): string {
@@ -38,8 +36,7 @@ export function DashboardHeader({
     isSyncing,
     syncProgress,
     dateRange,
-    onDateRangeChange,
-    onDelete
+    onDateRangeChange
 }: DashboardHeaderProps) {
     const lastSyncedAt = syncProgress?.lastSyncedAt;
 
@@ -71,15 +68,6 @@ export function DashboardHeader({
                         }) => void
                     }
                 />
-                {onDelete && (
-                    <button
-                        onClick={onDelete}
-                        title="Delete all owner data"
-                        className="p-2 text-gray-500 hover:text-red-400 transition-colors rounded-lg hover:bg-gray-800"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
-                )}
             </div>
         </div>
     );

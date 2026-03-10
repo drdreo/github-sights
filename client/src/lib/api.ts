@@ -44,6 +44,7 @@ class ApiError extends Error {
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
     const response = await fetch(`${API_BASE}${path}`, {
         ...options,
+        credentials: "include",
         headers: {
             "Content-Type": "application/json",
             ...options?.headers
@@ -76,7 +77,7 @@ export const api = {
             syncSince?: string | null;
         }>(`/config/${encodeURIComponent(owner)}`),
 
-    setConfig: (config: ApiConfig) =>
+    setConfig: (config: Omit<ApiConfig, "token">) =>
         fetchApi<void>("/config", {
             method: "POST",
             body: JSON.stringify(config)
@@ -185,5 +186,13 @@ export const api = {
     deleteOwnerData: (owner: string) =>
         fetchApi<{ deleted: boolean; owner: string }>(`/owner/${encodeURIComponent(owner)}`, {
             method: "DELETE"
-        })
+        }),
+
+    getAuthMe: () =>
+        fetchApi<{
+            authenticated: boolean;
+            user?: { login: string; avatar_url: string; github_id: number };
+        }>("/auth/me"),
+
+    logout: () => fetchApi<void>("/auth/logout", { method: "POST" })
 };

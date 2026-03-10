@@ -8,7 +8,7 @@
 // Phases (full_sync):
 //   queued → syncing_repos → aggregating → complete
 
-import {Octokit} from "octokit";
+import { Octokit } from "octokit";
 import {
     claimJob,
     advanceJob,
@@ -61,8 +61,8 @@ export async function tick(): Promise<boolean> {
 
     try {
         const config = getConfig(job.owner_login);
-        if (!config) {
-            await failJob(job.id, `No config found for ${job.owner_login}`);
+        if (!config?.token) {
+            await failJob(job.id, `No config or token found for ${job.owner_login}`);
             return true; // Job failed but queue may have more
         }
 
@@ -269,7 +269,10 @@ async function phaseSyncRepos(
             } else {
                 const failedName = repoNames[repos_done];
                 await recordJobError(job.id, `${failedName}: ${String(result.reason)}`);
-                console.warn(`[queue] Failed repo ${job.owner_login}/${failedName}:`, result.reason);
+                console.warn(
+                    `[queue] Failed repo ${job.owner_login}/${failedName}:`,
+                    result.reason
+                );
             }
         }
 

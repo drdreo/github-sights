@@ -283,7 +283,9 @@ export async function ingestPRsForRepo(
         Date.now() - pullState.last_synced_at.getTime() < PR_STALE_MS
     ) {
         const agoMin = Math.round((Date.now() - pullState.last_synced_at.getTime()) / 60_000);
-        console.log(`[ingest] ${owner}/${repoName}: PRs synced ${agoMin}min ago, skipping (stale after 60min)`);
+        console.log(
+            `[ingest] ${owner}/${repoName}: PRs synced ${agoMin}min ago, skipping (stale after 60min)`
+        );
         return { repoName, repoId, upserted: 0 };
     }
 
@@ -358,4 +360,3 @@ export async function ingestPRsForRepo(
 
     return { repoName, repoId, upserted: totalUpserted };
 }
-

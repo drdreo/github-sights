@@ -8,7 +8,10 @@ import {
     getPrsByRepo,
     getContributorStatsByRepo
 } from "../../shared/db/queries/events.ts";
-import { getContributorSnapshotsByRepo, getRepoSnapshotsByOwner } from "../../shared/db/queries/snapshots.ts";
+import {
+    getContributorSnapshotsByRepo,
+    getRepoSnapshotsByOwner
+} from "../../shared/db/queries/snapshots.ts";
 import { mapRepoRow, mapCommitRow, mapPrRow, mapContribSnapshotToContributor } from "../mappers.ts";
 import type { RepositoryMetaRow } from "../../shared/db/index.ts";
 import { syncRepo } from "../../shared/scraper/index.ts";
