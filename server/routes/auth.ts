@@ -172,7 +172,7 @@ auth.get("/api/auth/callback", async (c) => {
         const frontendUrl =
             Deno.env.get("ENVIRONMENT") === "local"
                 ? "http://localhost:5173"
-                : "https://github-sights.drdreo.workers.dev/";
+                : "https://github-sights.drdreo.workers.dev";
         return c.redirect(`${frontendUrl}/setup`);
     } catch (error) {
         return errorResponse(c, error);
