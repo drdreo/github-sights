@@ -54,7 +54,7 @@ export async function setConfig(config: ApiConfig): Promise<void> {
 
     // Persist to Postgres via new owner_config table
     if (isPoolAvailable()) {
-        await dbUpsertConfig(config.owner, config.token!, config.ownerType, config.syncSince);
+        await dbUpsertConfig(config.owner, config.token, config.ownerType, config.syncSince);
     }
 }
 
