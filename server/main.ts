@@ -23,7 +23,7 @@ const app = new Hono();
 const allowedOrigins =
     Deno.env.get("ENVIRONMENT") === "local"
         ? ["http://localhost:5173"]
-        : ["https://github-sights.bannerflow.workers.dev"];
+        : ["https://github-sights.drdreo.workers.dev/"];
 
 app.use("/*", cors({ origin: allowedOrigins, credentials: true }));
 app.use("/*", sessionMiddleware);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useSetConfig } from "../hooks/useGitHub";
 import { useAuth } from "../hooks/useAuth";
+import { API_BASE } from "../lib/api";
 import { useNavigate } from "react-router-dom";
 import { Building2, User, ArrowRight, Loader2, Github, Calendar } from "lucide-react";
 import { addRecentOwner } from "./LandingPage";
@@ -25,7 +26,7 @@ export default function SetupPage() {
     }, [user]);
 
     const handleSignIn = () => {
-        window.location.href = "/api/auth/github";
+        window.location.href = `${API_BASE}/auth/github`;
     };
 
     const handleSubmit = async (e: React.FormEvent) => {

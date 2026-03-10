@@ -21,10 +21,12 @@ function isProduction(): boolean {
 }
 
 function cookieOptions() {
+    const prod = isProduction();
     return {
         httpOnly: true,
-        secure: isProduction(),
-        sameSite: "Lax" as const,
+        secure: prod,
+        // Cross-origin fetch from the frontend requires "None"; locally "Lax" is fine.
+        sameSite: prod ? ("None" as const) : ("Lax" as const),
         path: "/",
         maxAge: SESSION_MAX_AGE
     };
@@ -166,7 +168,12 @@ auth.get("/api/auth/callback", async (c) => {
 
         console.log(`[auth] Session created for ${ghUser.login} (github_id=${ghUser.id})`);
 
-        return c.redirect("/setup");
+        // Redirect to the frontend setup page so the user can choose which owner to crawl
+        const frontendUrl =
+            Deno.env.get("ENVIRONMENT") === "local"
+                ? "http://localhost:5173"
+                : "https://github-sights.drdreo.workers.dev/";
+        return c.redirect(`${frontendUrl}/setup`);
     } catch (error) {
         return errorResponse(c, error);
     }
