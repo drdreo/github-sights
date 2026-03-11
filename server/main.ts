@@ -1,4 +1,4 @@
-\import { Hono } from "hono";
+import { Hono } from "hono";
 import { cors } from "jsr:@hono/hono@^4/cors";
 import { loadConfig } from "../shared/config.ts";
 
