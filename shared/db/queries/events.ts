@@ -287,6 +287,117 @@ export interface InsertWorkflowInput {
     created_at: string;
 }
 
+/** Get workflow runs for a repo, paginated. */
+export async function getWorkflowsByRepo(
+    repoId: number,
+    options?: { limit?: number; offset?: number }
+): Promise<import("../types.ts").WorkflowEventRow[]> {
+    const limit = options?.limit ?? 100;
+    const offset = options?.offset ?? 0;
+    return query<import("../types.ts").WorkflowEventRow>(
+        `SELECT * FROM workflow_event
+         WHERE repo_id = $1 AND status = 'completed'
+         ORDER BY created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [repoId, limit, offset]
+    );
+}
+
+/** Per-workflow-name breakdown stats for a repo. */
+export async function getWorkflowStatsByRepo(repoId: number): Promise<
+    Array<{
+        workflow_name: string;
+        total_runs: number;
+        success_count: number;
+        failure_count: number;
+        cancelled_count: number;
+        avg_duration_seconds: number;
+        total_duration_seconds: number;
+        success_rate: number;
+    }>
+> {
+    return query(
+        `SELECT
+            COALESCE(workflow_name, 'Unknown') AS workflow_name,
+            COUNT(*)::INTEGER AS total_runs,
+            COUNT(*) FILTER (WHERE conclusion = 'success')::INTEGER AS success_count,
+            COUNT(*) FILTER (WHERE conclusion = 'failure')::INTEGER AS failure_count,
+            COUNT(*) FILTER (WHERE conclusion = 'cancelled')::INTEGER AS cancelled_count,
+            COALESCE(AVG(duration_seconds) FILTER (WHERE duration_seconds IS NOT NULL), 0)::INTEGER AS avg_duration_seconds,
+            COALESCE(SUM(duration_seconds) FILTER (WHERE duration_seconds IS NOT NULL), 0)::INTEGER AS total_duration_seconds,
+            COALESCE(ROUND(COUNT(*) FILTER (WHERE conclusion = 'success')::NUMERIC / NULLIF(COUNT(*), 0) * 100, 1), 0)::NUMERIC AS success_rate
+         FROM workflow_event
+         WHERE repo_id = $1 AND status = 'completed'
+         GROUP BY workflow_name
+         ORDER BY total_runs DESC`,
+        [repoId]
+    );
+}
+
+/** Owner-wide workflow stats for dashboard. */
+export async function getWorkflowStatsByOwner(ownerLogin: string): Promise<{
+    total_runs: number;
+    total_duration_seconds: number;
+    success_rate: number;
+    avg_duration_seconds: number;
+    top_failing_workflows: Array<{ workflow_name: string; repo_name: string; failure_count: number }>;
+    top_contributors_by_minutes: Array<{ login: string; total_duration_seconds: number; run_count: number }>;
+}> {
+    const [totals] = await query<{
+        total_runs: number;
+        total_duration_seconds: number;
+        success_rate: number;
+        avg_duration_seconds: number;
+    }>(
+        `SELECT
+            COUNT(*)::INTEGER AS total_runs,
+            COALESCE(SUM(we.duration_seconds), 0)::INTEGER AS total_duration_seconds,
+            COALESCE(ROUND(COUNT(*) FILTER (WHERE we.conclusion = 'success')::NUMERIC / NULLIF(COUNT(*), 0) * 100, 1), 0)::NUMERIC AS success_rate,
+            COALESCE(AVG(we.duration_seconds) FILTER (WHERE we.duration_seconds IS NOT NULL), 0)::INTEGER AS avg_duration_seconds
+         FROM workflow_event we
+         JOIN repository_meta rm ON rm.id = we.repo_id
+         WHERE rm.owner_login = $1 AND we.status = 'completed'`,
+        [ownerLogin]
+    );
+
+    const topFailing = await query<{ workflow_name: string; repo_name: string; failure_count: number }>(
+        `SELECT
+            COALESCE(we.workflow_name, 'Unknown') AS workflow_name,
+            rm.name AS repo_name,
+            COUNT(*)::INTEGER AS failure_count
+         FROM workflow_event we
+         JOIN repository_meta rm ON rm.id = we.repo_id
+         WHERE rm.owner_login = $1 AND we.status = 'completed' AND we.conclusion IN ('failure','timed_out')
+         GROUP BY we.workflow_name, rm.name
+         ORDER BY failure_count DESC
+         LIMIT 5`,
+        [ownerLogin]
+    );
+
+    const topContributors = await query<{ login: string; total_duration_seconds: number; run_count: number }>(
+        `SELECT
+            we.actor_login AS login,
+            COALESCE(SUM(we.duration_seconds), 0)::INTEGER AS total_duration_seconds,
+            COUNT(*)::INTEGER AS run_count
+         FROM workflow_event we
+         JOIN repository_meta rm ON rm.id = we.repo_id
+         WHERE rm.owner_login = $1 AND we.status = 'completed' AND we.actor_login IS NOT NULL
+         GROUP BY we.actor_login
+         ORDER BY total_duration_seconds DESC
+         LIMIT 10`,
+        [ownerLogin]
+    );
+
+    return {
+        total_runs: totals?.total_runs ?? 0,
+        total_duration_seconds: totals?.total_duration_seconds ?? 0,
+        success_rate: Number(totals?.success_rate) || 0,
+        avg_duration_seconds: totals?.avg_duration_seconds ?? 0,
+        top_failing_workflows: topFailing,
+        top_contributors_by_minutes: topContributors
+    };
+}
+
 /** Batch insert workflow events. */
 export async function insertWorkflows(workflows: InsertWorkflowInput[]): Promise<number> {
     if (workflows.length === 0) return 0;

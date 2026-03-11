@@ -43,7 +43,10 @@ export default function RepositoriesPage() {
                     openPRs: s.openPRs,
                     mergedPRs: s.mergedPRs,
                     totalAdditions: s.totalAdditions,
-                    totalDeletions: s.totalDeletions
+                    totalDeletions: s.totalDeletions,
+                    ciSuccessRate: s.ciSuccessRate,
+                    ciAvgDurationSeconds: s.ciAvgDurationSeconds,
+                    lastCiConclusion: s.lastCiConclusion
                 }
             ])
         );

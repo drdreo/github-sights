@@ -9,6 +9,9 @@ export interface RepoSnapshotStats {
     mergedPRs: number;
     totalAdditions: number;
     totalDeletions: number;
+    ciSuccessRate: number;
+    ciAvgDurationSeconds: number;
+    lastCiConclusion: string | null;
 }
 
 interface RepoGridProps {

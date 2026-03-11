@@ -4,7 +4,17 @@ import { format } from "date-fns";
 import { formatLoc } from "../lib/format";
 import { OverviewStats } from "../types";
 import { LoadingSkeleton } from "./LoadingSkeleton";
-import { Activity, Box, Code, Flame, GitCommit, GitPullRequest, Users } from "lucide-react";
+import {
+    Activity,
+    Box,
+    Code,
+    Flame,
+    GitCommit,
+    GitPullRequest,
+    Timer,
+    Users
+} from "lucide-react";
+import type { OwnerWorkflowStats } from "../types";
 
 interface StatCardDef {
     label: string;
@@ -22,9 +32,10 @@ interface StatCardsProps {
     owner: string;
     dateRangeLabel?: string;
     syncSince?: string;
+    workflowStats?: OwnerWorkflowStats;
 }
 
-export function StatCards({ stats, loading, owner, dateRangeLabel, syncSince }: StatCardsProps) {
+export function StatCards({ stats, loading, owner, dateRangeLabel, syncSince, workflowStats }: StatCardsProps) {
     const navigate = useNavigate();
 
     if (loading || !stats) {
@@ -76,7 +87,19 @@ export function StatCards({ stats, loading, owner, dateRangeLabel, syncSince }: 
             icon: Code,
             color: "text-cyan-400",
             bg: "bg-cyan-500/10"
-        }
+        },
+        ...(workflowStats && workflowStats.totalRuns > 0
+            ? [
+                  {
+                      label: "CI Minutes",
+                      value: workflowStats.totalMinutes.toLocaleString(),
+                      subtext: `${workflowStats.totalRuns} runs · ${workflowStats.successRate}% success`,
+                      icon: Timer,
+                      color: "text-green-400",
+                      bg: "bg-green-500/10"
+                  } as StatCardDef
+              ]
+            : [])
     ];
 
     const overviewCards: StatCardDef[] = [
@@ -146,7 +169,7 @@ export function StatCards({ stats, loading, owner, dateRangeLabel, syncSince }: 
                 <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">
                     Activity{dateRangeLabel ? ` · ${dateRangeLabel}` : ""}
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className={`grid grid-cols-1 gap-6 ${activityCards.length > 3 ? "md:grid-cols-2 lg:grid-cols-4" : "md:grid-cols-3"}`}>
                     {activityCards.map(renderCard)}
                 </div>
             </div>

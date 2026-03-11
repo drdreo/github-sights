@@ -2,7 +2,7 @@ import React from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
-import { useRepo, useCommits, usePulls, useRepoContributorStats } from "../hooks/useGitHub";
+import { useRepo, useCommits, usePulls, useRepoContributorStats, useWorkflows, useWorkflowStats } from "../hooks/useGitHub";
 import { useOwner } from "../hooks/useOwner";
 import { RepoDetailSkeleton } from "../components/RepoDetailSkeleton";
 import { RepoHeader } from "../components/RepoHeader";
@@ -17,6 +17,11 @@ export default function RepoDetailPage() {
     const { data: commits, isLoading: commitsLoading } = useCommits(owner, repoName);
     const { data: pulls, isLoading: pullsLoading } = usePulls(owner, repoName);
     const { data: contributors, isLoading: contribLoading } = useRepoContributorStats(
+        owner,
+        repoName
+    );
+    const { data: workflows, isLoading: workflowsLoading } = useWorkflows(owner, repoName);
+    const { data: workflowStats, isLoading: workflowStatsLoading } = useWorkflowStats(
         owner,
         repoName
     );
@@ -62,6 +67,10 @@ export default function RepoDetailPage() {
                     pullsLoading={pullsLoading}
                     contributors={contributors}
                     contribLoading={contribLoading}
+                    workflows={workflows}
+                    workflowsLoading={workflowsLoading}
+                    workflowStats={workflowStats}
+                    workflowStatsLoading={workflowStatsLoading}
                 />
             </div>
         </div>

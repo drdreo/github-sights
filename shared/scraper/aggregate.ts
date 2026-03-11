@@ -182,11 +182,19 @@ async function rebuildRepoDailyActivitySQL(ownerLogin: string, repoId: number): 
             FROM pr_event pe WHERE pe.repo_id = $2 AND pe.closed_at IS NOT NULL AND pe.merged_at IS NULL
             GROUP BY pe.closed_at::DATE
         ),
+        workflow_daily AS (
+            SELECT we.created_at::DATE::TEXT AS date,
+                   COUNT(*)::INTEGER AS runs,
+                   COUNT(*) FILTER (WHERE we.conclusion IN ('failure','timed_out'))::INTEGER AS failures
+            FROM workflow_event we WHERE we.repo_id = $2 AND we.status = 'completed'
+            GROUP BY we.created_at::DATE
+        ),
         all_dates AS (
             SELECT date FROM commit_daily
             UNION SELECT date FROM pr_opened
             UNION SELECT date FROM pr_merged
             UNION SELECT date FROM pr_closed
+            UNION SELECT date FROM workflow_daily
         )
         SELECT
             $1::TEXT AS owner_login,
@@ -199,13 +207,14 @@ async function rebuildRepoDailyActivitySQL(ownerLogin: string, repoId: number): 
             COALESCE(po.cnt, 0) AS pr_opened,
             COALESCE(pm.cnt, 0) AS pr_merged,
             COALESCE(pc.cnt, 0) AS pr_closed,
-            0 AS workflow_runs,
-            0 AS workflow_failures
+            COALESCE(wd.runs, 0) AS workflow_runs,
+            COALESCE(wd.failures, 0) AS workflow_failures
         FROM all_dates d
         LEFT JOIN commit_daily cd ON cd.date = d.date
         LEFT JOIN pr_opened po ON po.date = d.date
         LEFT JOIN pr_merged pm ON pm.date = d.date
-        LEFT JOIN pr_closed pc ON pc.date = d.date`,
+        LEFT JOIN pr_closed pc ON pc.date = d.date
+        LEFT JOIN workflow_daily wd ON wd.date = d.date`,
         [ownerLogin, repoId]
     );
 
@@ -228,6 +237,9 @@ async function rebuildRepoSnapshotSQL(ownerLogin: string, repo: RepositoryMetaRo
         merged_prs: number;
         total_additions: number;
         total_deletions: number;
+        ci_success_rate: number;
+        ci_avg_duration_seconds: number;
+        last_ci_conclusion: string | null;
     }>(
         `SELECT
             (SELECT COUNT(*)::INTEGER FROM commit_event WHERE repo_id = $1) AS total_commits,
@@ -235,7 +247,10 @@ async function rebuildRepoSnapshotSQL(ownerLogin: string, repo: RepositoryMetaRo
             (SELECT COUNT(*)::INTEGER FROM pr_event WHERE repo_id = $1 AND state = 'open') AS open_prs,
             (SELECT COUNT(*)::INTEGER FROM pr_event WHERE repo_id = $1 AND merged_at IS NOT NULL) AS merged_prs,
             COALESCE((SELECT SUM(additions)::INTEGER FROM commit_event WHERE repo_id = $1 AND is_merge = false), 0) AS total_additions,
-            COALESCE((SELECT SUM(deletions)::INTEGER FROM commit_event WHERE repo_id = $1 AND is_merge = false), 0) AS total_deletions`,
+            COALESCE((SELECT SUM(deletions)::INTEGER FROM commit_event WHERE repo_id = $1 AND is_merge = false), 0) AS total_deletions,
+            COALESCE((SELECT ROUND(COUNT(*) FILTER (WHERE conclusion = 'success')::NUMERIC / NULLIF(COUNT(*), 0) * 100, 1) FROM workflow_event WHERE repo_id = $1 AND status = 'completed'), 0)::NUMERIC AS ci_success_rate,
+            COALESCE((SELECT AVG(duration_seconds)::INTEGER FROM workflow_event WHERE repo_id = $1 AND status = 'completed' AND duration_seconds IS NOT NULL), 0) AS ci_avg_duration_seconds,
+            (SELECT conclusion FROM workflow_event WHERE repo_id = $1 AND status = 'completed' ORDER BY created_at DESC LIMIT 1) AS last_ci_conclusion`,
         [repo.id]
     );
 
@@ -268,9 +283,9 @@ async function rebuildRepoSnapshotSQL(ownerLogin: string, repo: RepositoryMetaRo
         total_additions: stats.total_additions,
         total_deletions: stats.total_deletions,
         contributor_count: contribStats.length,
-        ci_success_rate: 0,
-        ci_avg_duration_seconds: 0,
-        last_ci_conclusion: null,
+        ci_success_rate: Number(stats.ci_success_rate) || 0,
+        ci_avg_duration_seconds: stats.ci_avg_duration_seconds,
+        last_ci_conclusion: stats.last_ci_conclusion,
         top_contributors: topContributors
     };
 
@@ -383,6 +398,19 @@ async function buildAndUpsertRepoSnapshot(
         deletions: cs.deletions
     }));
 
+    // Fetch CI stats from workflow_event
+    const [ciStats] = await query<{
+        ci_success_rate: number;
+        ci_avg_duration_seconds: number;
+        last_ci_conclusion: string | null;
+    }>(
+        `SELECT
+            COALESCE((SELECT ROUND(COUNT(*) FILTER (WHERE conclusion = 'success')::NUMERIC / NULLIF(COUNT(*), 0) * 100, 1) FROM workflow_event WHERE repo_id = $1 AND status = 'completed'), 0)::NUMERIC AS ci_success_rate,
+            COALESCE((SELECT AVG(duration_seconds)::INTEGER FROM workflow_event WHERE repo_id = $1 AND status = 'completed' AND duration_seconds IS NOT NULL), 0) AS ci_avg_duration_seconds,
+            (SELECT conclusion FROM workflow_event WHERE repo_id = $1 AND status = 'completed' ORDER BY created_at DESC LIMIT 1) AS last_ci_conclusion`,
+        [repo.id]
+    );
+
     const snap: UpsertRepoSnapshotInput = {
         repo_id: repo.id,
         owner_login: ownerLogin,
@@ -401,9 +429,9 @@ async function buildAndUpsertRepoSnapshot(
         total_additions: totalAdditions,
         total_deletions: totalDeletions,
         contributor_count: contribStats.length,
-        ci_success_rate: 0, // Deferred: workflow ingestion not yet implemented
-        ci_avg_duration_seconds: 0,
-        last_ci_conclusion: null,
+        ci_success_rate: Number(ciStats?.ci_success_rate) || 0,
+        ci_avg_duration_seconds: ciStats?.ci_avg_duration_seconds ?? 0,
+        last_ci_conclusion: ciStats?.last_ci_conclusion ?? null,
         top_contributors: topContributors
     };
 
@@ -471,6 +499,8 @@ async function rebuildContributorSnapshots(ownerLogin: string): Promise<number> 
         first_commit_at: Date | null;
         last_commit_at: Date | null;
         active_days: number;
+        workflow_runs_triggered: number;
+        workflow_failure_rate: number;
     }>(
         `WITH commit_stats AS (
             SELECT
@@ -498,9 +528,19 @@ async function rebuildContributorSnapshots(ownerLogin: string): Promise<number> 
             WHERE rm.owner_login = $1 AND pe.author_login IS NOT NULL
             GROUP BY pe.author_login
         ),
+        workflow_stats AS (
+            SELECT
+                we.actor_login AS login,
+                COUNT(*)::INTEGER AS runs_triggered,
+                COALESCE(ROUND(COUNT(*) FILTER (WHERE we.conclusion IN ('failure','timed_out'))::NUMERIC / NULLIF(COUNT(*), 0) * 100, 1), 0)::NUMERIC AS failure_rate
+            FROM workflow_event we
+            JOIN repository_meta rm ON rm.id = we.repo_id
+            WHERE rm.owner_login = $1 AND we.actor_login IS NOT NULL AND we.status = 'completed'
+            GROUP BY we.actor_login
+        ),
         combined AS (
             SELECT
-                COALESCE(c.login, p.login) AS login,
+                COALESCE(c.login, p.login, w.login) AS login,
                 COALESCE(c.total_commits, 0) AS total_commits,
                 COALESCE(c.total_additions, 0) AS total_additions,
                 COALESCE(c.total_deletions, 0) AS total_deletions,
@@ -510,9 +550,12 @@ async function rebuildContributorSnapshots(ownerLogin: string): Promise<number> 
                 p.pr_repos,
                 c.first_commit_at,
                 c.last_commit_at,
-                COALESCE(c.active_days, 0) AS active_days
+                COALESCE(c.active_days, 0) AS active_days,
+                COALESCE(w.runs_triggered, 0) AS workflow_runs_triggered,
+                COALESCE(w.failure_rate, 0) AS workflow_failure_rate
             FROM commit_stats c
             FULL OUTER JOIN pr_stats p ON c.login = p.login
+            FULL OUTER JOIN workflow_stats w ON COALESCE(c.login, p.login) = w.login
         )
         SELECT
             combined.login,
@@ -531,7 +574,9 @@ async function rebuildContributorSnapshots(ownerLogin: string): Promise<number> 
             ) AS r)::INTEGER AS repo_count,
             combined.first_commit_at,
             combined.last_commit_at,
-            combined.active_days
+            combined.active_days,
+            combined.workflow_runs_triggered,
+            combined.workflow_failure_rate
         FROM combined
         LEFT JOIN contributor_profile cp ON cp.login = combined.login`,
         [ownerLogin]
@@ -551,8 +596,8 @@ async function rebuildContributorSnapshots(ownerLogin: string): Promise<number> 
             total_prs_merged: row.total_prs_merged,
             repos: row.repos ?? [],
             repo_count: row.repo_count,
-            workflow_runs_triggered: 0,
-            workflow_failure_rate: 0,
+            workflow_runs_triggered: row.workflow_runs_triggered,
+            workflow_failure_rate: Number(row.workflow_failure_rate) || 0,
             first_commit_at: row.first_commit_at,
             last_commit_at: row.last_commit_at,
             active_days: row.active_days
@@ -652,6 +697,22 @@ async function rebuildOwnerSnapshot(ownerLogin: string, repos: RepositoryMetaRow
         deletions: r.total_deletions
     }));
 
+    // Aggregate workflow stats from workflow_event across all repos
+    const [wfStats] = await query<{
+        total_runs: number;
+        success_rate: number;
+        avg_duration: number;
+    }>(
+        `SELECT
+            COUNT(*)::INTEGER AS total_runs,
+            COALESCE(ROUND(COUNT(*) FILTER (WHERE we.conclusion = 'success')::NUMERIC / NULLIF(COUNT(*), 0) * 100, 1), 0)::NUMERIC AS success_rate,
+            COALESCE(AVG(we.duration_seconds) FILTER (WHERE we.duration_seconds IS NOT NULL), 0)::INTEGER AS avg_duration
+         FROM workflow_event we
+         JOIN repository_meta rm ON rm.id = we.repo_id
+         WHERE rm.owner_login = $1 AND we.status = 'completed'`,
+        [ownerLogin]
+    );
+
     const snap: UpsertOwnerSnapshotInput = {
         owner_login: ownerLogin,
         total_repos: repos.length,
@@ -669,9 +730,9 @@ async function rebuildOwnerSnapshot(ownerLogin: string, repos: RepositoryMetaRow
         avg_commits_per_day: avgCommitsPerDay,
         top_contributors: topContributors,
         language_breakdown: languageBreakdown,
-        total_workflow_runs: 0, // Deferred: workflow ingestion
-        workflow_success_rate: 0,
-        avg_workflow_duration: 0
+        total_workflow_runs: wfStats?.total_runs ?? 0,
+        workflow_success_rate: Number(wfStats?.success_rate) || 0,
+        avg_workflow_duration: wfStats?.avg_duration ?? 0
     };
 
     await upsertOwnerSnapshot(snap);

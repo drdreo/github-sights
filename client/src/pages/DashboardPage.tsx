@@ -6,7 +6,7 @@ import { CommitTrends } from "../components/CommitTrends";
 import { DashboardHeader } from "../components/DashboardHeader";
 import { LanguageDistribution } from "../components/LanguageDistribution";
 import { StatCards } from "../components/StatCards";
-import { useCommitTimelines, useOwnerConfig, useStats, useSync } from "../hooks/useGitHub";
+import { useCommitTimelines, useOwnerConfig, useOwnerWorkflowStats, useStats, useSync } from "../hooks/useGitHub";
 import { useOwner } from "../hooks/useOwner";
 import { useSyncProgress } from "../hooks/useSyncProgress";
 
@@ -22,6 +22,7 @@ export default function DashboardPage() {
     const until = dateRange.endDate.toISOString();
 
     const { data: stats, isLoading: statsLoading } = useStats(owner, since, until);
+    const { data: workflowStats } = useOwnerWorkflowStats(owner);
     const { data: timelines, isLoading: timelinesLoading } = useCommitTimelines(
         owner,
         since,
@@ -56,6 +57,7 @@ export default function DashboardPage() {
                         owner={owner}
                         dateRangeLabel={`Last ${differenceInDays(dateRange.endDate, dateRange.startDate)} days`}
                         syncSince={ownerConfig?.syncSince ?? undefined}
+                        workflowStats={workflowStats}
                     />
                 </div>
 

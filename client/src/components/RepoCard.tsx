@@ -2,13 +2,15 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import {
+    CheckCircle2,
     Code,
     ExternalLink,
     GitBranch,
     GitCommit,
     GitFork,
     GitPullRequest,
-    Star
+    Star,
+    XCircle
 } from "lucide-react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import type { Repository } from "../types";
@@ -140,6 +142,24 @@ export function RepoCard({ repo, owner, totalCommits, snapshot }: RepoCardProps)
                             </span>
                         </div>
                     </IconTooltip>
+
+                    {snapshot && snapshot.ciAvgDurationSeconds > 0 && (
+                        <>
+                            <span className="mx-2 h-3 w-px bg-gray-800" />
+                            <IconTooltip
+                                label={`CI: ${snapshot.ciSuccessRate}% success · ~${Math.round(snapshot.ciAvgDurationSeconds / 60)}m avg`}
+                            >
+                                <div className="flex items-center gap-1">
+                                    {snapshot.lastCiConclusion === "success" ? (
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                                    ) : (
+                                        <XCircle className="w-3.5 h-3.5 text-red-400" />
+                                    )}
+                                    <span>{Math.round(snapshot.ciSuccessRate)}%</span>
+                                </div>
+                            </IconTooltip>
+                        </>
+                    )}
 
                     {repo.updated_at && (
                         <IconTooltip

@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { GitCommit, GitPullRequest, Users } from "lucide-react";
+import { GitCommit, GitPullRequest, Play, Users } from "lucide-react";
 import { CommitList } from "./CommitList";
 import { PullRequestList } from "./PullRequestList";
 import { ContributorGrid } from "./ContributorGrid";
-import type { Commit, PullRequest, RepoContributorStat } from "../types";
+import { WorkflowList } from "./WorkflowList";
+import type { Commit, PullRequest, RepoContributorStat, WorkflowRun, WorkflowStat } from "../types";
 
-type TabId = "commits" | "pulls" | "contributors";
+type TabId = "commits" | "pulls" | "contributors" | "workflows";
 
 interface TabButtonProps {
     id: TabId;
@@ -49,6 +50,10 @@ interface RepoTabsProps {
     pullsLoading: boolean;
     contributors: RepoContributorStat[] | undefined;
     contribLoading: boolean;
+    workflows: WorkflowRun[] | undefined;
+    workflowsLoading: boolean;
+    workflowStats: WorkflowStat[] | undefined;
+    workflowStatsLoading: boolean;
 }
 
 export function RepoTabs({
@@ -57,7 +62,11 @@ export function RepoTabs({
     pulls,
     pullsLoading,
     contributors,
-    contribLoading
+    contribLoading,
+    workflows,
+    workflowsLoading,
+    workflowStats,
+    workflowStatsLoading
 }: RepoTabsProps) {
     const [activeTab, setActiveTab] = useState<TabId>("commits");
 
@@ -88,6 +97,14 @@ export function RepoTabs({
                     activeTab={activeTab}
                     onClick={setActiveTab}
                 />
+                <TabButton
+                    id="workflows"
+                    label="Workflows"
+                    icon={Play}
+                    count={workflows?.length}
+                    activeTab={activeTab}
+                    onClick={setActiveTab}
+                />
             </div>
 
             <div>
@@ -97,6 +114,14 @@ export function RepoTabs({
                 {activeTab === "pulls" && <PullRequestList pulls={pulls} loading={pullsLoading} />}
                 {activeTab === "contributors" && (
                     <ContributorGrid contributors={contributors} loading={contribLoading} />
+                )}
+                {activeTab === "workflows" && (
+                    <WorkflowList
+                        workflows={workflows}
+                        workflowStats={workflowStats}
+                        loading={workflowsLoading}
+                        statsLoading={workflowStatsLoading}
+                    />
                 )}
             </div>
         </div>

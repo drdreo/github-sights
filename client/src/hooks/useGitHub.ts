@@ -232,3 +232,29 @@ export function useRepoContributorStats(owner: string, repo: string) {
         enabled: !!owner && !!repo
     });
 }
+
+// ── Workflows ────────────────────────────────────────────────────────────────
+
+export function useWorkflows(owner: string, repo: string) {
+    return useQuery({
+        queryKey: ["workflows", owner, repo],
+        queryFn: () => api.getWorkflows(owner, repo),
+        enabled: !!owner && !!repo
+    });
+}
+
+export function useWorkflowStats(owner: string, repo: string) {
+    return useQuery({
+        queryKey: ["workflow-stats", owner, repo],
+        queryFn: () => api.getWorkflowStats(owner, repo),
+        enabled: !!owner && !!repo
+    });
+}
+
+export function useOwnerWorkflowStats(owner: string) {
+    return useQuery({
+        queryKey: ["owner-workflow-stats", owner],
+        queryFn: () => api.getOwnerWorkflowStats(owner),
+        enabled: !!owner
+    });
+}
