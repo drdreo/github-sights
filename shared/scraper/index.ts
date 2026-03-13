@@ -93,7 +93,10 @@ export async function syncOwner(
     console.log(`[sync] Enqueued full_sync job #${job.id} for ${owner}`);
     const reached = await wakeCrawler();
     if (!reached) {
-        await recordJobError(job.id, "Crawler service is offline — sync will start when it comes back up");
+        await recordJobError(
+            job.id,
+            "Crawler service is offline — sync will start when it comes back up"
+        );
     }
     return { enqueued: true, jobId: job.id, alreadyRunning: false };
 }
@@ -116,7 +119,10 @@ export async function syncRepo(owner: string, repoName: string): Promise<Enqueue
     console.log(`[sync] Enqueued repo_sync job #${job.id} for ${owner}/${repoName}`);
     const reached = await wakeCrawler();
     if (!reached) {
-        await recordJobError(job.id, "Crawler service is offline — sync will start when it comes back up");
+        await recordJobError(
+            job.id,
+            "Crawler service is offline — sync will start when it comes back up"
+        );
     }
     return { enqueued: true, jobId: job.id, alreadyRunning: false };
 }

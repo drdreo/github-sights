@@ -1,21 +1,21 @@
 import { Hono } from "hono";
 import { requireConfig } from "../../shared/config.ts";
 import { errorResponse, notFound } from "../errors.ts";
-import { getReposByOwner, getRepoByName, getOwner } from "../../shared/db/queries/identity.ts";
+import { getOwner, getRepoByName, getReposByOwner } from "../../shared/db/queries/identity.ts";
 import {
     getCommitsByOwner,
     getCommitsByRepo,
-    getPrsByRepo,
     getContributorStatsByRepo,
+    getPrsByRepo,
     getWorkflowsByRepo,
-    getWorkflowStatsByRepo,
-    getWorkflowStatsByOwner
+    getWorkflowStatsByOwner,
+    getWorkflowStatsByRepo
 } from "../../shared/db/queries/events.ts";
 import {
     getContributorSnapshotsByRepo,
     getRepoSnapshotsByOwner
 } from "../../shared/db/queries/snapshots.ts";
-import { mapRepoRow, mapCommitRow, mapPrRow, mapContribSnapshotToContributor } from "../mappers.ts";
+import { mapCommitRow, mapContribSnapshotToContributor, mapPrRow, mapRepoRow } from "../mappers.ts";
 import type { RepositoryMetaRow } from "../../shared/db/index.ts";
 import { syncRepo } from "../../shared/scraper/index.ts";
 
@@ -64,13 +64,14 @@ repos.get("/api/repos/:owner/:repo", async (c) => {
         }
 
         const ownerRow = await getOwner(owner);
-        const ownerInfo = ownerRow
-            ? {
-                  login: ownerRow.login,
-                  avatar_url: ownerRow.avatar_url ?? "",
-                  html_url: ownerRow.html_url ?? `https://github.com/${ownerRow.login}`
-              }
-            : undefined;
+        if (!ownerRow) {
+            throw new Error(`Owner ${owner} not found`);
+        }
+        const ownerInfo = {
+            login: ownerRow.login,
+            avatar_url: ownerRow.avatar_url ?? "",
+            html_url: ownerRow.html_url ?? `https://github.com/${ownerRow.login}`
+        };
 
         return c.json(mapRepoRow(repoRow, ownerInfo));
     } catch (error) {

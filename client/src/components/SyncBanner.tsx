@@ -14,7 +14,7 @@ interface SyncBannerProps {
 export function SyncBanner({ owner }: SyncBannerProps) {
     const { data: progress } = useSyncProgress(owner);
 
-    if (!progress?.active && !(progress?.errors?.length)) return null;
+    if (!progress?.active && !progress?.errors?.length) return null;
 
     return <SyncProgressBar progress={progress} barWidth="w-24" />;
 }

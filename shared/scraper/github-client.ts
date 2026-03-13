@@ -674,9 +674,7 @@ export async function fetchWorkflowRuns(
         let totalCount = 0;
 
         // Build created filter for incremental sync
-        const createdFilter = options?.since
-            ? `>=${options.since.slice(0, 10)}`
-            : undefined;
+        const createdFilter = options?.since ? `>=${options.since.slice(0, 10)}` : undefined;
 
         // deno-lint-ignore no-explicit-any
         const iterator = octokit.paginate.iterator(octokit.rest.actions.listWorkflowRunsForRepo, {

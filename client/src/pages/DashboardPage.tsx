@@ -6,7 +6,13 @@ import { CommitTrends } from "../components/CommitTrends";
 import { DashboardHeader } from "../components/DashboardHeader";
 import { LanguageDistribution } from "../components/LanguageDistribution";
 import { StatCards } from "../components/StatCards";
-import { useCommitTimelines, useOwnerConfig, useOwnerWorkflowStats, useStats, useSync } from "../hooks/useGitHub";
+import {
+    useCommitTimelines,
+    useOwnerConfig,
+    useOwnerWorkflowStats,
+    useStats,
+    useSync
+} from "../hooks/useGitHub";
 import { useOwner } from "../hooks/useOwner";
 import { useSyncProgress } from "../hooks/useSyncProgress";
 

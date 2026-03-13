@@ -26,7 +26,12 @@ import {
     getRateLimitState,
     type GitHubRepo
 } from "./github-client.ts";
-import { ingestRepos, ingestCommitsForRepo, ingestPRsForRepo, ingestWorkflowsForRepo } from "./ingest.ts";
+import {
+    ingestRepos,
+    ingestCommitsForRepo,
+    ingestPRsForRepo,
+    ingestWorkflowsForRepo
+} from "./ingest.ts";
 import { aggregateOwner, aggregateRepo } from "./aggregate.ts";
 import { getRepoByName, updateOwnerSyncedAt } from "../db/queries/identity.ts";
 import { getSyncSince } from "../db/queries/config.ts";

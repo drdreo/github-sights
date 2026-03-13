@@ -4,16 +4,7 @@ import { format } from "date-fns";
 import { formatLoc } from "../lib/format";
 import { OverviewStats } from "../types";
 import { LoadingSkeleton } from "./LoadingSkeleton";
-import {
-    Activity,
-    Box,
-    Code,
-    Flame,
-    GitCommit,
-    GitPullRequest,
-    Timer,
-    Users
-} from "lucide-react";
+import { Activity, Box, Code, Flame, GitCommit, GitPullRequest, Timer, Users } from "lucide-react";
 import type { OwnerWorkflowStats } from "../types";
 
 interface StatCardDef {
@@ -35,7 +26,14 @@ interface StatCardsProps {
     workflowStats?: OwnerWorkflowStats;
 }
 
-export function StatCards({ stats, loading, owner, dateRangeLabel, syncSince, workflowStats }: StatCardsProps) {
+export function StatCards({
+    stats,
+    loading,
+    owner,
+    dateRangeLabel,
+    syncSince,
+    workflowStats
+}: StatCardsProps) {
     const navigate = useNavigate();
 
     if (loading || !stats) {
@@ -169,7 +167,9 @@ export function StatCards({ stats, loading, owner, dateRangeLabel, syncSince, wo
                 <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">
                     Activity{dateRangeLabel ? ` · ${dateRangeLabel}` : ""}
                 </h3>
-                <div className={`grid grid-cols-1 gap-6 ${activityCards.length > 3 ? "md:grid-cols-2 lg:grid-cols-4" : "md:grid-cols-3"}`}>
+                <div
+                    className={`grid grid-cols-1 gap-6 ${activityCards.length > 3 ? "md:grid-cols-2 lg:grid-cols-4" : "md:grid-cols-3"}`}
+                >
                     {activityCards.map(renderCard)}
                 </div>
             </div>

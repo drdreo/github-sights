@@ -86,9 +86,13 @@ export function WorkflowStatsPanel({ stats, loading }: WorkflowStatsPanelProps) 
                                 </p>
                                 <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
                                     <span>{stat.totalRuns} runs</span>
-                                    <span className="text-green-400">{stat.successCount} passed</span>
+                                    <span className="text-green-400">
+                                        {stat.successCount} passed
+                                    </span>
                                     {stat.failureCount > 0 && (
-                                        <span className="text-red-400">{stat.failureCount} failed</span>
+                                        <span className="text-red-400">
+                                            {stat.failureCount} failed
+                                        </span>
                                     )}
                                     {stat.cancelledCount > 0 && (
                                         <span className="text-yellow-400">
@@ -129,7 +133,12 @@ interface WorkflowListProps {
     statsLoading: boolean;
 }
 
-export function WorkflowList({ workflows, workflowStats, loading, statsLoading }: WorkflowListProps) {
+export function WorkflowList({
+    workflows,
+    workflowStats,
+    loading,
+    statsLoading
+}: WorkflowListProps) {
     if (loading) {
         return (
             <div className="p-6 space-y-4">

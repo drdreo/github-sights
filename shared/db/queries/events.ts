@@ -340,8 +340,16 @@ export async function getWorkflowStatsByOwner(ownerLogin: string): Promise<{
     total_duration_seconds: number;
     success_rate: number;
     avg_duration_seconds: number;
-    top_failing_workflows: Array<{ workflow_name: string; repo_name: string; failure_count: number }>;
-    top_contributors_by_minutes: Array<{ login: string; total_duration_seconds: number; run_count: number }>;
+    top_failing_workflows: Array<{
+        workflow_name: string;
+        repo_name: string;
+        failure_count: number;
+    }>;
+    top_contributors_by_minutes: Array<{
+        login: string;
+        total_duration_seconds: number;
+        run_count: number;
+    }>;
 }> {
     const [totals] = await query<{
         total_runs: number;
@@ -360,7 +368,11 @@ export async function getWorkflowStatsByOwner(ownerLogin: string): Promise<{
         [ownerLogin]
     );
 
-    const topFailing = await query<{ workflow_name: string; repo_name: string; failure_count: number }>(
+    const topFailing = await query<{
+        workflow_name: string;
+        repo_name: string;
+        failure_count: number;
+    }>(
         `SELECT
             COALESCE(we.workflow_name, 'Unknown') AS workflow_name,
             rm.name AS repo_name,
@@ -374,7 +386,11 @@ export async function getWorkflowStatsByOwner(ownerLogin: string): Promise<{
         [ownerLogin]
     );
 
-    const topContributors = await query<{ login: string; total_duration_seconds: number; run_count: number }>(
+    const topContributors = await query<{
+        login: string;
+        total_duration_seconds: number;
+        run_count: number;
+    }>(
         `SELECT
             we.actor_login AS login,
             COALESCE(SUM(we.duration_seconds), 0)::INTEGER AS total_duration_seconds,

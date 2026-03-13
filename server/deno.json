@@ -12,7 +12,7 @@
         "lib": ["deno.window"]
     },
     "deploy": {
-      "org": "drdreo",
-      "app": "github-sights"
+        "org": "drdreo",
+        "app": "github-sights"
     }
 }

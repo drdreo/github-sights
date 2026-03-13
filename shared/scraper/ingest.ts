@@ -387,10 +387,7 @@ export async function ingestWorkflowsForRepo(
     // Skip if workflows were synced recently
     const wfState = await getSyncState(owner, repoId, "workflows");
     const WF_STALE_MS = 6 * 60 * 60 * 1000; // 6 hours
-    if (
-        wfState?.last_synced_at &&
-        Date.now() - wfState.last_synced_at.getTime() < WF_STALE_MS
-    ) {
+    if (wfState?.last_synced_at && Date.now() - wfState.last_synced_at.getTime() < WF_STALE_MS) {
         const agoMin = Math.round((Date.now() - wfState.last_synced_at.getTime()) / 60_000);
         console.log(
             `[ingest] ${owner}/${repoName}: workflows synced ${agoMin}min ago, skipping (stale after 60min)`
