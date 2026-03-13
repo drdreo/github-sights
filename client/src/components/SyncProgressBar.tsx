@@ -46,9 +46,9 @@ export function SyncProgressBar({ progress, barWidth = "w-32" }: SyncProgressBar
         <div className="flex items-center gap-2 text-sm">
             <RefreshCw className="w-3.5 h-3.5 text-blue-400 animate-spin" />
             {status === "fetching_repos" && (
-                <span className="text-gray-400">Discovering repositories…</span>
+                <span className="text-gray-400">Finding repositories…</span>
             )}
-            {status === "aggregating" && <span className="text-gray-400">Building snapshots…</span>}
+            {status === "aggregating" && <span className="text-gray-400">Processing data…</span>}
             {status === "syncing_repos" && totalRepos && totalRepos > 0 ? (
                 <>
                     <div className={`${barWidth} h-1.5 bg-gray-800 rounded-full overflow-hidden`}>

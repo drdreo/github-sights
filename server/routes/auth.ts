@@ -223,7 +223,9 @@ auth.get("/api/auth/orgs", async (c) => {
         }
     });
 
-    console.log(`[auth] Fetching orgs for ${session.github_login} (github_id=${session.github_id})`);
+    console.log(
+        `[auth] Fetching orgs for ${session.github_login} (github_id=${session.github_id})`
+    );
 
     if (!orgsResponse.ok) {
         return c.json({ orgs: [] });

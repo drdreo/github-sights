@@ -26,7 +26,13 @@ import {
     getRateLimitState,
     type GitHubRepo
 } from "./github-client.ts";
-import { ingestRepos, ingestCommitsForRepo, ingestPRsForRepo } from "./ingest.ts";
+import {
+    ingestRepos,
+    ingestCommitsForRepo,
+    ingestPRsForRepo,
+    ingestWorkflowsForRepo,
+    ingestWorkflowJobsForRepo
+} from "./ingest.ts";
 import { aggregateOwner, aggregateRepo } from "./aggregate.ts";
 import { getRepoByName, updateOwnerSyncedAt } from "../db/queries/identity.ts";
 import { getSyncSince } from "../db/queries/config.ts";
@@ -235,16 +241,20 @@ async function phaseSyncRepos(
         // Process batch concurrently
         const results = await Promise.allSettled(
             batch.map(async ({ name, row, ghRepo }) => {
-                const [commits, prs] = await Promise.all([
+                const [commits, prs, workflows] = await Promise.all([
                     ingestCommitsForRepo(octokit, job.owner_login, ghRepo, {
                         since: job.since_date ?? undefined,
                         until: job.until_date ?? undefined,
                         desiredSince
                     }),
-                    ingestPRsForRepo(octokit, job.owner_login, ghRepo)
+                    ingestPRsForRepo(octokit, job.owner_login, ghRepo),
+                    ingestWorkflowsForRepo(octokit, job.owner_login, ghRepo)
                 ]);
 
-                const events = commits.inserted + prs.upserted;
+                // Backfill jobs/steps for unfetched runs (budget-capped)
+                await ingestWorkflowJobsForRepo(octokit, job.owner_login, ghRepo);
+
+                const events = commits.inserted + prs.upserted + workflows.inserted;
 
                 // Progressive per-repo aggregation
                 if (events > 0) {
@@ -357,15 +367,21 @@ async function processRepoSync(job: SyncJobRow, octokit: Octokit): Promise<void>
 
     let commitCount = 0;
     let prCount = 0;
+    let workflowCount = 0;
     const errors: string[] = [];
 
     try {
-        const [commits, prs] = await Promise.all([
+        const [commits, prs, workflows] = await Promise.all([
             ingestCommitsForRepo(octokit, job.owner_login, ghRepo),
-            ingestPRsForRepo(octokit, job.owner_login, ghRepo)
+            ingestPRsForRepo(octokit, job.owner_login, ghRepo),
+            ingestWorkflowsForRepo(octokit, job.owner_login, ghRepo)
         ]);
         commitCount = commits.inserted;
         prCount = prs.upserted;
+        workflowCount = workflows.inserted;
+
+        // Backfill jobs/steps for unfetched runs (budget-capped)
+        await ingestWorkflowJobsForRepo(octokit, job.owner_login, ghRepo);
     } catch (err) {
         errors.push(String(err));
     }
@@ -381,11 +397,12 @@ async function processRepoSync(job: SyncJobRow, octokit: Octokit): Promise<void>
         repo: repoName,
         commits: commitCount,
         prs: prCount,
+        workflows: workflowCount,
         errors
     });
 
     console.log(
-        `[queue] Job #${job.id}: repo sync complete (${commitCount} commits, ${prCount} PRs)`
+        `[queue] Job #${job.id}: repo sync complete (${commitCount} commits, ${prCount} PRs, ${workflowCount} workflows)`
     );
 }
 

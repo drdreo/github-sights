@@ -1,18 +1,21 @@
 import { Hono } from "hono";
 import { requireConfig } from "../../shared/config.ts";
 import { errorResponse, notFound } from "../errors.ts";
-import { getReposByOwner, getRepoByName, getOwner } from "../../shared/db/queries/identity.ts";
+import { getOwner, getRepoByName, getReposByOwner } from "../../shared/db/queries/identity.ts";
 import {
     getCommitsByOwner,
     getCommitsByRepo,
+    getContributorStatsByRepo,
     getPrsByRepo,
-    getContributorStatsByRepo
+    getWorkflowsByRepo,
+    getWorkflowStatsByOwner,
+    getWorkflowStatsByRepo
 } from "../../shared/db/queries/events.ts";
 import {
     getContributorSnapshotsByRepo,
     getRepoSnapshotsByOwner
 } from "../../shared/db/queries/snapshots.ts";
-import { mapRepoRow, mapCommitRow, mapPrRow, mapContribSnapshotToContributor } from "../mappers.ts";
+import { mapCommitRow, mapContribSnapshotToContributor, mapPrRow, mapRepoRow } from "../mappers.ts";
 import type { RepositoryMetaRow } from "../../shared/db/index.ts";
 import { syncRepo } from "../../shared/scraper/index.ts";
 
@@ -61,13 +64,14 @@ repos.get("/api/repos/:owner/:repo", async (c) => {
         }
 
         const ownerRow = await getOwner(owner);
-        const ownerInfo = ownerRow
-            ? {
-                  login: ownerRow.login,
-                  avatar_url: ownerRow.avatar_url ?? "",
-                  html_url: ownerRow.html_url ?? `https://github.com/${ownerRow.login}`
-              }
-            : undefined;
+        if (!ownerRow) {
+            throw new Error(`Owner ${owner} not found`);
+        }
+        const ownerInfo = {
+            login: ownerRow.login,
+            avatar_url: ownerRow.avatar_url ?? "",
+            html_url: ownerRow.html_url ?? `https://github.com/${ownerRow.login}`
+        };
 
         return c.json(mapRepoRow(repoRow, ownerInfo));
     } catch (error) {
@@ -215,7 +219,7 @@ repos.get("/api/repos/:owner/:repo/contributor-stats", async (c) => {
     }
 });
 
-// ── GET /api/repo-snapshots/:owner — Bulk repo snapshots (PRs, LoC) ─────────
+// ── GET /api/repo-snapshots/:owner — Bulk repo snapshots (PRs, LoC, CI) ─────
 
 repos.get("/api/repo-snapshots/:owner", async (c) => {
     try {
@@ -229,9 +233,103 @@ repos.get("/api/repo-snapshots/:owner", async (c) => {
             openPRs: r.open_prs,
             mergedPRs: r.merged_prs,
             totalAdditions: r.total_additions,
-            totalDeletions: r.total_deletions
+            totalDeletions: r.total_deletions,
+            ciSuccessRate: r.ci_success_rate,
+            ciAvgDurationSeconds: r.ci_avg_duration_seconds,
+            lastCiConclusion: r.last_ci_conclusion
         }));
         return c.json(data);
+    } catch (error) {
+        return errorResponse(c, error);
+    }
+});
+
+// ── GET /api/repos/:owner/:repo/workflows — Workflow runs list ──────────────
+
+repos.get("/api/repos/:owner/:repo/workflows", async (c) => {
+    try {
+        const { owner, repo } = c.req.param();
+        requireConfig(owner);
+
+        const repoRow = await getRepoByName(owner, repo);
+        if (!repoRow) throw notFound("Repository", `${owner}/${repo}`);
+
+        const limit = parseInt(c.req.query("limit") || "100", 10);
+        const offset = parseInt(c.req.query("offset") || "0", 10);
+
+        const rows = await getWorkflowsByRepo(repoRow.id, { limit, offset });
+        const data = rows.map((r) => ({
+            id: r.id,
+            workflowName: r.workflow_name,
+            workflowPath: r.workflow_path,
+            actorLogin: r.actor_login,
+            runNumber: r.run_number,
+            status: r.status,
+            conclusion: r.conclusion,
+            headBranch: r.head_branch,
+            displayTitle: r.display_title,
+            durationSeconds: r.duration_seconds,
+            createdAt: r.created_at.toISOString()
+        }));
+        return c.json(data);
+    } catch (error) {
+        return errorResponse(c, error);
+    }
+});
+
+// ── GET /api/repos/:owner/:repo/workflow-stats — Per-workflow breakdown ──────
+
+repos.get("/api/repos/:owner/:repo/workflow-stats", async (c) => {
+    try {
+        const { owner, repo } = c.req.param();
+        requireConfig(owner);
+
+        const repoRow = await getRepoByName(owner, repo);
+        if (!repoRow) throw notFound("Repository", `${owner}/${repo}`);
+
+        const stats = await getWorkflowStatsByRepo(repoRow.id);
+        const data = stats.map((s) => ({
+            workflowName: s.workflow_name,
+            workflowPath: s.workflow_path,
+            totalRuns: s.total_runs,
+            successCount: s.success_count,
+            failureCount: s.failure_count,
+            cancelledCount: s.cancelled_count,
+            avgDurationSeconds: s.avg_duration_seconds,
+            totalDurationSeconds: s.total_duration_seconds,
+            successRate: Number(s.success_rate)
+        }));
+        return c.json(data);
+    } catch (error) {
+        return errorResponse(c, error);
+    }
+});
+
+// ── GET /api/workflow-stats/:owner — Owner-wide workflow stats ───────────────
+
+repos.get("/api/workflow-stats/:owner", async (c) => {
+    try {
+        const { owner } = c.req.param();
+        requireConfig(owner);
+
+        const stats = await getWorkflowStatsByOwner(owner);
+        return c.json({
+            totalRuns: stats.total_runs,
+            totalDurationSeconds: stats.total_duration_seconds,
+            totalMinutes: Math.round(stats.total_duration_seconds / 60),
+            successRate: stats.success_rate,
+            avgDurationSeconds: stats.avg_duration_seconds,
+            topFailingWorkflows: stats.top_failing_workflows.map((w) => ({
+                workflowName: w.workflow_name,
+                repoName: w.repo_name,
+                failureCount: w.failure_count
+            })),
+            topContributorsByMinutes: stats.top_contributors_by_minutes.map((c) => ({
+                login: c.login,
+                totalMinutes: Math.round(c.total_duration_seconds / 60),
+                runCount: c.run_count
+            }))
+        });
     } catch (error) {
         return errorResponse(c, error);
     }

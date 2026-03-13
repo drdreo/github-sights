@@ -86,6 +86,44 @@ export interface OverviewStats {
     languageBreakdown: { language: string; count: number; color: string }[];
 }
 
+// ── Workflow Types ────────────────────────────────────────────────────────────
+
+export interface WorkflowRun {
+    id: number;
+    workflowName: string | null;
+    workflowPath: string | null;
+    actorLogin: string | null;
+    runNumber: number | null;
+    status: string | null;
+    conclusion: string | null;
+    headBranch: string | null;
+    displayTitle: string | null;
+    durationSeconds: number | null;
+    createdAt: string;
+}
+
+export interface WorkflowStat {
+    workflowName: string;
+    workflowPath: string | null;
+    totalRuns: number;
+    successCount: number;
+    failureCount: number;
+    cancelledCount: number;
+    avgDurationSeconds: number;
+    totalDurationSeconds: number;
+    successRate: number;
+}
+
+export interface OwnerWorkflowStats {
+    totalRuns: number;
+    totalDurationSeconds: number;
+    totalMinutes: number;
+    successRate: number;
+    avgDurationSeconds: number;
+    topFailingWorkflows: { workflowName: string; repoName: string; failureCount: number }[];
+    topContributorsByMinutes: { login: string; totalMinutes: number; runCount: number }[];
+}
+
 /** Raw weekly stats from GitHub's /repos/{owner}/{repo}/stats/contributors endpoint. */
 export interface ContributorWeekStat {
     w: number; // unix timestamp (start of week)

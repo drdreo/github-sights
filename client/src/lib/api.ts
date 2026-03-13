@@ -7,7 +7,10 @@ import {
     Commit,
     PullRequest,
     Contributor,
-    RepoContributorStat
+    RepoContributorStat,
+    WorkflowRun,
+    WorkflowStat,
+    OwnerWorkflowStats
 } from "../types";
 export interface CachedResponse<T> {
     data: T;
@@ -99,6 +102,9 @@ export const api = {
                 mergedPRs: number;
                 totalAdditions: number;
                 totalDeletions: number;
+                ciSuccessRate: number;
+                ciAvgDurationSeconds: number;
+                lastCiConclusion: string | null;
             }[]
         >(`/repo-snapshots/${encodeURIComponent(owner)}`),
 
@@ -163,6 +169,17 @@ export const api = {
         return fetchApi<OverviewStats>(`/stats/${owner}${qs ? `?${qs}` : ""}`);
     },
 
+    getWorkflows: (owner: string, repo: string, limit = 100, offset = 0) =>
+        fetchApi<WorkflowRun[]>(
+            `/repos/${owner}/${repo}/workflows?limit=${limit}&offset=${offset}`
+        ),
+
+    getWorkflowStats: (owner: string, repo: string) =>
+        fetchApi<WorkflowStat[]>(`/repos/${owner}/${repo}/workflow-stats`),
+
+    getOwnerWorkflowStats: (owner: string) =>
+        fetchApi<OwnerWorkflowStats>(`/workflow-stats/${encodeURIComponent(owner)}`),
+
     /** Trigger sync — ensures data freshness (debounced to hourly).
      *  Pass `since` for explicit backfill syncs. */
     sync: (owner: string, since?: string) => {
@@ -194,8 +211,7 @@ export const api = {
             user?: { login: string; avatar_url: string; github_id: number };
         }>("/auth/me"),
 
-    getMyOrgs: () =>
-        fetchApi<{ orgs: { login: string; avatar_url: string }[] }>("/auth/orgs"),
+    getMyOrgs: () => fetchApi<{ orgs: { login: string; avatar_url: string }[] }>("/auth/orgs"),
 
     logout: () => fetchApi<void>("/auth/logout", { method: "POST" })
 };

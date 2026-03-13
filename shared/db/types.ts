@@ -118,6 +118,7 @@ export interface WorkflowEventRow {
         | null;
     head_branch: string | null;
     head_sha: string | null;
+    display_title: string | null;
     duration_seconds: number | null;
     created_at: Date;
     ingested_at: Date;

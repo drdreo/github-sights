@@ -40,7 +40,7 @@ interface AccountOption {
 function AccountPicker({
     selected,
     onSelect,
-    onCustom,
+    onCustom
 }: {
     selected: { owner: string; ownerType: "user" | "org" } | null;
     onSelect: (owner: string, ownerType: "user" | "org") => void;
@@ -67,7 +67,8 @@ function AccountPicker({
             </p>
             <div className="space-y-1.5">
                 {accounts.map((account) => {
-                    const isSelected = selected?.owner === account.login && selected?.ownerType === account.type;
+                    const isSelected =
+                        selected?.owner === account.login && selected?.ownerType === account.type;
                     return (
                         <button
                             key={`${account.type}:${account.login}`}
@@ -76,9 +77,10 @@ function AccountPicker({
                             className={`
                                 w-full flex items-center gap-3 p-3 rounded-xl border transition-colors duration-200
                                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/70 focus-visible:ring-offset-1 focus-visible:ring-offset-gray-900
-                                ${isSelected
-                                    ? "bg-blue-600/10 border-blue-500/50 ring-1 ring-blue-500/30"
-                                    : "bg-gray-800 border-gray-700 hover:border-gray-600 hover:bg-gray-800/80"
+                                ${
+                                    isSelected
+                                        ? "bg-blue-600/10 border-blue-500/50 ring-1 ring-blue-500/30"
+                                        : "bg-gray-800 border-gray-700 hover:border-gray-600 hover:bg-gray-800/80"
                                 }
                             `}
                         >
@@ -88,21 +90,25 @@ function AccountPicker({
                                 className="w-8 h-8 rounded-full ring-1 ring-gray-700 bg-gray-700"
                             />
                             <div className="text-left min-w-0">
-                                <p className={`text-sm font-medium truncate ${isSelected ? "text-blue-300" : "text-gray-100"}`}>
+                                <p
+                                    className={`text-sm font-medium truncate ${isSelected ? "text-blue-300" : "text-gray-100"}`}
+                                >
                                     {account.login}
                                 </p>
                             </div>
                             <div className="ml-auto flex items-center gap-2">
                                 <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400 flex items-center gap-1">
                                     {account.type === "user" ? (
-                                        <><User className="w-3 h-3" /> User</>
+                                        <>
+                                            <User className="w-3 h-3" /> User
+                                        </>
                                     ) : (
-                                        <><Building2 className="w-3 h-3" /> Org</>
+                                        <>
+                                            <Building2 className="w-3 h-3" /> Org
+                                        </>
                                     )}
                                 </span>
-                                {isSelected && (
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                                )}
+                                {isSelected && <div className="w-2 h-2 bg-blue-500 rounded-full" />}
                             </div>
                         </button>
                     );
@@ -135,7 +141,7 @@ function CustomOwnerInput({
     ownerType,
     onOwnerChange,
     onOwnerTypeChange,
-    onBack,
+    onBack
 }: {
     owner: string;
     ownerType: "user" | "org";
@@ -173,23 +179,22 @@ function CustomOwnerInput({
 
             {/* Owner Type */}
             <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-300">
-                    Owner Type
-                </label>
+                <label className="block text-sm font-medium text-gray-300">Owner Type</label>
                 <div className="grid grid-cols-2 gap-2 p-1 bg-gray-800 rounded-xl border border-gray-700">
-                    {([
+                    {[
                         { type: "user" as const, label: "User", icon: User },
-                        { type: "org" as const, label: "Organization", icon: Building2 },
-                    ]).map(({ type, label, icon: Icon }) => (
+                        { type: "org" as const, label: "Organization", icon: Building2 }
+                    ].map(({ type, label, icon: Icon }) => (
                         <button
                             key={type}
                             type="button"
                             onClick={() => onOwnerTypeChange(type)}
                             className={`
                                 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200
-                                ${ownerType === type
-                                    ? "bg-gray-700 text-gray-100 shadow-sm ring-1 ring-gray-600"
-                                    : "text-gray-400 hover:text-gray-200 hover:bg-gray-700"
+                                ${
+                                    ownerType === type
+                                        ? "bg-gray-700 text-gray-100 shadow-sm ring-1 ring-gray-600"
+                                        : "text-gray-400 hover:text-gray-200 hover:bg-gray-700"
                                 }
                             `}
                         >
@@ -237,7 +242,7 @@ function ConfigureStep() {
             navigate(`/${owner}/dashboard?syncSince=${syncSince}`);
         } catch (err) {
             console.error("Setup failed:", err);
-            setError("Failed to save configuration. Please try again.");
+            setError("Something went wrong saving your setup. Check your connection and try again.");
         }
     };
 
@@ -251,9 +256,7 @@ function ConfigureStep() {
                     className="w-9 h-9 rounded-full ring-2 ring-gray-700 bg-gray-700"
                 />
                 <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-100 truncate">
-                        {user!.login}
-                    </p>
+                    <p className="text-sm font-medium text-gray-100 truncate">{user!.login}</p>
                     <p className="text-xs text-gray-400">Connected via GitHub</p>
                 </div>
                 <div className="ml-auto w-2 h-2 bg-green-500 rounded-full shrink-0" />
@@ -293,8 +296,7 @@ function ConfigureStep() {
                     className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-gray-100 focus:bg-gray-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 outline-none transition-all duration-200"
                 />
                 <p className="text-xs text-gray-500">
-                    How far back to crawl commit and PR history. Older dates use
-                    more API budget.
+                    How far back to sync commit and PR history. Older dates take longer to sync.
                 </p>
             </div>
 
@@ -312,7 +314,7 @@ function ConfigureStep() {
                 {setConfig.isPending ? (
                     <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        Connecting...
+                        Saving...
                     </>
                 ) : (
                     <>
@@ -376,14 +378,11 @@ export default function SetupPage() {
 
             {/* Footer Links */}
             <div className="mt-8 flex gap-6 text-sm text-gray-500">
-                <a href="#" className="hover:text-gray-300 transition-colors">
-                    Documentation
+                <a href="https://github.com/drdreo/github-sights" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">
+                    Source
                 </a>
-                <a href="#" className="hover:text-gray-300 transition-colors">
+                <a href="https://github.com/drdreo/github-sights/issues" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">
                     Support
-                </a>
-                <a href="#" className="hover:text-gray-300 transition-colors">
-                    Privacy
                 </a>
             </div>
         </div>
