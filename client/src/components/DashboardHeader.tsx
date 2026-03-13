@@ -47,7 +47,7 @@ export function DashboardHeader({
                     {owner}
                     <span className="text-gray-500 font-normal text-xl">/ Dashboard</span>
                 </h1>
-                {isSyncing && syncProgress ? (
+                {syncProgress && (isSyncing || syncProgress.errors?.length) ? (
                     <div className="mt-1">
                         <SyncProgressBar progress={syncProgress} />
                     </div>
