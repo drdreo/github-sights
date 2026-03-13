@@ -60,8 +60,11 @@ function AccountPicker({
     return (
         <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-300">
-                Choose an account to sync
+                Which owner do you want to sync?
             </label>
+            <p className="text-xs text-gray-500">
+                Pick a user or organization — we'll sync only its repositories.
+            </p>
             <div className="space-y-1.5">
                 {accounts.map((account) => {
                     const isSelected = selected?.owner === account.login && selected?.ownerType === account.type;
@@ -153,25 +156,25 @@ function CustomOwnerInput({
                 <span className="text-sm text-gray-500">Enter any GitHub user or organization</span>
             </div>
 
-            {/* Owner Name */}
+            {/* Owner */}
             <div className="space-y-2 group">
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-300 group-focus-within:text-blue-400 transition-colors">
-                    Owner Name
+                    Owner
                 </label>
                 <input
                     type="text"
                     value={owner}
                     onChange={(e) => onOwnerChange(e.target.value)}
-                    placeholder="e.g. vercel"
+                    placeholder="e.g. ThePrimeagen"
                     autoFocus
                     className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-gray-100 placeholder:text-gray-500 focus:bg-gray-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 outline-none transition-all duration-200"
                 />
             </div>
 
-            {/* Account Type */}
+            {/* Owner Type */}
             <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-300">
-                    Account Type
+                    Owner Type
                 </label>
                 <div className="grid grid-cols-2 gap-2 p-1 bg-gray-800 rounded-xl border border-gray-700">
                     {([
@@ -224,7 +227,7 @@ function ConfigureStep() {
         setError(null);
 
         if (!owner.trim()) {
-            setError("Please select an account or enter a name");
+            setError("Please select an owner or enter a name");
             return;
         }
 
@@ -313,7 +316,7 @@ function ConfigureStep() {
                     </>
                 ) : (
                     <>
-                        Start Syncing
+                        {owner ? `Sync ${owner}'s repos` : "Start Syncing"}
                         <ArrowRight className="w-4 h-4" />
                     </>
                 )}
