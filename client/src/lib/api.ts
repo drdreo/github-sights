@@ -194,5 +194,8 @@ export const api = {
             user?: { login: string; avatar_url: string; github_id: number };
         }>("/auth/me"),
 
+    getMyOrgs: () =>
+        fetchApi<{ orgs: { login: string; avatar_url: string }[] }>("/auth/orgs"),
+
     logout: () => fetchApi<void>("/auth/logout", { method: "POST" })
 };
