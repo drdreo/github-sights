@@ -55,7 +55,7 @@ auth.get("/api/auth/github", (c) => {
     const params = new URLSearchParams({
         client_id: clientId,
         redirect_uri: `${appUrl}/api/auth/callback`,
-        scope: "read:user repo",
+        scope: "read:user read:org repo",
         state
     });
 
@@ -199,6 +199,40 @@ auth.get("/api/auth/me", async (c) => {
             avatar_url: session.avatar_url,
             github_id: session.github_id
         }
+    });
+});
+
+// ── GET /api/auth/orgs — Return authenticated user's GitHub organizations ─────
+
+auth.get("/api/auth/orgs", async (c) => {
+    const sessionId = getCookie(c, COOKIE_SESSION);
+    if (!sessionId) {
+        return c.json({ orgs: [] });
+    }
+
+    const session = await getSession(sessionId);
+    if (!session) {
+        return c.json({ orgs: [] });
+    }
+
+    const orgsResponse = await fetch("https://api.github.com/user/orgs", {
+        headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            Accept: "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28"
+        }
+    });
+
+    console.log(`[auth] Fetching orgs for ${session.github_login} (github_id=${session.github_id})`);
+
+    if (!orgsResponse.ok) {
+        return c.json({ orgs: [] });
+    }
+
+    const orgsData = (await orgsResponse.json()) as Array<{ login: string; avatar_url: string }>;
+
+    return c.json({
+        orgs: orgsData.map(({ login, avatar_url }) => ({ login, avatar_url }))
     });
 });
 

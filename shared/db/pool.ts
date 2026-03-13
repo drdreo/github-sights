@@ -36,6 +36,8 @@ export async function initPool(): Promise<boolean> {
         return false;
     }
 
+    const dbName = new URL(connectionString).pathname.slice(1) || "unknown";
+    console.log(`[db] connecting to database: ${dbName}`);
     pool = new Pool({
         connectionString,
         max: 3,

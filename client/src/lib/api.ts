@@ -31,6 +31,7 @@ export interface SyncProgressResponse {
     totalEvents?: number;
     elapsedMs?: number;
     lastSyncedAt?: string | null;
+    errors?: string[];
 }
 
 export const API_BASE = `${import.meta.env.VITE_API_BASE_URL ?? ""}/api`;
@@ -187,8 +188,7 @@ export const api = {
         const qs = params.toString();
         return fetchApi<{
             triggered?: boolean;
-            synced?: number;
-            repos?: string[];
+            enqueued?: boolean;
             errors?: string[];
         }>(`/sync/${encodeURIComponent(owner)}${qs ? `?${qs}` : ""}`, { method: "POST" });
     },
@@ -210,6 +210,9 @@ export const api = {
             authenticated: boolean;
             user?: { login: string; avatar_url: string; github_id: number };
         }>("/auth/me"),
+
+    getMyOrgs: () =>
+        fetchApi<{ orgs: { login: string; avatar_url: string }[] }>("/auth/orgs"),
 
     logout: () => fetchApi<void>("/auth/logout", { method: "POST" })
 };

@@ -10,5 +10,9 @@
     },
     "compilerOptions": {
         "lib": ["deno.window"]
+    },
+    "deploy": {
+      "org": "drdreo",
+      "app": "github-sights"
     }
 }

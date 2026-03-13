@@ -9,6 +9,7 @@ import {
     getActiveJob,
     getLatestJob,
     cancelJob,
+    recordJobError,
     type SyncJobRow
 } from "../db/queries/sync-jobs.ts";
 
@@ -19,18 +20,20 @@ const CRAWLER_URL = Deno.env.get("CRAWLER_URL") || "http://localhost:3002";
 
 /**
  * Wake the crawler service so it starts draining the job queue.
- * Fire-and-forget — failures are logged but never block the caller.
+ * Returns true if the crawler was successfully reached, false otherwise.
  */
-async function wakeCrawler(): Promise<void> {
+async function wakeCrawler(): Promise<boolean> {
     try {
         const res = await fetch(`${CRAWLER_URL}/wake`, { method: "POST" });
         if (!res.ok) {
             console.warn(`[sync] Failed to wake crawler: ${res.status}`);
-        } else {
-            console.log("[sync] Crawler woken");
+            return false;
         }
+        console.log("[sync] Crawler woken");
+        return true;
     } catch (err) {
         console.warn("[sync] Could not reach crawler:", err);
+        return false;
     }
 }
 
@@ -88,7 +91,10 @@ export async function syncOwner(
     }
 
     console.log(`[sync] Enqueued full_sync job #${job.id} for ${owner}`);
-    wakeCrawler();
+    const reached = await wakeCrawler();
+    if (!reached) {
+        await recordJobError(job.id, "Crawler service is offline — sync will start when it comes back up");
+    }
     return { enqueued: true, jobId: job.id, alreadyRunning: false };
 }
 
@@ -108,7 +114,10 @@ export async function syncRepo(owner: string, repoName: string): Promise<Enqueue
     }
 
     console.log(`[sync] Enqueued repo_sync job #${job.id} for ${owner}/${repoName}`);
-    wakeCrawler();
+    const reached = await wakeCrawler();
+    if (!reached) {
+        await recordJobError(job.id, "Crawler service is offline — sync will start when it comes back up");
+    }
     return { enqueued: true, jobId: job.id, alreadyRunning: false };
 }
 
