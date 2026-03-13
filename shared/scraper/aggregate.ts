@@ -43,6 +43,28 @@ function toDateString(d: Date): string {
     return d.toISOString().split("T")[0];
 }
 
+/** Fetch CI stats (success rate, avg duration, last conclusion) for a repo. */
+async function getCiStatsByRepo(
+    repoId: number
+): Promise<{ ci_success_rate: number; ci_avg_duration_seconds: number; last_ci_conclusion: string | null }> {
+    const [row] = await query<{
+        ci_success_rate: number;
+        ci_avg_duration_seconds: number;
+        last_ci_conclusion: string | null;
+    }>(
+        `SELECT
+            COALESCE((SELECT ROUND(COUNT(*) FILTER (WHERE conclusion = 'success')::NUMERIC / NULLIF(COUNT(*), 0) * 100, 1) FROM workflow_event WHERE repo_id = $1 AND status = 'completed'), 0)::NUMERIC AS ci_success_rate,
+            COALESCE((SELECT AVG(duration_seconds)::INTEGER FROM workflow_event WHERE repo_id = $1 AND status = 'completed' AND duration_seconds IS NOT NULL), 0) AS ci_avg_duration_seconds,
+            (SELECT conclusion FROM workflow_event WHERE repo_id = $1 AND status = 'completed' ORDER BY created_at DESC LIMIT 1) AS last_ci_conclusion`,
+        [repoId]
+    );
+    return {
+        ci_success_rate: Number(row?.ci_success_rate) || 0,
+        ci_avg_duration_seconds: row?.ci_avg_duration_seconds ?? 0,
+        last_ci_conclusion: row?.last_ci_conclusion ?? null
+    };
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────────
 
 export interface AggregateResult {
@@ -230,32 +252,27 @@ async function rebuildRepoDailyActivitySQL(ownerLogin: string, repoId: number): 
  */
 async function rebuildRepoSnapshotSQL(ownerLogin: string, repo: RepositoryMetaRow): Promise<void> {
     // Get aggregate stats from SQL
-    const [stats] = await query<{
-        total_commits: number;
-        total_prs: number;
-        open_prs: number;
-        merged_prs: number;
-        total_additions: number;
-        total_deletions: number;
-        ci_success_rate: number;
-        ci_avg_duration_seconds: number;
-        last_ci_conclusion: string | null;
-    }>(
-        `SELECT
-            (SELECT COUNT(*)::INTEGER FROM commit_event WHERE repo_id = $1) AS total_commits,
-            (SELECT COUNT(*)::INTEGER FROM pr_event WHERE repo_id = $1) AS total_prs,
-            (SELECT COUNT(*)::INTEGER FROM pr_event WHERE repo_id = $1 AND state = 'open') AS open_prs,
-            (SELECT COUNT(*)::INTEGER FROM pr_event WHERE repo_id = $1 AND merged_at IS NOT NULL) AS merged_prs,
-            COALESCE((SELECT SUM(additions)::INTEGER FROM commit_event WHERE repo_id = $1 AND is_merge = false), 0) AS total_additions,
-            COALESCE((SELECT SUM(deletions)::INTEGER FROM commit_event WHERE repo_id = $1 AND is_merge = false), 0) AS total_deletions,
-            COALESCE((SELECT ROUND(COUNT(*) FILTER (WHERE conclusion = 'success')::NUMERIC / NULLIF(COUNT(*), 0) * 100, 1) FROM workflow_event WHERE repo_id = $1 AND status = 'completed'), 0)::NUMERIC AS ci_success_rate,
-            COALESCE((SELECT AVG(duration_seconds)::INTEGER FROM workflow_event WHERE repo_id = $1 AND status = 'completed' AND duration_seconds IS NOT NULL), 0) AS ci_avg_duration_seconds,
-            (SELECT conclusion FROM workflow_event WHERE repo_id = $1 AND status = 'completed' ORDER BY created_at DESC LIMIT 1) AS last_ci_conclusion`,
-        [repo.id]
-    );
-
-    // Get contributor stats (already SQL-based)
-    const contribStats = await getContributorStatsByRepo(repo.id);
+    const [[stats], ciStats, contribStats] = await Promise.all([
+        query<{
+            total_commits: number;
+            total_prs: number;
+            open_prs: number;
+            merged_prs: number;
+            total_additions: number;
+            total_deletions: number;
+        }>(
+            `SELECT
+                (SELECT COUNT(*)::INTEGER FROM commit_event WHERE repo_id = $1) AS total_commits,
+                (SELECT COUNT(*)::INTEGER FROM pr_event WHERE repo_id = $1) AS total_prs,
+                (SELECT COUNT(*)::INTEGER FROM pr_event WHERE repo_id = $1 AND state = 'open') AS open_prs,
+                (SELECT COUNT(*)::INTEGER FROM pr_event WHERE repo_id = $1 AND merged_at IS NOT NULL) AS merged_prs,
+                COALESCE((SELECT SUM(additions)::INTEGER FROM commit_event WHERE repo_id = $1 AND is_merge = false), 0) AS total_additions,
+                COALESCE((SELECT SUM(deletions)::INTEGER FROM commit_event WHERE repo_id = $1 AND is_merge = false), 0) AS total_deletions`,
+            [repo.id]
+        ),
+        getCiStatsByRepo(repo.id),
+        getContributorStatsByRepo(repo.id)
+    ]);
 
     const topContributors: SnapshotContributor[] = contribStats.slice(0, 10).map((cs) => ({
         login: cs.login,
@@ -283,9 +300,9 @@ async function rebuildRepoSnapshotSQL(ownerLogin: string, repo: RepositoryMetaRo
         total_additions: stats.total_additions,
         total_deletions: stats.total_deletions,
         contributor_count: contribStats.length,
-        ci_success_rate: Number(stats.ci_success_rate) || 0,
-        ci_avg_duration_seconds: stats.ci_avg_duration_seconds,
-        last_ci_conclusion: stats.last_ci_conclusion,
+        ci_success_rate: ciStats.ci_success_rate,
+        ci_avg_duration_seconds: ciStats.ci_avg_duration_seconds,
+        last_ci_conclusion: ciStats.last_ci_conclusion,
         top_contributors: topContributors
     };
 
@@ -398,18 +415,7 @@ async function buildAndUpsertRepoSnapshot(
         deletions: cs.deletions
     }));
 
-    // Fetch CI stats from workflow_event
-    const [ciStats] = await query<{
-        ci_success_rate: number;
-        ci_avg_duration_seconds: number;
-        last_ci_conclusion: string | null;
-    }>(
-        `SELECT
-            COALESCE((SELECT ROUND(COUNT(*) FILTER (WHERE conclusion = 'success')::NUMERIC / NULLIF(COUNT(*), 0) * 100, 1) FROM workflow_event WHERE repo_id = $1 AND status = 'completed'), 0)::NUMERIC AS ci_success_rate,
-            COALESCE((SELECT AVG(duration_seconds)::INTEGER FROM workflow_event WHERE repo_id = $1 AND status = 'completed' AND duration_seconds IS NOT NULL), 0) AS ci_avg_duration_seconds,
-            (SELECT conclusion FROM workflow_event WHERE repo_id = $1 AND status = 'completed' ORDER BY created_at DESC LIMIT 1) AS last_ci_conclusion`,
-        [repo.id]
-    );
+    const ciStats = await getCiStatsByRepo(repo.id);
 
     const snap: UpsertRepoSnapshotInput = {
         repo_id: repo.id,
@@ -429,9 +435,9 @@ async function buildAndUpsertRepoSnapshot(
         total_additions: totalAdditions,
         total_deletions: totalDeletions,
         contributor_count: contribStats.length,
-        ci_success_rate: Number(ciStats?.ci_success_rate) || 0,
-        ci_avg_duration_seconds: ciStats?.ci_avg_duration_seconds ?? 0,
-        last_ci_conclusion: ciStats?.last_ci_conclusion ?? null,
+        ci_success_rate: ciStats.ci_success_rate,
+        ci_avg_duration_seconds: ciStats.ci_avg_duration_seconds,
+        last_ci_conclusion: ciStats.last_ci_conclusion,
         top_contributors: topContributors
     };
 

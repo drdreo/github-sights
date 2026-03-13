@@ -143,7 +143,7 @@ export function RepoCard({ repo, owner, totalCommits, snapshot }: RepoCardProps)
                         </div>
                     </IconTooltip>
 
-                    {snapshot && snapshot.ciAvgDurationSeconds > 0 && (
+                    {snapshot && snapshot.ciSuccessRate > 0 && (
                         <>
                             <span className="mx-2 h-3 w-px bg-gray-800" />
                             <IconTooltip

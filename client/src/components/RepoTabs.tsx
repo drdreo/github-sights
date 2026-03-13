@@ -101,7 +101,6 @@ export function RepoTabs({
                     id="workflows"
                     label="Workflows"
                     icon={Play}
-                    count={workflows?.length}
                     activeTab={activeTab}
                     onClick={setActiveTab}
                 />

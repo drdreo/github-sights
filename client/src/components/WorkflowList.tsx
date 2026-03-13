@@ -5,7 +5,7 @@ import { LoadingSkeleton } from "./LoadingSkeleton";
 import type { WorkflowRun, WorkflowStat } from "../types";
 
 function formatDuration(seconds: number | null): string {
-    if (!seconds) return "-";
+    if (seconds == null) return "-";
     if (seconds < 60) return `${seconds}s`;
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;

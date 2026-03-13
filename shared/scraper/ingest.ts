@@ -390,7 +390,7 @@ export async function ingestWorkflowsForRepo(
     if (wfState?.last_synced_at && Date.now() - wfState.last_synced_at.getTime() < WF_STALE_MS) {
         const agoMin = Math.round((Date.now() - wfState.last_synced_at.getTime()) / 60_000);
         console.log(
-            `[ingest] ${owner}/${repoName}: workflows synced ${agoMin}min ago, skipping (stale after 60min)`
+            `[ingest] ${owner}/${repoName}: workflows synced ${agoMin}min ago, skipping (stale after 6h)`
         );
         return { repoName, repoId, inserted: 0 };
     }
