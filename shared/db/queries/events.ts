@@ -283,6 +283,7 @@ export interface InsertWorkflowInput {
     conclusion: string | null;
     head_branch: string | null;
     head_sha: string | null;
+    display_title: string | null;
     duration_seconds: number | null;
     created_at: string;
 }
@@ -307,6 +308,7 @@ export async function getWorkflowsByRepo(
 export async function getWorkflowStatsByRepo(repoId: number): Promise<
     Array<{
         workflow_name: string;
+        workflow_path: string | null;
         total_runs: number;
         success_count: number;
         failure_count: number;
@@ -319,6 +321,7 @@ export async function getWorkflowStatsByRepo(repoId: number): Promise<
     return query(
         `SELECT
             COALESCE(workflow_name, 'Unknown') AS workflow_name,
+            MAX(workflow_path) AS workflow_path,
             COUNT(*)::INTEGER AS total_runs,
             COUNT(*) FILTER (WHERE conclusion = 'success')::INTEGER AS success_count,
             COUNT(*) FILTER (WHERE conclusion = 'failure')::INTEGER AS failure_count,
@@ -435,6 +438,7 @@ export async function insertWorkflows(workflows: InsertWorkflowInput[]): Promise
                 w.conclusion,
                 w.head_branch,
                 w.head_sha,
+                w.display_title,
                 w.duration_seconds,
                 w.created_at
             ]);
@@ -442,7 +446,7 @@ export async function insertWorkflows(workflows: InsertWorkflowInput[]): Promise
                 `INSERT INTO workflow_event (
                     id, repo_id, workflow_name, workflow_path, actor_login,
                     run_number, status, conclusion, head_branch, head_sha,
-                    duration_seconds, created_at
+                    display_title, duration_seconds, created_at
                  ) VALUES ${text}
                  ON CONFLICT (id) DO NOTHING`,
                 params
@@ -451,4 +455,128 @@ export async function insertWorkflows(workflows: InsertWorkflowInput[]): Promise
         }
     });
     return inserted;
+}
+
+// ── Workflow Jobs & Steps ────────────────────────────────────────────────────
+
+export interface InsertWorkflowJobInput {
+    id: number;
+    workflow_run_id: number;
+    repo_id: number;
+    name: string;
+    status: string | null;
+    conclusion: string | null;
+    started_at: string | null;
+    completed_at: string | null;
+    duration_seconds: number;
+    runner_name: string | null;
+}
+
+export interface InsertWorkflowStepInput {
+    job_id: number;
+    number: number;
+    name: string;
+    status: string | null;
+    conclusion: string | null;
+    started_at: string | null;
+    completed_at: string | null;
+    duration_seconds: number;
+}
+
+/** Batch insert workflow jobs. Skips duplicates. */
+export async function insertWorkflowJobs(jobs: InsertWorkflowJobInput[]): Promise<number> {
+    if (jobs.length === 0) return 0;
+
+    let inserted = 0;
+    await transaction(async (client) => {
+        for (let i = 0; i < jobs.length; i += BATCH_SIZE) {
+            const chunk = jobs.slice(i, i + BATCH_SIZE);
+            const { text, params } = buildMultiRowValues(chunk, (j) => [
+                j.id,
+                j.workflow_run_id,
+                j.repo_id,
+                j.name,
+                j.status,
+                j.conclusion,
+                j.started_at,
+                j.completed_at,
+                j.duration_seconds,
+                j.runner_name
+            ]);
+            const result = await client.query(
+                `INSERT INTO workflow_job (
+                    id, workflow_run_id, repo_id, name, status, conclusion,
+                    started_at, completed_at, duration_seconds, runner_name
+                 ) VALUES ${text}
+                 ON CONFLICT (id) DO NOTHING`,
+                params
+            );
+            inserted += result.rowCount ?? 0;
+        }
+    });
+    return inserted;
+}
+
+/** Batch insert workflow steps. Skips duplicates. */
+export async function insertWorkflowSteps(steps: InsertWorkflowStepInput[]): Promise<number> {
+    if (steps.length === 0) return 0;
+
+    let inserted = 0;
+    await transaction(async (client) => {
+        for (let i = 0; i < steps.length; i += BATCH_SIZE) {
+            const chunk = steps.slice(i, i + BATCH_SIZE);
+            const { text, params } = buildMultiRowValues(chunk, (s) => [
+                s.job_id,
+                s.number,
+                s.name,
+                s.status,
+                s.conclusion,
+                s.started_at,
+                s.completed_at,
+                s.duration_seconds
+            ]);
+            const result = await client.query(
+                `INSERT INTO workflow_step (
+                    job_id, number, name, status, conclusion,
+                    started_at, completed_at, duration_seconds
+                 ) VALUES ${text}
+                 ON CONFLICT (job_id, number) DO NOTHING`,
+                params
+            );
+            inserted += result.rowCount ?? 0;
+        }
+    });
+    return inserted;
+}
+
+/** Get unfetched workflow runs for a repo (newest first), limited by budget. */
+export async function getUnfetchedWorkflowRuns(
+    repoId: number,
+    limit: number
+): Promise<{ id: number; repo_id: number }[]> {
+    return query<{ id: number; repo_id: number }>(
+        `SELECT id, repo_id FROM workflow_event
+         WHERE repo_id = $1 AND jobs_fetched = FALSE AND status = 'completed'
+         ORDER BY created_at DESC
+         LIMIT $2`,
+        [repoId, limit]
+    );
+}
+
+/** Mark workflow runs as having their jobs fetched. Also updates duration from job data. */
+export async function markJobsFetched(
+    runId: number,
+    accurateDuration: number | null
+): Promise<void> {
+    if (accurateDuration !== null) {
+        await query(
+            `UPDATE workflow_event SET jobs_fetched = TRUE, duration_seconds = $2 WHERE id = $1`,
+            [runId, accurateDuration]
+        );
+    } else {
+        await query(
+            `UPDATE workflow_event SET jobs_fetched = TRUE WHERE id = $1`,
+            [runId]
+        );
+    }
 }

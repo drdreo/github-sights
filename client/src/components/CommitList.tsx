@@ -20,7 +20,7 @@ export function CommitList({ commits, loading }: CommitListProps) {
     if (!commits?.length) {
         return (
             <div className="p-12 text-center text-gray-400">
-                No commits found in the last 90 days.
+                No commits in the last 90 days. Try expanding the time range or syncing again.
             </div>
         );
     }

@@ -36,7 +36,7 @@ export default function Layout() {
 
     const handleDelete = async () => {
         if (!owner) return;
-        if (!window.confirm(`Delete ALL data for "${owner}"? This cannot be undone.`)) return;
+        if (!window.confirm(`Delete all synced data for "${owner}"? You'll need to re-sync to get it back.`)) return;
         await api.deleteOwnerData(owner);
         setMenuOpen(false);
         navigate("/");
@@ -146,7 +146,7 @@ export default function Layout() {
                                                     className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-red-400 transition-colors"
                                                 >
                                                     <Trash2 className="w-4 h-4 text-gray-500" />
-                                                    Delete Data
+                                                    Delete {owner} data
                                                 </button>
                                             )}
                                             <div className="border-t border-gray-800 mt-1 pt-1">

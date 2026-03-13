@@ -23,7 +23,7 @@ export function ContributorGrid({ contributors, loading }: ContributorGridProps)
     }
 
     if (!contributors?.length) {
-        return <div className="p-12 text-center text-gray-400">No contributors found.</div>;
+        return <div className="p-12 text-center text-gray-400">No contributor activity found for this repository.</div>;
     }
 
     return <DataTable columns={columns} data={contributors} />;

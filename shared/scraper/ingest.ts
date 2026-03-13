@@ -13,6 +13,7 @@ import {
     fetchCommits,
     fetchPullRequests,
     fetchWorkflowRuns,
+    fetchWorkflowJobs,
     isRepoExcluded,
     type GitHubRepo
 } from "./github-client.ts";
@@ -27,9 +28,15 @@ import {
     insertCommits,
     upsertPrs,
     insertWorkflows,
+    insertWorkflowJobs,
+    insertWorkflowSteps,
+    getUnfetchedWorkflowRuns,
+    markJobsFetched,
     type InsertCommitInput,
     type InsertPrInput,
-    type InsertWorkflowInput
+    type InsertWorkflowInput,
+    type InsertWorkflowJobInput,
+    type InsertWorkflowStepInput
 } from "../db/queries/events.ts";
 import {
     getSyncState,
@@ -424,6 +431,7 @@ export async function ingestWorkflowsForRepo(
                 conclusion: run.conclusion,
                 head_branch: run.head_branch,
                 head_sha: run.head_sha,
+                display_title: run.display_title,
                 duration_seconds: run.duration_seconds,
                 created_at: run.created_at
             }));
@@ -457,4 +465,100 @@ export async function ingestWorkflowsForRepo(
     console.log(`[ingest] ${owner}/${repoName}: workflow ingestion complete`);
 
     return { repoName, repoId, inserted: totalInserted };
+}
+
+// ── Workflow Jobs Ingestion (budget-capped) ─────────────────────────────────
+
+/** Max jobs-fetch API calls per repo per tick. */
+const JOBS_BUDGET_PER_REPO = 50;
+
+export interface IngestWorkflowJobsResult {
+    repoName: string;
+    repoId: number;
+    runsFetched: number;
+    jobsInserted: number;
+    stepsInserted: number;
+}
+
+/**
+ * Fetch jobs & steps for unfetched workflow runs in a repo.
+ * Budget-capped: fetches at most JOBS_BUDGET_PER_REPO runs per call.
+ * Newest runs are prioritized. Each run costs 1 API call.
+ */
+export async function ingestWorkflowJobsForRepo(
+    octokit: Octokit,
+    owner: string,
+    repo: GitHubRepo
+): Promise<IngestWorkflowJobsResult> {
+    const repoId = repo.id;
+    const repoName = repo.name;
+
+    const unfetched = await getUnfetchedWorkflowRuns(repoId, JOBS_BUDGET_PER_REPO);
+    if (unfetched.length === 0) {
+        return { repoName, repoId, runsFetched: 0, jobsInserted: 0, stepsInserted: 0 };
+    }
+
+    console.log(
+        `[ingest] ${owner}/${repoName}: fetching jobs for ${unfetched.length} workflow runs…`
+    );
+
+    let totalJobsInserted = 0;
+    let totalStepsInserted = 0;
+
+    for (const run of unfetched) {
+        const ghJobs = await fetchWorkflowJobs(octokit, owner, repoName, run.id);
+
+        const jobInputs: InsertWorkflowJobInput[] = ghJobs.map((j) => ({
+            id: j.id,
+            workflow_run_id: run.id,
+            repo_id: repoId,
+            name: j.name,
+            status: j.status,
+            conclusion: j.conclusion,
+            started_at: j.started_at,
+            completed_at: j.completed_at,
+            duration_seconds: j.duration_seconds,
+            runner_name: j.runner_name
+        }));
+
+        const stepInputs: InsertWorkflowStepInput[] = ghJobs.flatMap((j) =>
+            j.steps.map((s) => ({
+                job_id: j.id,
+                number: s.number,
+                name: s.name,
+                status: s.status,
+                conclusion: s.conclusion,
+                started_at: s.started_at,
+                completed_at: s.completed_at,
+                duration_seconds: s.duration_seconds
+            }))
+        );
+
+        totalJobsInserted += await insertWorkflowJobs(jobInputs);
+        totalStepsInserted += await insertWorkflowSteps(stepInputs);
+
+        // Compute accurate duration from job timing
+        const completedJobs = ghJobs.filter((j) => j.started_at && j.completed_at);
+        let accurateDuration: number | null = null;
+        if (completedJobs.length > 0) {
+            const earliest = Math.min(...completedJobs.map((j) => new Date(j.started_at!).getTime()));
+            const latest = Math.max(...completedJobs.map((j) => new Date(j.completed_at!).getTime()));
+            accurateDuration = Math.max(0, Math.round((latest - earliest) / 1000));
+        }
+
+        await markJobsFetched(run.id, accurateDuration);
+    }
+
+    console.log(
+        `[ingest] ${owner}/${repoName}: jobs ingestion complete — ` +
+            `${unfetched.length} runs, ${totalJobsInserted} jobs, ${totalStepsInserted} steps`
+    );
+
+    return {
+        repoName,
+        repoId,
+        runsFetched: unfetched.length,
+        jobsInserted: totalJobsInserted,
+        stepsInserted: totalStepsInserted
+    };
 }

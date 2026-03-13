@@ -267,6 +267,7 @@ repos.get("/api/repos/:owner/:repo/workflows", async (c) => {
             status: r.status,
             conclusion: r.conclusion,
             headBranch: r.head_branch,
+            displayTitle: r.display_title,
             durationSeconds: r.duration_seconds,
             createdAt: r.created_at.toISOString()
         }));
@@ -289,6 +290,7 @@ repos.get("/api/repos/:owner/:repo/workflow-stats", async (c) => {
         const stats = await getWorkflowStatsByRepo(repoRow.id);
         const data = stats.map((s) => ({
             workflowName: s.workflow_name,
+            workflowPath: s.workflow_path,
             totalRuns: s.total_runs,
             successCount: s.success_count,
             failureCount: s.failure_count,

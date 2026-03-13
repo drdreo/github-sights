@@ -97,12 +97,14 @@ export interface WorkflowRun {
     status: string | null;
     conclusion: string | null;
     headBranch: string | null;
+    displayTitle: string | null;
     durationSeconds: number | null;
     createdAt: string;
 }
 
 export interface WorkflowStat {
     workflowName: string;
+    workflowPath: string | null;
     totalRuns: number;
     successCount: number;
     failureCount: number;

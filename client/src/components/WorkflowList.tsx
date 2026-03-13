@@ -1,7 +1,9 @@
 import React from "react";
 import { format } from "date-fns";
-import { CheckCircle2, XCircle, MinusCircle, Clock, Timer } from "lucide-react";
+import { useParams } from "react-router-dom";
+import { CheckCircle2, XCircle, MinusCircle, Clock, Timer, ExternalLink } from "lucide-react";
 import { LoadingSkeleton } from "./LoadingSkeleton";
+import { useOwner } from "../hooks/useOwner";
 import type { WorkflowRun, WorkflowStat } from "../types";
 
 function formatDuration(seconds: number | null): string {
@@ -55,6 +57,9 @@ interface WorkflowStatsPanelProps {
 }
 
 export function WorkflowStatsPanel({ stats, loading }: WorkflowStatsPanelProps) {
+    const owner = useOwner();
+    const { repo } = useParams<{ repo: string }>();
+
     if (loading) {
         return (
             <div className="p-6 space-y-4">
@@ -75,15 +80,33 @@ export function WorkflowStatsPanel({ stats, loading }: WorkflowStatsPanelProps) 
                     Workflow Breakdown
                 </h4>
                 <div className="space-y-3">
-                    {stats.map((stat) => (
+                    {stats.map((stat) => {
+                        const filename = stat.workflowPath?.split("/").pop();
+                        const ghUrl = filename && repo
+                            ? `https://github.com/${owner}/${repo}/actions/workflows/${filename}`
+                            : null;
+
+                        return (
                         <div
                             key={stat.workflowName}
                             className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg"
                         >
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-gray-200 truncate">
-                                    {stat.workflowName}
-                                </p>
+                                {ghUrl ? (
+                                    <a
+                                        href={ghUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-sm font-medium text-gray-200 truncate hover:text-blue-400 transition-colors inline-flex items-center gap-1.5 group"
+                                    >
+                                        {stat.workflowName}
+                                        <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </a>
+                                ) : (
+                                    <p className="text-sm font-medium text-gray-200 truncate">
+                                        {stat.workflowName}
+                                    </p>
+                                )}
                                 <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
                                     <span>{stat.totalRuns} runs</span>
                                     <span className="text-green-400">
@@ -117,7 +140,8 @@ export function WorkflowStatsPanel({ stats, loading }: WorkflowStatsPanelProps) 
                                 </span>
                             </div>
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         </div>
@@ -150,7 +174,7 @@ export function WorkflowList({
     }
 
     if (!workflows?.length) {
-        return <div className="p-12 text-center text-gray-400">No workflow runs found.</div>;
+        return <div className="p-12 text-center text-gray-400">No workflow runs found. Workflows appear here after CI pipelines run.</div>;
     }
 
     return (
@@ -174,11 +198,14 @@ export function WorkflowList({
                         <div className="flex-grow min-w-0">
                             <div className="flex items-start justify-between gap-4 mb-1">
                                 <p className="text-sm font-semibold text-gray-100 line-clamp-1">
-                                    {run.workflowName ?? "Unknown workflow"}
+                                    {run.displayTitle ?? run.workflowName ?? "Unknown workflow"}
                                 </p>
                                 <ConclusionBadge conclusion={run.conclusion} />
                             </div>
                             <div className="flex items-center gap-2 text-xs text-gray-400">
+                                {run.displayTitle && run.workflowName && (
+                                    <span className="font-medium text-gray-500">{run.workflowName}</span>
+                                )}
                                 {run.runNumber && <span>#{run.runNumber}</span>}
                                 {run.actorLogin && (
                                     <>

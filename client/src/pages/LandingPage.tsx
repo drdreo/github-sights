@@ -164,12 +164,18 @@ const FEATURES = [
     }
 ];
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const MiniTooltip = ({ active, payload }: any) => {
+interface TooltipEntry {
+    dataKey: string;
+    name?: string;
+    value: number;
+    color?: string;
+}
+
+const MiniTooltip = ({ active, payload }: { active?: boolean; payload?: TooltipEntry[] }) => {
     if (!active || !payload?.length) return null;
     return (
         <div className="bg-gray-800/95 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200 shadow-xl">
-            {payload.map((entry: any) => (
+            {payload.map((entry) => (
                 <div key={entry.dataKey} style={{ color: entry.color }}>
                     {entry.name ?? entry.dataKey}: {entry.value}
                 </div>
@@ -180,7 +186,7 @@ const MiniTooltip = ({ active, payload }: any) => {
 
 function ShowcaseCard({ repo }: { repo: (typeof SHOWCASE_REPOS)[number] }) {
     return (
-        <div className="group bg-gray-900 border border-gray-800 rounded-xl p-5 hover:border-gray-700 hover:bg-gray-900/80 transition-all duration-300">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
             {/* Repo header */}
             <div className="flex items-start justify-between mb-3">
                 <div className="min-w-0">
@@ -276,9 +282,9 @@ export default function LandingPage() {
                         </div>
                         <Link
                             to="/setup"
-                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-300 hover:text-white bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 rounded-lg transition-all duration-200"
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-300 hover:text-white bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 rounded-lg transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
                         >
-                            Sign in
+                            Get Started
                             <ArrowRight className="w-3.5 h-3.5" />
                         </Link>
                     </nav>
@@ -300,26 +306,17 @@ export default function LandingPage() {
 
                         <p className="text-lg text-gray-400 max-w-xl mx-auto mb-10 leading-relaxed">
                             Track commits, analyze contributors, and uncover trends across any
-                            GitHub user or organization. Beautiful analytics, zero setup.
+                            GitHub user or organization. Beautiful analytics in minutes.
                         </p>
 
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                             <Link
                                 to="/setup"
-                                className="inline-flex items-center gap-2 px-7 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 active:scale-[0.98]"
+                                className="inline-flex items-center gap-2 px-7 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-[background-color,box-shadow,transform] duration-200 shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
                             >
                                 Get Started
                                 <ArrowRight className="w-4 h-4" />
                             </Link>
-                            <a
-                                href="https://github.com/drdreo/github-sights"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 px-7 py-3.5 text-gray-300 hover:text-white font-medium rounded-xl border border-gray-800 hover:border-gray-700 hover:bg-gray-900 transition-all duration-200"
-                            >
-                                <Github className="w-4 h-4" />
-                                View Source
-                            </a>
                         </div>
                     </div>
 
@@ -335,7 +332,7 @@ export default function LandingPage() {
                                     <Link
                                         key={owner}
                                         to={`/${owner}/dashboard`}
-                                        className="px-3.5 py-1.5 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-300 hover:text-gray-100 hover:border-gray-700 hover:bg-gray-800 transition-all"
+                                        className="px-3.5 py-1.5 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-300 hover:text-gray-100 hover:border-gray-700 hover:bg-gray-800 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
                                     >
                                         {owner}
                                     </Link>
@@ -630,7 +627,7 @@ export default function LandingPage() {
                     {FEATURES.map((f) => (
                         <div
                             key={f.title}
-                            className="bg-gray-900/50 border border-gray-800/60 rounded-xl p-5 hover:border-gray-700 transition-colors duration-300"
+                            className="bg-gray-900/50 border border-gray-800/60 rounded-xl p-5"
                         >
                             <div className="p-2.5 bg-gray-800 rounded-lg w-fit mb-3">
                                 <f.icon className="w-5 h-5 text-blue-400" />
@@ -656,9 +653,9 @@ export default function LandingPage() {
                         </p>
                         <Link
                             to="/setup"
-                            className="inline-flex items-center gap-2 px-7 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 active:scale-[0.98]"
+                            className="inline-flex items-center gap-2 px-7 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-[background-color,box-shadow,transform] duration-200 shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
                         >
-                            Get Started Free
+                            Get Started
                             <ArrowRight className="w-4 h-4" />
                         </Link>
                     </div>
@@ -677,7 +674,7 @@ export default function LandingPage() {
                             href="https://github.com/drdreo/github-sights"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="hover:text-gray-300 transition-colors"
+                            className="hover:text-gray-300 transition-colors duration-150 focus-visible:outline-none focus-visible:text-gray-300"
                         >
                             Source
                         </a>

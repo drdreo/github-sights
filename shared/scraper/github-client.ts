@@ -648,6 +648,7 @@ export interface GitHubWorkflowRun {
         | null;
     head_branch: string | null;
     head_sha: string | null;
+    display_title: string | null;
     duration_seconds: number;
     created_at: string;
     html_url: string;
@@ -690,9 +691,9 @@ export async function fetchWorkflowRuns(
 
             // deno-lint-ignore no-explicit-any
             const runs: GitHubWorkflowRun[] = (response.data as any[]).map((run: any) => {
-                const createdMs = new Date(run.created_at).getTime();
+                const startedMs = new Date(run.run_started_at ?? run.created_at).getTime();
                 const updatedMs = new Date(run.updated_at).getTime();
-                const durationSeconds = Math.max(0, Math.round((updatedMs - createdMs) / 1000));
+                const durationSeconds = Math.max(0, Math.round((updatedMs - startedMs) / 1000));
 
                 return {
                     id: run.id,
@@ -705,6 +706,7 @@ export async function fetchWorkflowRuns(
                     conclusion: run.conclusion ?? null,
                     head_branch: run.head_branch ?? null,
                     head_sha: run.head_sha ?? null,
+                    display_title: run.display_title ?? null,
                     duration_seconds: durationSeconds,
                     created_at: run.created_at,
                     html_url: run.html_url
@@ -734,6 +736,97 @@ export async function fetchWorkflowRuns(
             return [];
         }
         throw githubApiError(`list workflow runs for ${owner}/${repo}`, error);
+    }
+}
+
+// ── Workflow Jobs & Steps ─────────────────────────────────────────────────────
+
+export interface GitHubWorkflowStep {
+    name: string;
+    number: number;
+    status: "completed" | "in_progress" | "queued";
+    conclusion: "success" | "failure" | "cancelled" | "skipped" | null;
+    started_at: string | null;
+    completed_at: string | null;
+    duration_seconds: number;
+}
+
+export interface GitHubWorkflowJob {
+    id: number;
+    workflow_run_id: number;
+    name: string;
+    status: "completed" | "in_progress" | "queued";
+    conclusion: "success" | "failure" | "cancelled" | "skipped" | "timed_out" | "action_required" | "neutral" | "stale" | null;
+    started_at: string | null;
+    completed_at: string | null;
+    duration_seconds: number;
+    runner_name: string | null;
+    steps: GitHubWorkflowStep[];
+}
+
+/**
+ * Fetch jobs (with embedded steps) for a single workflow run.
+ * Costs 1 API call per run (paginated if >100 jobs, rare).
+ */
+export async function fetchWorkflowJobs(
+    octokit: Octokit,
+    owner: string,
+    repo: string,
+    runId: number
+): Promise<GitHubWorkflowJob[]> {
+    try {
+        await guardRateLimit(octokit);
+
+        const response = await octokit.rest.actions.listJobsForWorkflowRun({
+            owner,
+            repo,
+            run_id: runId,
+            per_page: 100
+        });
+
+        // deno-lint-ignore no-explicit-any
+        return (response.data.jobs as any[]).map((job: any) => {
+            const startedMs = job.started_at ? new Date(job.started_at).getTime() : 0;
+            const completedMs = job.completed_at ? new Date(job.completed_at).getTime() : 0;
+            const jobDuration = startedMs && completedMs ? Math.max(0, Math.round((completedMs - startedMs) / 1000)) : 0;
+
+            // deno-lint-ignore no-explicit-any
+            const steps: GitHubWorkflowStep[] = (job.steps ?? []).map((step: any) => {
+                const stepStartMs = step.started_at ? new Date(step.started_at).getTime() : 0;
+                const stepEndMs = step.completed_at ? new Date(step.completed_at).getTime() : 0;
+                const stepDuration = stepStartMs && stepEndMs ? Math.max(0, Math.round((stepEndMs - stepStartMs) / 1000)) : 0;
+
+                return {
+                    name: step.name,
+                    number: step.number,
+                    status: step.status,
+                    conclusion: step.conclusion ?? null,
+                    started_at: step.started_at ?? null,
+                    completed_at: step.completed_at ?? null,
+                    duration_seconds: stepDuration
+                };
+            });
+
+            return {
+                id: job.id,
+                workflow_run_id: runId,
+                name: job.name,
+                status: job.status,
+                conclusion: job.conclusion ?? null,
+                started_at: job.started_at ?? null,
+                completed_at: job.completed_at ?? null,
+                duration_seconds: jobDuration,
+                runner_name: job.runner_name ?? null,
+                steps
+            };
+        });
+    } catch (error) {
+        // deno-lint-ignore no-explicit-any
+        if ((error as any)?.status === 404 || (error as any)?.response?.status === 404) {
+            console.log(`[github] ${owner}/${repo}: Run ${runId} not found, skipping jobs`);
+            return [];
+        }
+        throw githubApiError(`list jobs for ${owner}/${repo} run ${runId}`, error);
     }
 }
 

@@ -159,7 +159,7 @@ export default function ContributorDetailPage() {
         return (
             <div className="p-8 flex flex-col items-center justify-center h-screen text-center">
                 <AlertCircle className="w-16 h-16 text-gray-600 mb-4" />
-                <h1 className="text-2xl font-bold text-gray-100">Contributor not found</h1>
+                <h1 className="text-2xl font-bold text-gray-100">This contributor doesn't exist or has no recorded activity</h1>
                 <Link to={`/${owner}/contributors`} className="mt-4 text-blue-400 hover:underline">
                     Return to Contributors
                 </Link>

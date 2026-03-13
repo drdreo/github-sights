@@ -242,7 +242,7 @@ function ConfigureStep() {
             navigate(`/${owner}/dashboard?syncSince=${syncSince}`);
         } catch (err) {
             console.error("Setup failed:", err);
-            setError("Failed to save configuration. Please try again.");
+            setError("Something went wrong saving your setup. Check your connection and try again.");
         }
     };
 
@@ -296,7 +296,7 @@ function ConfigureStep() {
                     className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-gray-100 focus:bg-gray-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 outline-none transition-all duration-200"
                 />
                 <p className="text-xs text-gray-500">
-                    How far back to crawl commit and PR history. Older dates use more API budget.
+                    How far back to sync commit and PR history. Older dates take longer to sync.
                 </p>
             </div>
 
@@ -314,7 +314,7 @@ function ConfigureStep() {
                 {setConfig.isPending ? (
                     <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        Connecting...
+                        Saving...
                     </>
                 ) : (
                     <>
@@ -378,14 +378,11 @@ export default function SetupPage() {
 
             {/* Footer Links */}
             <div className="mt-8 flex gap-6 text-sm text-gray-500">
-                <a href="#" className="hover:text-gray-300 transition-colors">
-                    Documentation
+                <a href="https://github.com/drdreo/github-sights" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">
+                    Source
                 </a>
-                <a href="#" className="hover:text-gray-300 transition-colors">
+                <a href="https://github.com/drdreo/github-sights/issues" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">
                     Support
-                </a>
-                <a href="#" className="hover:text-gray-300 transition-colors">
-                    Privacy
                 </a>
             </div>
         </div>
