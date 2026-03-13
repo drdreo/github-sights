@@ -1,5 +1,5 @@
 import React from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, AlertTriangle } from "lucide-react";
 import type { SyncProgressResponse } from "../lib/api";
 
 function formatEvents(n: number): string {
@@ -23,9 +23,21 @@ interface SyncProgressBarProps {
 /**
  * Reusable sync progress indicator.
  * Shows spinner + status text + progress bar during active syncs.
- * Returns null when no sync is active.
+ * Shows warning when there are errors (e.g. crawler offline).
+ * Returns null when no sync is active and no errors.
  */
 export function SyncProgressBar({ progress, barWidth = "w-32" }: SyncProgressBarProps) {
+    const hasErrors = progress.errors && progress.errors.length > 0;
+
+    if (!progress.active && hasErrors) {
+        return (
+            <div className="flex items-center gap-2 text-sm">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-amber-400">{progress.errors![0]}</span>
+            </div>
+        );
+    }
+
     if (!progress.active) return null;
 
     const { status, totalRepos, syncedRepos, totalEvents, currentRepo, elapsedMs } = progress;
@@ -61,6 +73,12 @@ export function SyncProgressBar({ progress, barWidth = "w-32" }: SyncProgressBar
             ) : status === "syncing_repos" ? (
                 <span className="text-gray-400">Syncing…</span>
             ) : null}
+            {hasErrors && (
+                <span className="text-amber-400 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    {progress.errors![0]}
+                </span>
+            )}
         </div>
     );
 }

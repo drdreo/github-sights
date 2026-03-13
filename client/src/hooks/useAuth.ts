@@ -16,6 +16,19 @@ export function useAuth() {
     };
 }
 
+export function useMyOrgs(enabled: boolean) {
+    const { data, isLoading } = useQuery({
+        queryKey: ["auth", "orgs"],
+        queryFn: api.getMyOrgs,
+        enabled
+    });
+
+    return {
+        orgs: data?.orgs ?? [],
+        isLoading
+    };
+}
+
 export function useLogout() {
     const qc = useQueryClient();
     return useMutation({
