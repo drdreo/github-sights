@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { formatLoc } from "../lib/format";
+import { formatDuration, formatLoc } from "../lib/format";
 import { OverviewStats } from "../types";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { Activity, Box, Code, Flame, GitCommit, GitPullRequest, Timer, Users } from "lucide-react";
@@ -89,9 +89,9 @@ export function StatCards({
         ...(workflowStats && workflowStats.totalRuns > 0
             ? [
                   {
-                      label: "CI Minutes",
-                      value: workflowStats.totalMinutes.toLocaleString(),
-                      subtext: `${workflowStats.totalRuns} runs · ${workflowStats.successRate}% success`,
+                      label: "CI Time",
+                      value: formatDuration(workflowStats.totalDurationSeconds),
+                      subtext: `${workflowStats.totalRuns.toLocaleString()} runs · ~${formatDuration(workflowStats.avgDurationSeconds)} avg · ${workflowStats.successRate}% success`,
                       icon: Timer,
                       color: "text-green-400",
                       bg: "bg-green-500/10"
@@ -140,26 +140,47 @@ export function StatCards({
         }
     ];
 
-    const renderCard = (card: StatCardDef, i: number) => (
-        <div
-            key={i}
-            onClick={card.href ? () => navigate(card.href!) : undefined}
-            className={`bg-gray-900 rounded-xl border border-gray-800 p-6 flex items-start justify-between transition-all hover:shadow-lg hover:shadow-black/20 group ${card.href ? "cursor-pointer hover:border-blue-500/30" : ""}`}
-        >
-            <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-gray-400 mb-1">{card.label}</p>
-                <h3 className="text-2xl font-bold text-gray-100 tracking-tight group-hover:text-blue-400 transition-colors">
-                    {card.value}
-                </h3>
-                {card.subtext && (
-                    <p className="text-xs text-gray-500 mt-2 font-medium">{card.subtext}</p>
-                )}
+    const renderCard = (card: StatCardDef, i: number) => {
+        const isClickable = !!card.href;
+        const content = (
+            <>
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-400 mb-1">{card.label}</p>
+                    <p className={`text-2xl font-bold text-gray-100 tracking-tight transition-colors duration-150 ${isClickable ? "group-hover:text-blue-400" : ""}`}>
+                        {card.value}
+                    </p>
+                    {card.subtext && (
+                        <p className="text-xs text-gray-500 mt-2 font-medium">{card.subtext}</p>
+                    )}
+                </div>
+                <div className={`p-3 rounded-lg shrink-0 ml-3 ${card.bg} ${card.color}`}>
+                    <card.icon className="w-6 h-6" />
+                </div>
+            </>
+        );
+
+        const baseClasses =
+            "bg-gray-900 rounded-xl border border-gray-800 p-6 flex items-start justify-between group text-left w-full";
+
+        if (isClickable) {
+            return (
+                <button
+                    key={i}
+                    type="button"
+                    onClick={() => navigate(card.href!)}
+                    className={`${baseClasses} cursor-pointer transition-[border-color,box-shadow] duration-150 hover:border-blue-500/30 hover:shadow-lg hover:shadow-black/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950`}
+                >
+                    {content}
+                </button>
+            );
+        }
+
+        return (
+            <div key={i} className={baseClasses}>
+                {content}
             </div>
-            <div className={`p-3 rounded-lg shrink-0 ml-3 ${card.bg} ${card.color}`}>
-                <card.icon className="w-6 h-6" />
-            </div>
-        </div>
-    );
+        );
+    };
 
     return (
         <div className="space-y-8">
