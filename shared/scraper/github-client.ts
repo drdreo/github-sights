@@ -408,7 +408,12 @@ export async function fetchRepos(
                       sort: "updated"
                   });
 
-        console.log(`[github] GET repos for ${ownerType}:${owner} → ${raw.length} repos`);
+        const forkCount = raw.filter((r) => r.fork).length;
+        const privateCount = raw.filter((r) => r.private).length;
+        console.log(
+            `[github] GET repos for ${ownerType}:${owner} → ${raw.length} repos ` +
+                `(${forkCount} forks, ${privateCount} private)`
+        );
 
         return (
             raw
@@ -756,7 +761,16 @@ export interface GitHubWorkflowJob {
     workflow_run_id: number;
     name: string;
     status: "completed" | "in_progress" | "queued";
-    conclusion: "success" | "failure" | "cancelled" | "skipped" | "timed_out" | "action_required" | "neutral" | "stale" | null;
+    conclusion:
+        | "success"
+        | "failure"
+        | "cancelled"
+        | "skipped"
+        | "timed_out"
+        | "action_required"
+        | "neutral"
+        | "stale"
+        | null;
     started_at: string | null;
     completed_at: string | null;
     duration_seconds: number;
@@ -788,13 +802,19 @@ export async function fetchWorkflowJobs(
         return (response.data.jobs as any[]).map((job: any) => {
             const startedMs = job.started_at ? new Date(job.started_at).getTime() : 0;
             const completedMs = job.completed_at ? new Date(job.completed_at).getTime() : 0;
-            const jobDuration = startedMs && completedMs ? Math.max(0, Math.round((completedMs - startedMs) / 1000)) : 0;
+            const jobDuration =
+                startedMs && completedMs
+                    ? Math.max(0, Math.round((completedMs - startedMs) / 1000))
+                    : 0;
 
             // deno-lint-ignore no-explicit-any
             const steps: GitHubWorkflowStep[] = (job.steps ?? []).map((step: any) => {
                 const stepStartMs = step.started_at ? new Date(step.started_at).getTime() : 0;
                 const stepEndMs = step.completed_at ? new Date(step.completed_at).getTime() : 0;
-                const stepDuration = stepStartMs && stepEndMs ? Math.max(0, Math.round((stepEndMs - stepStartMs) / 1000)) : 0;
+                const stepDuration =
+                    stepStartMs && stepEndMs
+                        ? Math.max(0, Math.round((stepEndMs - stepStartMs) / 1000))
+                        : 0;
 
                 return {
                     name: step.name,

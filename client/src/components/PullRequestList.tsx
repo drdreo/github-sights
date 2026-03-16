@@ -20,7 +20,11 @@ export function PullRequestList({ pulls, loading }: PullRequestListProps) {
     }
 
     if (!pulls?.length) {
-        return <div className="p-12 text-center text-gray-400">No pull requests found for this repository.</div>;
+        return (
+            <div className="p-12 text-center text-gray-400">
+                No pull requests found for this repository.
+            </div>
+        );
     }
 
     return (

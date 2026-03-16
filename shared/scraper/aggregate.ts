@@ -46,7 +46,11 @@ function toDateString(d: Date): string {
 /** Fetch CI stats (success rate, avg duration, last conclusion) for a repo. */
 async function getCiStatsByRepo(
     repoId: number
-): Promise<{ ci_success_rate: number; ci_avg_duration_seconds: number; last_ci_conclusion: string | null }> {
+): Promise<{
+    ci_success_rate: number;
+    ci_avg_duration_seconds: number;
+    last_ci_conclusion: string | null;
+}> {
     const [row] = await query<{
         ci_success_rate: number;
         ci_avg_duration_seconds: number;

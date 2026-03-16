@@ -146,7 +146,9 @@ export function StatCards({
             <>
                 <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-gray-400 mb-1">{card.label}</p>
-                    <p className={`text-2xl font-bold text-gray-100 tracking-tight transition-colors duration-150 ${isClickable ? "group-hover:text-blue-400" : ""}`}>
+                    <p
+                        className={`text-2xl font-bold text-gray-100 tracking-tight transition-colors duration-150 ${isClickable ? "group-hover:text-blue-400" : ""}`}
+                    >
                         {card.value}
                     </p>
                     {card.subtext && (

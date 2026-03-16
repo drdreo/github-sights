@@ -2,20 +2,36 @@
 //
 // CRUD operations for the owner_config table.
 // Replaces the old in-memory + Postgres config store.
+//
+// Tokens are AES-256-GCM encrypted before storage and decrypted on read.
+// Encryption/decryption is handled at this DB boundary using shared/crypto.ts.
 
 import { query, queryOne, execute } from "../pool.ts";
 import type { OwnerConfigRow } from "../types.ts";
+import { encryptToken, decryptToken } from "../../crypto.ts";
 
 /** Get config for a specific owner (case-insensitive). */
 export async function getConfig(owner: string): Promise<OwnerConfigRow | null> {
-    return queryOne<OwnerConfigRow>("SELECT * FROM owner_config WHERE LOWER(owner) = LOWER($1)", [
-        owner
-    ]);
+    const row = await queryOne<OwnerConfigRow>(
+        "SELECT * FROM owner_config WHERE LOWER(owner) = LOWER($1)",
+        [owner]
+    );
+    if (!row) return null;
+    return {
+        ...row,
+        token: await decryptToken(row.token)
+    };
 }
 
 /** Get all stored configs. */
 export async function getAllConfigs(): Promise<OwnerConfigRow[]> {
-    return query<OwnerConfigRow>("SELECT * FROM owner_config ORDER BY owner");
+    const rows = await query<OwnerConfigRow>("SELECT * FROM owner_config ORDER BY owner");
+    return Promise.all(
+        rows.map(async (row) => ({
+            ...row,
+            token: await decryptToken(row.token)
+        }))
+    );
 }
 
 /**
@@ -28,6 +44,8 @@ export async function upsertConfig(
     ownerType: "user" | "org",
     syncSince?: string | null
 ): Promise<void> {
+    const storedToken = await encryptToken(token);
+
     // Ensure owner identity exists
     await execute(
         `INSERT INTO owner (login, type)
@@ -43,7 +61,7 @@ export async function upsertConfig(
            token = $2, owner_type = $3,
            sync_since = COALESCE($4, owner_config.sync_since),
            updated_at = NOW()`,
-        [owner, token, ownerType, syncSince ?? null]
+        [owner, storedToken, ownerType, syncSince ?? null]
     );
 }
 

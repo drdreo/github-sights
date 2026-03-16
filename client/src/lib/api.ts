@@ -32,6 +32,7 @@ export interface SyncProgressResponse {
     elapsedMs?: number;
     lastSyncedAt?: string | null;
     errors?: string[];
+    jobId?: number | null;
 }
 
 export const API_BASE = `${import.meta.env.VITE_API_BASE_URL ?? ""}/api`;
@@ -81,7 +82,7 @@ export const api = {
             syncSince?: string | null;
         }>(`/config/${encodeURIComponent(owner)}`),
 
-    setConfig: (config: Omit<ApiConfig, "token">) =>
+    setConfig: (config: Omit<ApiConfig, "token"> & { token?: string }) =>
         fetchApi<void>("/config", {
             method: "POST",
             body: JSON.stringify(config)
@@ -181,14 +182,16 @@ export const api = {
         fetchApi<OwnerWorkflowStats>(`/workflow-stats/${encodeURIComponent(owner)}`),
 
     /** Trigger sync — ensures data freshness (debounced to hourly).
-     *  Pass `since` for explicit backfill syncs. */
-    sync: (owner: string, since?: string) => {
+     *  Pass `since`/`until` to bypass staleness check and always enqueue. */
+    sync: (owner: string, since?: string, until?: string) => {
         const params = new URLSearchParams();
         if (since) params.append("since", since);
+        if (until) params.append("until", until);
         const qs = params.toString();
         return fetchApi<{
             triggered?: boolean;
             enqueued?: boolean;
+            alreadyRunning?: boolean;
             errors?: string[];
         }>(`/sync/${encodeURIComponent(owner)}${qs ? `?${qs}` : ""}`, { method: "POST" });
     },

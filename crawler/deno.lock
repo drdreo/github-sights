@@ -2,12 +2,16 @@
   "version": "5",
   "specifiers": {
     "jsr:@hono/hono@4": "4.11.9",
+    "jsr:@std/encoding@*": "1.0.10",
     "npm:octokit@^4.1.2": "4.1.4_@octokit+core@6.1.6",
     "npm:pg@8": "8.18.0"
   },
   "jsr": {
     "@hono/hono@4.11.9": {
       "integrity": "c82c6b846abc3c1879d921d8365287d77cdef8073019f509ff80bf53033bdcba"
+    },
+    "@std/encoding@1.0.10": {
+      "integrity": "8783c6384a2d13abd5e9e87a7ae0520a30e9f56aeeaa3bdf910a3eaaf5c811a1"
     }
   },
   "npm": {

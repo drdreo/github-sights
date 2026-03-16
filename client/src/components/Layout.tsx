@@ -4,6 +4,7 @@ import {
     Github,
     LogIn,
     LogOut,
+    RefreshCw,
     Settings,
     Trash2,
     Users
@@ -34,9 +35,28 @@ export default function Layout() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    const [syncing, setSyncing] = useState(false);
+
+    const handleForceSync = async () => {
+        if (!owner) return;
+        setSyncing(true);
+        try {
+            // Pass `until` to bypass the staleness check and always enqueue a sync
+            await api.sync(owner, undefined, new Date().toISOString());
+        } finally {
+            setSyncing(false);
+            setMenuOpen(false);
+        }
+    };
+
     const handleDelete = async () => {
         if (!owner) return;
-        if (!window.confirm(`Delete all synced data for "${owner}"? You'll need to re-sync to get it back.`)) return;
+        if (
+            !window.confirm(
+                `Delete all synced data for "${owner}"? You'll need to re-sync to get it back.`
+            )
+        )
+            return;
         await api.deleteOwnerData(owner);
         setMenuOpen(false);
         navigate("/");
@@ -140,6 +160,18 @@ export default function Layout() {
                                                 <Settings className="w-4 h-4 text-gray-500" />
                                                 Settings
                                             </Link>
+                                            {owner && (
+                                                <button
+                                                    onClick={handleForceSync}
+                                                    disabled={syncing}
+                                                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-blue-400 transition-colors disabled:opacity-50"
+                                                >
+                                                    <RefreshCw
+                                                        className={`w-4 h-4 text-gray-500 ${syncing ? "animate-spin" : ""}`}
+                                                    />
+                                                    Force sync
+                                                </button>
+                                            )}
                                             {owner && (
                                                 <button
                                                     onClick={handleDelete}

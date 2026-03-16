@@ -82,64 +82,65 @@ export function WorkflowStatsPanel({ stats, loading }: WorkflowStatsPanelProps) 
                 <div className="space-y-3">
                     {stats.map((stat) => {
                         const filename = stat.workflowPath?.split("/").pop();
-                        const ghUrl = filename && repo
-                            ? `https://github.com/${owner}/${repo}/actions/workflows/${filename}`
-                            : null;
+                        const ghUrl =
+                            filename && repo
+                                ? `https://github.com/${owner}/${repo}/actions/workflows/${filename}`
+                                : null;
 
                         return (
-                        <div
-                            key={stat.workflowName}
-                            className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg"
-                        >
-                            <div className="min-w-0 flex-1">
-                                {ghUrl ? (
-                                    <a
-                                        href={ghUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-sm font-medium text-gray-200 truncate hover:text-blue-400 transition-colors inline-flex items-center gap-1.5 group"
+                            <div
+                                key={stat.workflowName}
+                                className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg"
+                            >
+                                <div className="min-w-0 flex-1">
+                                    {ghUrl ? (
+                                        <a
+                                            href={ghUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-sm font-medium text-gray-200 truncate hover:text-blue-400 transition-colors inline-flex items-center gap-1.5 group"
+                                        >
+                                            {stat.workflowName}
+                                            <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </a>
+                                    ) : (
+                                        <p className="text-sm font-medium text-gray-200 truncate">
+                                            {stat.workflowName}
+                                        </p>
+                                    )}
+                                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                                        <span>{stat.totalRuns} runs</span>
+                                        <span className="text-green-400">
+                                            {stat.successCount} passed
+                                        </span>
+                                        {stat.failureCount > 0 && (
+                                            <span className="text-red-400">
+                                                {stat.failureCount} failed
+                                            </span>
+                                        )}
+                                        {stat.cancelledCount > 0 && (
+                                            <span className="text-yellow-400">
+                                                {stat.cancelledCount} cancelled
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4 text-xs text-gray-400 flex-shrink-0 ml-4">
+                                    <div className="flex items-center gap-1">
+                                        <Timer className="w-3.5 h-3.5" />
+                                        <span>~{formatDuration(stat.avgDurationSeconds)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <Clock className="w-3.5 h-3.5" />
+                                        <span>{formatDuration(stat.totalDurationSeconds)}</span>
+                                    </div>
+                                    <span
+                                        className={`font-medium ${stat.successRate >= 80 ? "text-green-400" : stat.successRate >= 50 ? "text-yellow-400" : "text-red-400"}`}
                                     >
-                                        {stat.workflowName}
-                                        <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </a>
-                                ) : (
-                                    <p className="text-sm font-medium text-gray-200 truncate">
-                                        {stat.workflowName}
-                                    </p>
-                                )}
-                                <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                                    <span>{stat.totalRuns} runs</span>
-                                    <span className="text-green-400">
-                                        {stat.successCount} passed
+                                        {stat.successRate}%
                                     </span>
-                                    {stat.failureCount > 0 && (
-                                        <span className="text-red-400">
-                                            {stat.failureCount} failed
-                                        </span>
-                                    )}
-                                    {stat.cancelledCount > 0 && (
-                                        <span className="text-yellow-400">
-                                            {stat.cancelledCount} cancelled
-                                        </span>
-                                    )}
                                 </div>
                             </div>
-                            <div className="flex items-center gap-4 text-xs text-gray-400 flex-shrink-0 ml-4">
-                                <div className="flex items-center gap-1">
-                                    <Timer className="w-3.5 h-3.5" />
-                                    <span>~{formatDuration(stat.avgDurationSeconds)}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <Clock className="w-3.5 h-3.5" />
-                                    <span>{formatDuration(stat.totalDurationSeconds)}</span>
-                                </div>
-                                <span
-                                    className={`font-medium ${stat.successRate >= 80 ? "text-green-400" : stat.successRate >= 50 ? "text-yellow-400" : "text-red-400"}`}
-                                >
-                                    {stat.successRate}%
-                                </span>
-                            </div>
-                        </div>
                         );
                     })}
                 </div>
@@ -174,7 +175,11 @@ export function WorkflowList({
     }
 
     if (!workflows?.length) {
-        return <div className="p-12 text-center text-gray-400">No workflow runs found. Workflows appear here after CI pipelines run.</div>;
+        return (
+            <div className="p-12 text-center text-gray-400">
+                No workflow runs found. Workflows appear here after CI pipelines run.
+            </div>
+        );
     }
 
     return (
@@ -204,7 +209,9 @@ export function WorkflowList({
                             </div>
                             <div className="flex items-center gap-2 text-xs text-gray-400">
                                 {run.displayTitle && run.workflowName && (
-                                    <span className="font-medium text-gray-500">{run.workflowName}</span>
+                                    <span className="font-medium text-gray-500">
+                                        {run.workflowName}
+                                    </span>
                                 )}
                                 {run.runNumber && <span>#{run.runNumber}</span>}
                                 {run.actorLogin && (
