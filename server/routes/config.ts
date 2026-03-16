@@ -27,14 +27,17 @@ config.get("/api/config/:owner", (c) => {
 config.post("/api/config", requireAuth, async (c) => {
     try {
         const session = c.get("session")!;
-        const token = session.access_token;
 
         const body = await c.req.json<{
             owner?: string;
             ownerType?: string;
             syncSince?: string;
+            token?: string;
         }>();
         const { owner, ownerType, syncSince } = body;
+
+        // Use provided PAT if given, otherwise fall back to OAuth session token
+        const token = body.token || session.access_token;
 
         // ── Validation ──────────────────────────────────────────────
         if (!owner) {

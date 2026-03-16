@@ -3,7 +3,7 @@ import { useSetConfig } from "../hooks/useGitHub";
 import { useAuth, useMyOrgs } from "../hooks/useAuth";
 import { API_BASE } from "../lib/api";
 import { useNavigate } from "react-router-dom";
-import { Building2, User, ArrowRight, Loader2, Github, Calendar, Pencil } from "lucide-react";
+import { Building2, User, ArrowRight, Loader2, Github, Calendar, Pencil, Key } from "lucide-react";
 import { addRecentOwner } from "./LandingPage";
 import { subYears, format } from "date-fns";
 
@@ -217,6 +217,8 @@ function ConfigureStep() {
     const [ownerType, setOwnerType] = useState<"user" | "org">("user");
     const [customMode, setCustomMode] = useState(false);
     const [syncSince, setSyncSince] = useState(() => format(subYears(new Date(), 1), "yyyy-MM-dd"));
+    const [pat, setPat] = useState("");
+    const [showPat, setShowPat] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const selected = owner ? { owner, ownerType } : null;
@@ -237,7 +239,8 @@ function ConfigureStep() {
         }
 
         try {
-            await setConfig.mutateAsync({ owner, ownerType, syncSince });
+            const token = pat.trim() || undefined;
+            await setConfig.mutateAsync({ owner, ownerType, syncSince, token });
             addRecentOwner(owner);
             navigate(`/${owner}/dashboard?syncSince=${syncSince}`);
         } catch (err) {
@@ -298,6 +301,32 @@ function ConfigureStep() {
                 <p className="text-xs text-gray-500">
                     How far back to sync commit and PR history. Older dates take longer to sync.
                 </p>
+            </div>
+
+            {/* Optional PAT override */}
+            <div className="space-y-2">
+                <button
+                    type="button"
+                    onClick={() => setShowPat((v) => !v)}
+                    className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                >
+                    <Key className="w-3 h-3" />
+                    {showPat ? "Hide" : "Use a Personal Access Token instead"}
+                </button>
+                {showPat && (
+                    <div className="space-y-1.5">
+                        <input
+                            type="password"
+                            value={pat}
+                            onChange={(e) => setPat(e.target.value)}
+                            placeholder="ghp_..."
+                            className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-gray-100 placeholder:text-gray-500 focus:bg-gray-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 outline-none transition-all duration-200 font-mono text-sm"
+                        />
+                        <p className="text-xs text-gray-500">
+                           Provide your own PAT. Needs <code className="text-gray-400">repo</code> scope.
+                        </p>
+                    </div>
+                )}
             </div>
 
             {error && (

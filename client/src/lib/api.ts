@@ -81,7 +81,7 @@ export const api = {
             syncSince?: string | null;
         }>(`/config/${encodeURIComponent(owner)}`),
 
-    setConfig: (config: Omit<ApiConfig, "token">) =>
+    setConfig: (config: Omit<ApiConfig, "token"> & { token?: string }) =>
         fetchApi<void>("/config", {
             method: "POST",
             body: JSON.stringify(config)
