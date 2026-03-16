@@ -51,7 +51,12 @@ export default function Layout() {
 
     const handleDelete = async () => {
         if (!owner) return;
-        if (!window.confirm(`Delete all synced data for "${owner}"? You'll need to re-sync to get it back.`)) return;
+        if (
+            !window.confirm(
+                `Delete all synced data for "${owner}"? You'll need to re-sync to get it back.`
+            )
+        )
+            return;
         await api.deleteOwnerData(owner);
         setMenuOpen(false);
         navigate("/");
@@ -161,7 +166,9 @@ export default function Layout() {
                                                     disabled={syncing}
                                                     className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-blue-400 transition-colors disabled:opacity-50"
                                                 >
-                                                    <RefreshCw className={`w-4 h-4 text-gray-500 ${syncing ? "animate-spin" : ""}`} />
+                                                    <RefreshCw
+                                                        className={`w-4 h-4 text-gray-500 ${syncing ? "animate-spin" : ""}`}
+                                                    />
                                                     Force sync
                                                 </button>
                                             )}

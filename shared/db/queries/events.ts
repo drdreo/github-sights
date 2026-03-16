@@ -574,9 +574,6 @@ export async function markJobsFetched(
             [runId, accurateDuration]
         );
     } else {
-        await query(
-            `UPDATE workflow_event SET jobs_fetched = TRUE WHERE id = $1`,
-            [runId]
-        );
+        await query(`UPDATE workflow_event SET jobs_fetched = TRUE WHERE id = $1`, [runId]);
     }
 }

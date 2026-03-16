@@ -245,7 +245,9 @@ function ConfigureStep() {
             navigate(`/${owner}/dashboard?syncSince=${syncSince}`);
         } catch (err) {
             console.error("Setup failed:", err);
-            setError("Something went wrong saving your setup. Check your connection and try again.");
+            setError(
+                "Something went wrong saving your setup. Check your connection and try again."
+            );
         }
     };
 
@@ -323,7 +325,8 @@ function ConfigureStep() {
                             className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-gray-100 placeholder:text-gray-500 focus:bg-gray-900 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 outline-none transition-all duration-200 font-mono text-sm"
                         />
                         <p className="text-xs text-gray-500">
-                           Provide your own PAT. Needs <code className="text-gray-400">repo</code> scope.
+                            Provide your own PAT. Needs <code className="text-gray-400">repo</code>{" "}
+                            scope.
                         </p>
                     </div>
                 )}
@@ -407,10 +410,20 @@ export default function SetupPage() {
 
             {/* Footer Links */}
             <div className="mt-8 flex gap-6 text-sm text-gray-500">
-                <a href="https://github.com/drdreo/github-sights" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">
+                <a
+                    href="https://github.com/drdreo/github-sights"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-gray-300 transition-colors"
+                >
                     Source
                 </a>
-                <a href="https://github.com/drdreo/github-sights/issues" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">
+                <a
+                    href="https://github.com/drdreo/github-sights/issues"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-gray-300 transition-colors"
+                >
                     Support
                 </a>
             </div>

@@ -541,8 +541,12 @@ export async function ingestWorkflowJobsForRepo(
         const completedJobs = ghJobs.filter((j) => j.started_at && j.completed_at);
         let accurateDuration: number | null = null;
         if (completedJobs.length > 0) {
-            const earliest = Math.min(...completedJobs.map((j) => new Date(j.started_at!).getTime()));
-            const latest = Math.max(...completedJobs.map((j) => new Date(j.completed_at!).getTime()));
+            const earliest = Math.min(
+                ...completedJobs.map((j) => new Date(j.started_at!).getTime())
+            );
+            const latest = Math.max(
+                ...completedJobs.map((j) => new Date(j.completed_at!).getTime())
+            );
             accurateDuration = Math.max(0, Math.round((latest - earliest) / 1000));
         }
 
