@@ -408,7 +408,12 @@ export async function fetchRepos(
                       sort: "updated"
                   });
 
-        console.log(`[github] GET repos for ${ownerType}:${owner} → ${raw.length} repos`);
+        const forkCount = raw.filter((r) => r.fork).length;
+        const privateCount = raw.filter((r) => r.private).length;
+        console.log(
+            `[github] GET repos for ${ownerType}:${owner} → ${raw.length} repos ` +
+                `(${forkCount} forks, ${privateCount} private)`
+        );
 
         return (
             raw
