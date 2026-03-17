@@ -13,10 +13,12 @@ interface CommitTrendsProps {
 export function CommitTrends({ timelines, startDate, endDate, loading }: CommitTrendsProps) {
     return (
         <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-            <h2 className="text-lg font-semibold text-gray-100 mb-6 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-gray-500" />
-                Commit Trends
-            </h2>
+            <div className="flex items-center gap-2 mb-5">
+                <TrendingUp className="w-5 h-5 text-green-400" />
+                <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">
+                    Commit Trends
+                </h3>
+            </div>
             <div className="h-[350px]">
                 <CommitActivityChart
                     timelines={timelines}

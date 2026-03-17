@@ -4,10 +4,13 @@ import { useSearchParams } from "react-router-dom";
 import { CommitActivity } from "../components/CommitActivity";
 import { CommitTrends } from "../components/CommitTrends";
 import { DashboardHeader } from "../components/DashboardHeader";
+import { ContributorLeaderboard } from "../components/dashboard/ContributorLeaderboard";
+import { RepoRanking } from "../components/dashboard/RepoRanking";
 import { LanguageDistribution } from "../components/LanguageDistribution";
 import { StatCards } from "../components/StatCards";
 import {
     useCommitTimelines,
+    useContributorOverview,
     useOwnerWorkflowStats,
     useStats,
     useSync
@@ -33,6 +36,8 @@ export default function DashboardPage() {
         since,
         until
     );
+    const { data: contributors, isLoading: contributorsLoading } =
+        useContributorOverview(owner, since, until);
 
     // Read initial sync range from URL (set by SetupPage on first-time redirect)
     const [searchParams] = useSearchParams();
@@ -53,23 +58,54 @@ export default function DashboardPage() {
                     dateRange={dateRange}
                     onDateRangeChange={setDateRange}
                 />
-                <div className="grid grid-cols-1 gap-6">
-                    <StatCards
-                        stats={stats}
-                        loading={statsLoading}
-                        owner={owner}
-                        dateRangeLabel={`Last ${differenceInDays(dateRange.endDate, dateRange.startDate)} days`}
-                        workflowStats={workflowStats}
-                    />
-                </div>
-
-                <LanguageDistribution stats={stats} loading={statsLoading} />
-                <CommitTrends
-                    timelines={timelines || []}
-                    startDate={dateRange.startDate}
-                    endDate={dateRange.endDate}
-                    loading={timelinesLoading}
+                <StatCards
+                    stats={stats}
+                    loading={statsLoading}
+                    owner={owner}
+                    dateRangeLabel={`Last ${differenceInDays(dateRange.endDate, dateRange.startDate)} days`}
+                    workflowStats={workflowStats}
                 />
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Main content – left 2 columns */}
+                    <div className="lg:col-span-2 space-y-6">
+                        <CommitTrends
+                            timelines={timelines || []}
+                            startDate={dateRange.startDate}
+                            endDate={dateRange.endDate}
+                            loading={timelinesLoading}
+                        />
+                        <LanguageDistribution stats={stats} loading={statsLoading} />
+
+                        {/* Tablet: leaderboard + ranking side by side below chart */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:hidden gap-6">
+                            <ContributorLeaderboard
+                                contributors={contributors?.data || []}
+                                loading={contributorsLoading}
+                                owner={owner}
+                            />
+                            <RepoRanking
+                                timelines={timelines || []}
+                                loading={timelinesLoading}
+                                owner={owner}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Desktop sidebar */}
+                    <div className="hidden lg:block space-y-6">
+                        <ContributorLeaderboard
+                            contributors={contributors?.data || []}
+                            loading={contributorsLoading}
+                            owner={owner}
+                        />
+                        <RepoRanking
+                            timelines={timelines || []}
+                            loading={timelinesLoading}
+                            owner={owner}
+                        />
+                    </div>
+                </div>
             </div>
 
             {/* Full-bleed commit activity — edge to edge */}

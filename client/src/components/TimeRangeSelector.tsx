@@ -91,17 +91,27 @@ export function TimeRangeSelector({
                 <Calendar className="w-4 h-4 text-gray-500" />
                 <input
                     type="date"
+                    name="chart-range-start"
                     value={startDate ? format(startDate, "yyyy-MM-dd") : ""}
                     onChange={(e) => handleDateChange("start", e.target.value)}
                     disabled={isAllTime}
+                    autoComplete="off"
+                    data-1p-ignore
+                    data-lpignore="true"
+                    data-form-type="other"
                     className="border-none bg-transparent p-0 focus:ring-0 text-gray-300 font-medium cursor-pointer disabled:cursor-default"
                 />
                 <span className="text-gray-500">to</span>
                 <input
                     type="date"
+                    name="chart-range-end"
                     value={endDate ? format(endDate, "yyyy-MM-dd") : ""}
                     onChange={(e) => handleDateChange("end", e.target.value)}
                     disabled={isAllTime}
+                    autoComplete="off"
+                    data-1p-ignore
+                    data-lpignore="true"
+                    data-form-type="other"
                     className="border-none bg-transparent p-0 focus:ring-0 text-gray-300 font-medium cursor-pointer disabled:cursor-default"
                 />
             </div>

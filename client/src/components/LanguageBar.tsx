@@ -24,7 +24,7 @@ export function LanguageBar({ data }: LanguageBarProps) {
                     );
                 })}
             </div>
-            <div className="flex flex-wrap gap-4 text-xs text-gray-400">
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-400">
                 {data.map((item) => (
                     <div key={item.language} className="flex items-center gap-1.5">
                         <span
