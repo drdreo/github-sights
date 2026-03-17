@@ -633,6 +633,17 @@ export async function fetchPullRequests(
 
 // ── Workflow Runs ─────────────────────────────────────────────────────────────
 
+const VALID_CONCLUSIONS = new Set([
+    "success", "failure", "cancelled", "skipped", "timed_out",
+    "action_required", "neutral", "stale", "startup_failure"
+]);
+
+/** Coerce unknown conclusion values to null so they don't violate the DB check constraint. */
+function sanitizeConclusion(value: string | null | undefined): string | null {
+    if (!value) return null;
+    return VALID_CONCLUSIONS.has(value) ? value : null;
+}
+
 export interface GitHubWorkflowRun {
     id: number;
     workflow_name: string | null;
@@ -650,6 +661,7 @@ export interface GitHubWorkflowRun {
         | "action_required"
         | "neutral"
         | "stale"
+        | "startup_failure"
         | null;
     head_branch: string | null;
     head_sha: string | null;
@@ -708,7 +720,7 @@ export async function fetchWorkflowRuns(
                     actor_avatar_url: run.actor?.avatar_url ?? null,
                     run_number: run.run_number,
                     status: run.status,
-                    conclusion: run.conclusion ?? null,
+                    conclusion: sanitizeConclusion(run.conclusion),
                     head_branch: run.head_branch ?? null,
                     head_sha: run.head_sha ?? null,
                     display_title: run.display_title ?? null,
@@ -820,7 +832,7 @@ export async function fetchWorkflowJobs(
                     name: step.name,
                     number: step.number,
                     status: step.status,
-                    conclusion: step.conclusion ?? null,
+                    conclusion: sanitizeConclusion(step.conclusion),
                     started_at: step.started_at ?? null,
                     completed_at: step.completed_at ?? null,
                     duration_seconds: stepDuration
@@ -832,7 +844,7 @@ export async function fetchWorkflowJobs(
                 workflow_run_id: runId,
                 name: job.name,
                 status: job.status,
-                conclusion: job.conclusion ?? null,
+                conclusion: sanitizeConclusion(job.conclusion),
                 started_at: job.started_at ?? null,
                 completed_at: job.completed_at ?? null,
                 duration_seconds: jobDuration,
