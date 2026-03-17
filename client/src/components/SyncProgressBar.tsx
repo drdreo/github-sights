@@ -120,7 +120,7 @@ export function SyncProgressBar({ progress, barWidth = "w-32" }: SyncProgressBar
     const { status, totalRepos, syncedRepos, totalEvents, currentRepo, elapsedMs } = progress;
 
     return (
-        <div className="text-sm">
+        <div className="text-sm space-y-1">
             <div className="flex items-center gap-2">
                 <RefreshCw className="w-3.5 h-3.5 text-blue-400 animate-spin shrink-0" />
                 {status === "fetching_repos" && (
@@ -146,33 +146,37 @@ export function SyncProgressBar({ progress, barWidth = "w-32" }: SyncProgressBar
                             {totalEvents ? ` · ${formatEvents(totalEvents)} events` : ""}
                             {elapsedMs ? ` · ${formatElapsed(elapsedMs)}` : ""}
                         </span>
-                        {currentRepo && (
-                            <span className="text-gray-500 text-xs truncate max-w-[160px]">
-                                {currentRepo}
-                            </span>
-                        )}
                     </>
                 ) : status === "syncing_repos" ? (
                     <span className="text-gray-400">Syncing…</span>
                 ) : null}
-                {hasErrors && (
-                    <button
-                        onClick={() => setExpanded((v) => !v)}
-                        title="Some repos failed but sync is still running"
-                        className="text-amber-400 hover:text-amber-300 flex items-center gap-1 ml-1 transition-colors"
-                    >
-                        <AlertTriangle className="w-3 h-3" />
-                        <span>{errorCount} skipped</span>
-                        {expanded ? (
-                            <ChevronUp className="w-3 h-3" />
-                        ) : (
-                            <ChevronDown className="w-3 h-3" />
-                        )}
-                    </button>
-                )}
             </div>
+            {status === "syncing_repos" && (currentRepo || hasErrors) && (
+                <div className="flex items-center gap-2 pl-5.5">
+                    {currentRepo && (
+                        <span className="text-gray-500 text-xs truncate max-w-[200px]">
+                            {currentRepo}
+                        </span>
+                    )}
+                    {hasErrors && (
+                        <button
+                            onClick={() => setExpanded((v) => !v)}
+                            title="Some repos failed but sync is still running"
+                            className="text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors"
+                        >
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>{errorCount} skipped</span>
+                            {expanded ? (
+                                <ChevronUp className="w-3 h-3" />
+                            ) : (
+                                <ChevronDown className="w-3 h-3" />
+                            )}
+                        </button>
+                    )}
+                </div>
+            )}
             {hasErrors && expanded && (
-                <div className="mt-2 bg-gray-800/50 rounded-lg p-2 space-y-1">
+                <div className="ml-5.5 bg-gray-800/50 rounded-lg p-2 space-y-1">
                     {progress.errors!.map(parseError).map((e, i) => (
                         <div key={i} className="text-xs text-gray-400 flex items-center gap-1.5">
                             <span className="text-amber-400/80">{e.message}</span>

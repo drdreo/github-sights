@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useCallback } from "react";
 import {
     ResponsiveContainer,
-    LineChart,
-    Line,
+    AreaChart,
+    Area,
     XAxis,
     YAxis,
     Tooltip,
@@ -10,7 +10,7 @@ import {
     CartesianGrid
 } from "recharts";
 import type { Payload } from "recharts/types/component/DefaultLegendContent";
-import { format, eachDayOfInterval } from "date-fns";
+import { format, eachDayOfInterval, differenceInDays } from "date-fns";
 import { RepoCommitTimeline } from "../types";
 
 interface CommitActivityChartProps {
@@ -59,7 +59,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                 fontSize: "0.8rem"
             }}
         >
-            <p style={{ color: "#e5e7eb", marginBottom: "0.25rem" }}>{label}</p>
+            <p style={{ color: "#e5e7eb", marginBottom: "0.25rem" }}>
+                {format(new Date(label), "MMM d, yyyy - EEEE")}
+            </p>
             {payload.map((entry: any) => (
                 <p key={entry.dataKey} style={{ color: entry.color, padding: 0, margin: 0 }}>
                     {entry.name}: {entry.value}
@@ -99,7 +101,6 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
             const dayStr = format(day, "yyyy-MM-dd");
             const point: Record<string, string | number> = {
                 date: dayStr,
-                displayDate: format(day, "MMM d - E"),
                 total: 0
             };
 
@@ -142,6 +143,18 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
         };
     }, [timelines, startDate, endDate]);
 
+    const totalDays = differenceInDays(endDate, startDate);
+
+    const formatTick = useCallback(
+        (dateStr: string) => {
+            const d = new Date(dateStr);
+            if (totalDays <= 14) return format(d, "MMM d - E"); // "Mar 5 - Wed"
+            if (totalDays <= 90) return format(d, "MMM d"); // "Mar 5"
+            return format(d, "MMM yyyy"); // "Mar 2026"
+        },
+        [totalDays]
+    );
+
     const [opacity, setOpacity] = useState<Record<string, number>>({});
 
     const handleMouseEnter = useCallback(
@@ -180,65 +193,92 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
 
     return (
         <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" />
+            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                    {topRepoNames.map((repoName) => {
+                        const color = getRepoColor(repoName);
+                        const gradId = `grad-${repoName.replace(/[^a-zA-Z0-9]/g, "_")}`;
+                        return (
+                            <linearGradient key={gradId} id={gradId} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor={color} stopOpacity={0.15} />
+                                <stop offset="95%" stopColor={color} stopOpacity={0} />
+                            </linearGradient>
+                        );
+                    })}
+                    <linearGradient id="grad-total" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#e5e7eb" stopOpacity={0.12} />
+                        <stop offset="95%" stopColor="#e5e7eb" stopOpacity={0} />
+                    </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f2937" />
                 <XAxis
-                    dataKey="displayDate"
-                    stroke="#4b5563"
-                    tick={{ fill: "#9ca3af", fontSize: 12 }}
-                    tickLine={{ stroke: "#4b5563" }}
-                    axisLine={{ stroke: "#4b5563" }}
-                    minTickGap={30}
+                    dataKey="date"
+                    stroke="#374151"
+                    tick={{ fill: "#6b7280", fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={formatTick}
+                    minTickGap={40}
                 />
                 <YAxis
-                    stroke="#4b5563"
-                    tick={{ fill: "#9ca3af", fontSize: 12 }}
-                    tickLine={{ stroke: "#4b5563" }}
-                    axisLine={{ stroke: "#4b5563" }}
+                    stroke="#374151"
+                    tick={{ fill: "#6b7280", fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
                     allowDecimals={false}
+                    width={35}
                 />
                 <Tooltip
                     content={<CustomTooltip />}
-                    cursor={{ stroke: "#6b7280", strokeWidth: 1, strokeDasharray: "4 4" }}
+                    cursor={{ stroke: "#374151", strokeWidth: 1, strokeDasharray: "4 4" }}
                 />
                 <Legend
                     verticalAlign="bottom"
                     height={36}
                     iconType="circle"
-                    wrapperStyle={{ color: "#9ca3af", paddingTop: "10px" }}
+                    iconSize={8}
+                    wrapperStyle={{ color: "#6b7280", paddingTop: "10px", fontSize: "11px" }}
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
                 />
 
-                {/* Render lines for top repos */}
-                {topRepoNames.map((repoName) => (
-                    <Line
-                        key={repoName}
-                        type="monotone"
-                        dataKey={repoName}
-                        stroke={getRepoColor(repoName)}
-                        strokeWidth={1.5}
-                        strokeOpacity={opacity[repoName] ?? 0.7}
-                        dot={false}
-                        activeDot={{ r: 4, strokeWidth: 0 }}
-                        animationDuration={800}
-                        connectNulls
-                    />
-                ))}
+                {/* Render areas for top repos */}
+                {topRepoNames.map((repoName) => {
+                    const color = getRepoColor(repoName);
+                    const gradId = `grad-${repoName.replace(/[^a-zA-Z0-9]/g, "_")}`;
+                    return (
+                        <Area
+                            key={repoName}
+                            type="monotone"
+                            dataKey={repoName}
+                            stroke={color}
+                            strokeWidth={1.5}
+                            strokeOpacity={opacity[repoName] ?? 0.7}
+                            fill={`url(#${gradId})`}
+                            fillOpacity={opacity[repoName] ?? 0.7}
+                            dot={false}
+                            activeDot={{ r: 4, strokeWidth: 0 }}
+                            animationDuration={1000}
+                            connectNulls
+                        />
+                    );
+                })}
 
-                {/* Total commits line (on top) */}
-                <Line
+                {/* Total commits area (on top) */}
+                <Area
                     type="monotone"
                     dataKey="total"
                     name="Total Commits"
                     stroke="#e5e7eb"
-                    strokeWidth={2.5}
+                    strokeWidth={2}
                     strokeOpacity={opacity["total"] ?? 1}
+                    fill="url(#grad-total)"
+                    fillOpacity={opacity["total"] ?? 1}
                     dot={false}
-                    activeDot={{ r: 6, fill: "#fff" }}
-                    animationDuration={800}
+                    activeDot={{ r: 5, fill: "#fff", strokeWidth: 0 }}
+                    animationDuration={1000}
                 />
-            </LineChart>
+            </AreaChart>
         </ResponsiveContainer>
     );
 };
