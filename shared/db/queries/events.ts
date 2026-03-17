@@ -259,8 +259,8 @@ export async function getContributorStatsByRepo(repoId: number): Promise<
             c.author_login AS login,
             cp.avatar_url,
             COUNT(*)::INTEGER AS commits,
-            COALESCE(SUM(c.additions) FILTER (WHERE c.is_merge = false), 0)::INTEGER AS additions,
-            COALESCE(SUM(c.deletions) FILTER (WHERE c.is_merge = false), 0)::INTEGER AS deletions
+            COALESCE(SUM(c.additions) FILTER (WHERE c.is_merge = false), 0)::BIGINT AS additions,
+            COALESCE(SUM(c.deletions) FILTER (WHERE c.is_merge = false), 0)::BIGINT AS deletions
          FROM commit_event c
          LEFT JOIN contributor_profile cp ON cp.login = c.author_login
          WHERE c.repo_id = $1 AND c.author_login IS NOT NULL
@@ -327,7 +327,7 @@ export async function getWorkflowStatsByRepo(repoId: number): Promise<
             COUNT(*) FILTER (WHERE conclusion = 'failure')::INTEGER AS failure_count,
             COUNT(*) FILTER (WHERE conclusion = 'cancelled')::INTEGER AS cancelled_count,
             COALESCE(AVG(duration_seconds) FILTER (WHERE duration_seconds IS NOT NULL), 0)::INTEGER AS avg_duration_seconds,
-            COALESCE(SUM(duration_seconds) FILTER (WHERE duration_seconds IS NOT NULL), 0)::INTEGER AS total_duration_seconds,
+            COALESCE(SUM(duration_seconds) FILTER (WHERE duration_seconds IS NOT NULL), 0)::BIGINT AS total_duration_seconds,
             COALESCE(ROUND(COUNT(*) FILTER (WHERE conclusion = 'success')::NUMERIC / NULLIF(COUNT(*), 0) * 100, 1), 0)::NUMERIC AS success_rate
          FROM workflow_event
          WHERE repo_id = $1 AND status = 'completed'
@@ -363,7 +363,7 @@ export async function getWorkflowStatsByOwner(ownerLogin: string): Promise<{
         }>(
             `SELECT
                 COUNT(*)::INTEGER AS total_runs,
-                COALESCE(SUM(we.duration_seconds), 0)::INTEGER AS total_duration_seconds,
+                COALESCE(SUM(we.duration_seconds), 0)::BIGINT AS total_duration_seconds,
                 COALESCE(ROUND(COUNT(*) FILTER (WHERE we.conclusion = 'success')::NUMERIC / NULLIF(COUNT(*), 0) * 100, 1), 0)::NUMERIC AS success_rate,
                 COALESCE(AVG(we.duration_seconds) FILTER (WHERE we.duration_seconds IS NOT NULL), 0)::INTEGER AS avg_duration_seconds
              FROM workflow_event we
@@ -395,7 +395,7 @@ export async function getWorkflowStatsByOwner(ownerLogin: string): Promise<{
         }>(
             `SELECT
                 we.actor_login AS login,
-                COALESCE(SUM(we.duration_seconds), 0)::INTEGER AS total_duration_seconds,
+                COALESCE(SUM(we.duration_seconds), 0)::BIGINT AS total_duration_seconds,
                 COUNT(*)::INTEGER AS run_count
              FROM workflow_event we
              JOIN repository_meta rm ON rm.id = we.repo_id
