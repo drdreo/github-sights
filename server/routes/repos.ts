@@ -312,7 +312,9 @@ repos.get("/api/workflow-stats/:owner", async (c) => {
         const { owner } = c.req.param();
         requireConfig(owner);
 
-        const stats = await getWorkflowStatsByOwner(owner);
+        const since = c.req.query("since") || undefined;
+        const until = c.req.query("until") || undefined;
+        const stats = await getWorkflowStatsByOwner(owner, since, until);
         return c.json({
             totalRuns: stats.total_runs,
             totalDurationSeconds: stats.total_duration_seconds,

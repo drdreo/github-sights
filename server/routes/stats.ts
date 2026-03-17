@@ -36,7 +36,13 @@ stats.get("/api/stats/:owner", async (c) => {
                 totalDeletions: Number(agg.total_deletions),
                 totalPRs: agg.total_pr_opened + agg.total_pr_merged + agg.total_pr_closed,
                 openPRs: agg.total_pr_opened,
-                mergedPRs: agg.total_pr_merged
+                mergedPRs: agg.total_pr_merged,
+                totalRepos: agg.active_repos,
+                uniqueContributors: agg.unique_contributors,
+                mostActiveRepo: agg.most_active_repo_name
+                    ? { name: agg.most_active_repo_name, commits: agg.most_active_repo_commits }
+                    : null,
+                avgCommitsPerDay: agg.avg_commits_per_day
             });
         }
 

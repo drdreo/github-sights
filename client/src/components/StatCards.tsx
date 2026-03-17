@@ -1,6 +1,5 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { format } from "date-fns";
 import { formatDuration, formatLoc } from "../lib/format";
 import { OverviewStats } from "../types";
 import { LoadingSkeleton } from "./LoadingSkeleton";
@@ -22,7 +21,6 @@ interface StatCardsProps {
     loading?: boolean;
     owner: string;
     dateRangeLabel?: string;
-    syncSince?: string;
     workflowStats?: OwnerWorkflowStats;
 }
 
@@ -31,7 +29,6 @@ export function StatCards({
     loading,
     owner,
     dateRangeLabel,
-    syncSince,
     workflowStats
 }: StatCardsProps) {
     const navigate = useNavigate();
@@ -100,11 +97,24 @@ export function StatCards({
             : [])
     ];
 
+    const hasDateRange = !!dateRangeLabel;
+
     const overviewCards: StatCardDef[] = [
         {
-            label: "Total Repos",
+            label: "Most Active Repo",
+            value: stats.mostActiveRepo?.name || "N/A",
+            subtext: `${stats.mostActiveRepo?.commits || 0} commits`,
+            icon: Activity,
+            color: "text-emerald-400",
+            bg: "bg-emerald-500/10",
+            href: stats.mostActiveRepo?.name
+                ? `/${owner}/repo/${stats.mostActiveRepo.name}`
+                : undefined
+        },
+        {
+            label: hasDateRange ? "Active Repos" : "Total Repos",
             value: stats.totalRepos,
-            subtext: "Tracking activity",
+            subtext: hasDateRange ? "With activity in period" : "Tracking activity",
             icon: Box,
             color: "text-gray-400",
             bg: "bg-gray-800",
@@ -118,17 +128,6 @@ export function StatCards({
             color: "text-orange-400",
             bg: "bg-orange-500/10",
             href: `/${owner}/contributors`
-        },
-        {
-            label: "Most Active Repo",
-            value: stats.mostActiveRepo?.name || "N/A",
-            subtext: `${stats.mostActiveRepo?.commits || 0} commits`,
-            icon: Activity,
-            color: "text-emerald-400",
-            bg: "bg-emerald-500/10",
-            href: stats.mostActiveRepo?.name
-                ? `/${owner}/repo/${stats.mostActiveRepo.name}`
-                : undefined
         },
         {
             label: "Longest Streak",
@@ -198,8 +197,7 @@ export function StatCards({
             </div>
             <div>
                 <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">
-                    Overview
-                    {syncSince ? ` · Since ${format(new Date(syncSince), "MMM d, yyyy")}` : ""}
+                    Overview{dateRangeLabel ? ` · ${dateRangeLabel}` : ""}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {overviewCards.map(renderCard)}

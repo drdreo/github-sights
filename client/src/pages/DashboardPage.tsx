@@ -8,7 +8,6 @@ import { LanguageDistribution } from "../components/LanguageDistribution";
 import { StatCards } from "../components/StatCards";
 import {
     useCommitTimelines,
-    useOwnerConfig,
     useOwnerWorkflowStats,
     useStats,
     useSync
@@ -28,7 +27,7 @@ export default function DashboardPage() {
     const until = dateRange.endDate.toISOString();
 
     const { data: stats, isLoading: statsLoading } = useStats(owner, since, until);
-    const { data: workflowStats } = useOwnerWorkflowStats(owner);
+    const { data: workflowStats } = useOwnerWorkflowStats(owner, since, until);
     const { data: timelines, isLoading: timelinesLoading } = useCommitTimelines(
         owner,
         since,
@@ -38,8 +37,6 @@ export default function DashboardPage() {
     // Read initial sync range from URL (set by SetupPage on first-time redirect)
     const [searchParams] = useSearchParams();
     const syncSince = searchParams.get("syncSince") || undefined;
-
-    const { data: ownerConfig } = useOwnerConfig(owner);
 
     useSync(owner, syncSince);
     const { data: syncProgress } = useSyncProgress(owner);
@@ -62,7 +59,6 @@ export default function DashboardPage() {
                         loading={statsLoading}
                         owner={owner}
                         dateRangeLabel={`Last ${differenceInDays(dateRange.endDate, dateRange.startDate)} days`}
-                        syncSince={ownerConfig?.syncSince ?? undefined}
                         workflowStats={workflowStats}
                     />
                 </div>

@@ -147,39 +147,90 @@ export async function getRepoDailyActivity(
  * Aggregate daily activity over a date range for an owner.
  * Returns summed totals (useful for date-range filtered stats).
  */
-export async function aggregateOwnerActivity(
-    ownerLogin: string,
-    since: string,
-    until: string
-): Promise<{
+export interface OwnerActivityAggregation {
     total_commits: number;
     total_additions: number;
     total_deletions: number;
     total_pr_opened: number;
     total_pr_merged: number;
     total_pr_closed: number;
-} | null> {
-    return query<{
-        total_commits: number;
-        total_additions: number;
-        total_deletions: number;
-        total_pr_opened: number;
-        total_pr_merged: number;
-        total_pr_closed: number;
-    }>(
-        `SELECT
-            COALESCE(SUM(commit_count), 0)::INTEGER AS total_commits,
-            COALESCE(SUM(additions), 0)::BIGINT AS total_additions,
-            COALESCE(SUM(deletions), 0)::BIGINT AS total_deletions,
-            COALESCE(SUM(pr_opened), 0)::INTEGER AS total_pr_opened,
-            COALESCE(SUM(pr_merged), 0)::INTEGER AS total_pr_merged,
-            COALESCE(SUM(pr_closed), 0)::INTEGER AS total_pr_closed
-         FROM daily_activity
-         WHERE owner_login = $1
-           AND repo_id IS NULL AND contributor_login IS NULL
-           AND date BETWEEN $2 AND $3`,
-        [ownerLogin, since, until]
-    ).then((rows) => rows[0] ?? null);
+    active_repos: number;
+    unique_contributors: number;
+    most_active_repo_name: string | null;
+    most_active_repo_commits: number;
+    avg_commits_per_day: number;
+}
+
+export async function aggregateOwnerActivity(
+    ownerLogin: string,
+    since: string,
+    until: string
+): Promise<OwnerActivityAggregation | null> {
+    const [totals, repoActivity, contributors] = await Promise.all([
+        // Owner-level totals (repo_id IS NULL rows)
+        query<{
+            total_commits: number;
+            total_additions: number;
+            total_deletions: number;
+            total_pr_opened: number;
+            total_pr_merged: number;
+            total_pr_closed: number;
+            days_with_commits: number;
+        }>(
+            `SELECT
+                COALESCE(SUM(commit_count), 0)::INTEGER AS total_commits,
+                COALESCE(SUM(additions), 0)::BIGINT AS total_additions,
+                COALESCE(SUM(deletions), 0)::BIGINT AS total_deletions,
+                COALESCE(SUM(pr_opened), 0)::INTEGER AS total_pr_opened,
+                COALESCE(SUM(pr_merged), 0)::INTEGER AS total_pr_merged,
+                COALESCE(SUM(pr_closed), 0)::INTEGER AS total_pr_closed,
+                COUNT(*) FILTER (WHERE commit_count > 0)::INTEGER AS days_with_commits
+             FROM daily_activity
+             WHERE owner_login = $1
+               AND repo_id IS NULL AND contributor_login IS NULL
+               AND date BETWEEN $2 AND $3`,
+            [ownerLogin, since, until]
+        ),
+        // Per-repo activity (for active repos + most active repo)
+        query<{
+            repo_name: string;
+            total_commits: number;
+        }>(
+            `SELECT rm.name AS repo_name, COALESCE(SUM(da.commit_count), 0)::INTEGER AS total_commits
+             FROM daily_activity da
+             JOIN repository_meta rm ON rm.id = da.repo_id
+             WHERE da.owner_login = $1
+               AND da.repo_id IS NOT NULL AND da.contributor_login IS NULL
+               AND da.date BETWEEN $2 AND $3
+             GROUP BY rm.name
+             HAVING SUM(da.commit_count) > 0 OR SUM(da.pr_opened) > 0 OR SUM(da.pr_merged) > 0
+             ORDER BY total_commits DESC`,
+            [ownerLogin, since, until]
+        ),
+        // Unique contributors — reuse aggregateContributorActivity to avoid duplicating the query
+        aggregateContributorActivity(ownerLogin, since, until)
+    ]);
+
+    const t = totals[0];
+    if (!t) return null;
+
+    const dayCount = Math.max(1, Math.round(
+        (new Date(until).getTime() - new Date(since).getTime()) / (1000 * 60 * 60 * 24)
+    ));
+
+    return {
+        total_commits: t.total_commits,
+        total_additions: t.total_additions,
+        total_deletions: t.total_deletions,
+        total_pr_opened: t.total_pr_opened,
+        total_pr_merged: t.total_pr_merged,
+        total_pr_closed: t.total_pr_closed,
+        active_repos: repoActivity.length,
+        unique_contributors: contributors.length,
+        most_active_repo_name: repoActivity[0]?.repo_name ?? null,
+        most_active_repo_commits: repoActivity[0]?.total_commits ?? 0,
+        avg_commits_per_day: Math.round((t.total_commits / dayCount) * 10) / 10
+    };
 }
 
 // ── Contributor Activity Aggregation ─────────────────────────────────────────────

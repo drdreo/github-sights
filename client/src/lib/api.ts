@@ -178,8 +178,13 @@ export const api = {
     getWorkflowStats: (owner: string, repo: string) =>
         fetchApi<WorkflowStat[]>(`/repos/${owner}/${repo}/workflow-stats`),
 
-    getOwnerWorkflowStats: (owner: string) =>
-        fetchApi<OwnerWorkflowStats>(`/workflow-stats/${encodeURIComponent(owner)}`),
+    getOwnerWorkflowStats: (owner: string, since?: string, until?: string) => {
+        const params = new URLSearchParams();
+        if (since) params.set("since", since);
+        if (until) params.set("until", until);
+        const qs = params.toString();
+        return fetchApi<OwnerWorkflowStats>(`/workflow-stats/${encodeURIComponent(owner)}${qs ? `?${qs}` : ""}`);
+    },
 
     /** Trigger sync — ensures data freshness (debounced to hourly).
      *  Pass `since`/`until` to bypass staleness check and always enqueue. */

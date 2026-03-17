@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { api } from "../lib/api";
 import type { Commit, DailyCommitActivity, RepoCommitTimeline } from "../types";
@@ -64,7 +64,8 @@ export function useStats(owner: string, since?: string, until?: string) {
     return useQuery({
         queryKey: ["stats", owner, since, until],
         queryFn: () => api.getStats(owner, since, until, true),
-        enabled: !!owner
+        enabled: !!owner,
+        placeholderData: keepPreviousData
     });
 }
 
@@ -97,7 +98,8 @@ export function useCommitTimelines(owner: string, since?: string, until?: string
 
             return timelines.sort((a, b) => b.totalCommits - a.totalCommits);
         },
-        enabled: !!owner
+        enabled: !!owner,
+        placeholderData: keepPreviousData
     });
 }
 
@@ -251,10 +253,11 @@ export function useWorkflowStats(owner: string, repo: string) {
     });
 }
 
-export function useOwnerWorkflowStats(owner: string) {
+export function useOwnerWorkflowStats(owner: string, since?: string, until?: string) {
     return useQuery({
-        queryKey: ["owner-workflow-stats", owner],
-        queryFn: () => api.getOwnerWorkflowStats(owner),
-        enabled: !!owner
+        queryKey: ["owner-workflow-stats", owner, since, until],
+        queryFn: () => api.getOwnerWorkflowStats(owner, since, until),
+        enabled: !!owner,
+        placeholderData: keepPreviousData
     });
 }

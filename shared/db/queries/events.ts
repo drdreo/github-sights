@@ -338,7 +338,7 @@ export async function getWorkflowStatsByRepo(repoId: number): Promise<
 }
 
 /** Owner-wide workflow stats for dashboard. */
-export async function getWorkflowStatsByOwner(ownerLogin: string): Promise<{
+export async function getWorkflowStatsByOwner(ownerLogin: string, since?: string, until?: string): Promise<{
     total_runs: number;
     total_duration_seconds: number;
     success_rate: number;
@@ -354,6 +354,17 @@ export async function getWorkflowStatsByOwner(ownerLogin: string): Promise<{
         run_count: number;
     }>;
 }> {
+    const params: (string | undefined)[] = [ownerLogin];
+    let dateFilter = "";
+    if (since) {
+        params.push(since);
+        dateFilter += ` AND we.created_at >= $${params.length}`;
+    }
+    if (until) {
+        params.push(until);
+        dateFilter += ` AND we.created_at <= $${params.length}`;
+    }
+
     const [totalsRows, topFailing, topContributors] = await Promise.all([
         query<{
             total_runs: number;
@@ -368,8 +379,8 @@ export async function getWorkflowStatsByOwner(ownerLogin: string): Promise<{
                 COALESCE(AVG(we.duration_seconds) FILTER (WHERE we.duration_seconds IS NOT NULL), 0)::INTEGER AS avg_duration_seconds
              FROM workflow_event we
              JOIN repository_meta rm ON rm.id = we.repo_id
-             WHERE rm.owner_login = $1 AND we.status = 'completed'`,
-            [ownerLogin]
+             WHERE rm.owner_login = $1 AND we.status = 'completed'${dateFilter}`,
+            params
         ),
         query<{
             workflow_name: string;
@@ -382,11 +393,11 @@ export async function getWorkflowStatsByOwner(ownerLogin: string): Promise<{
                 COUNT(*)::INTEGER AS failure_count
              FROM workflow_event we
              JOIN repository_meta rm ON rm.id = we.repo_id
-             WHERE rm.owner_login = $1 AND we.status = 'completed' AND we.conclusion IN ('failure','timed_out')
+             WHERE rm.owner_login = $1 AND we.status = 'completed' AND we.conclusion IN ('failure','timed_out')${dateFilter}
              GROUP BY we.workflow_name, rm.name
              ORDER BY failure_count DESC
              LIMIT 5`,
-            [ownerLogin]
+            params
         ),
         query<{
             login: string;
@@ -399,11 +410,11 @@ export async function getWorkflowStatsByOwner(ownerLogin: string): Promise<{
                 COUNT(*)::INTEGER AS run_count
              FROM workflow_event we
              JOIN repository_meta rm ON rm.id = we.repo_id
-             WHERE rm.owner_login = $1 AND we.status = 'completed' AND we.actor_login IS NOT NULL
+             WHERE rm.owner_login = $1 AND we.status = 'completed' AND we.actor_login IS NOT NULL${dateFilter}
              GROUP BY we.actor_login
              ORDER BY total_duration_seconds DESC
              LIMIT 10`,
-            [ownerLogin]
+            params
         )
     ]);
 
