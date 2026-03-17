@@ -9,7 +9,7 @@ import type { OwnerWorkflowStats } from "../types";
 interface StatCardDef {
     label: string;
     value: string | number;
-    subtext: string;
+    subtext: React.ReactNode;
     icon: React.ElementType;
     color: string;
     bg: string;
@@ -78,7 +78,13 @@ export function StatCards({
         {
             label: "Lines Changed",
             value: formatLoc(totalLoc),
-            subtext: `+${formatLoc(stats.totalAdditions ?? 0)} / -${formatLoc(stats.totalDeletions ?? 0)}`,
+            subtext: (
+                <>
+                    <span className="text-green-400">+{formatLoc(stats.totalAdditions ?? 0)}</span>
+                    {" / "}
+                    <span className="text-red-400">-{formatLoc(stats.totalDeletions ?? 0)}</span>
+                </>
+            ),
             icon: Code,
             color: "text-cyan-400",
             bg: "bg-cyan-500/10"

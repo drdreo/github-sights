@@ -251,6 +251,22 @@ export default function ContributorDetailPage() {
                                 : "N/A"
                         }
                     />
+                    <StatBadge
+                        label="First PR"
+                        value={
+                            contributor.firstPrAt
+                                ? format(new Date(contributor.firstPrAt), "MMM d, yyyy")
+                                : "N/A"
+                        }
+                    />
+                    <StatBadge
+                        label="Last PR"
+                        value={
+                            contributor.lastPrAt
+                                ? format(new Date(contributor.lastPrAt), "MMM d, yyyy")
+                                : "N/A"
+                        }
+                    />
                 </div>
 
                 {/* Activity Chart */}

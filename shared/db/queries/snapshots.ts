@@ -196,6 +196,8 @@ export interface UpsertContributorSnapshotInput {
     first_commit_at: Date | string | null;
     last_commit_at: Date | string | null;
     active_days: number;
+    first_pr_at: Date | string | null;
+    last_pr_at: Date | string | null;
 }
 
 export async function upsertContributorSnapshot(
@@ -209,8 +211,9 @@ export async function upsertContributorSnapshot(
             repos, repo_count,
             workflow_runs_triggered, workflow_failure_rate,
             first_commit_at, last_commit_at, active_days,
+            first_pr_at, last_pr_at,
             computed_at
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW())
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW())
          ON CONFLICT (owner_login, contributor_login) DO UPDATE SET
             avatar_url=COALESCE($3, contributor_snapshot.avatar_url),
             html_url=COALESCE($4, contributor_snapshot.html_url),
@@ -219,6 +222,7 @@ export async function upsertContributorSnapshot(
             repos=$10, repo_count=$11,
             workflow_runs_triggered=$12, workflow_failure_rate=$13,
             first_commit_at=$14, last_commit_at=$15, active_days=$16,
+            first_pr_at=$17, last_pr_at=$18,
             computed_at=NOW()`,
         [
             snap.owner_login,
@@ -236,7 +240,9 @@ export async function upsertContributorSnapshot(
             snap.workflow_failure_rate,
             snap.first_commit_at,
             snap.last_commit_at,
-            snap.active_days
+            snap.active_days,
+            snap.first_pr_at,
+            snap.last_pr_at
         ]
     );
 }

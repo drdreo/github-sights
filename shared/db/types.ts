@@ -205,6 +205,8 @@ export interface ContributorSnapshotRow {
     first_commit_at: Date | null;
     last_commit_at: Date | null;
     active_days: number;
+    first_pr_at: Date | null;
+    last_pr_at: Date | null;
     computed_at: Date;
 }
 

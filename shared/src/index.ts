@@ -195,6 +195,8 @@ export interface ContributorDetail {
     activeDays: number;
     firstCommitAt: string | null;
     lastCommitAt: string | null;
+    firstPrAt: string | null;
+    lastPrAt: string | null;
     repoBreakdown: {
         repo: string;
         commits: number;

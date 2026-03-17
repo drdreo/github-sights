@@ -152,6 +152,14 @@ export async function aggregateOwner(ownerLogin: string): Promise<AggregateResul
         `[aggregate] ${ownerLogin}: rebuilt ${ownerDailyRows} owner-level daily activity rows`
     );
 
+    // Step 2b: Rebuild contributor-level daily_activity (per-contributor, repo_id IS NULL)
+    console.log(`[aggregate] ${ownerLogin}: rebuilding contributor daily activity`);
+    const contribDailyRows = await rebuildContributorDailyActivity(ownerLogin);
+    dailyActivityRows += contribDailyRows;
+    console.log(
+        `[aggregate] ${ownerLogin}: rebuilt ${contribDailyRows} contributor-level daily activity rows`
+    );
+
     // Step 3: Rebuild contributor_snapshot
     console.log(`[aggregate] ${ownerLogin}: rebuilding contributor snapshots`);
     const contributorSnapshots = await rebuildContributorSnapshots(ownerLogin);
@@ -454,7 +462,7 @@ async function buildAndUpsertRepoSnapshot(
  */
 async function rebuildOwnerDailyActivity(ownerLogin: string): Promise<number> {
     // Clear existing owner-level rows (repo_id IS NULL)
-    await query("DELETE FROM daily_activity WHERE owner_login = $1 AND repo_id IS NULL", [
+    await query("DELETE FROM daily_activity WHERE owner_login = $1 AND repo_id IS NULL AND contributor_login IS NULL", [
         ownerLogin
     ]);
 
@@ -486,6 +494,92 @@ async function rebuildOwnerDailyActivity(ownerLogin: string): Promise<number> {
     return rows.length;
 }
 
+// ── Contributor-Level Daily Activity ─────────────────────────────────────────
+
+/**
+ * Rebuild contributor-level daily_activity rows (repo_id IS NULL, contributor_login IS NOT NULL).
+ * Aggregates from commit_event + pr_event per contributor per date.
+ * These rows power the date-filtered contributor detail view.
+ */
+async function rebuildContributorDailyActivity(ownerLogin: string): Promise<number> {
+    // Clear existing contributor-level rows
+    await query(
+        "DELETE FROM daily_activity WHERE owner_login = $1 AND repo_id IS NULL AND contributor_login IS NOT NULL",
+        [ownerLogin]
+    );
+
+    // Aggregate per-contributor daily stats from raw events
+    const rows = await query<UpsertDailyActivityInput>(
+        `WITH commit_daily AS (
+            SELECT
+                ce.author_login AS contributor_login,
+                ce.committed_at::DATE::TEXT AS date,
+                COUNT(*)::INTEGER AS commit_count,
+                COALESCE(SUM(ce.additions) FILTER (WHERE ce.is_merge = false), 0)::INTEGER AS additions,
+                COALESCE(SUM(ce.deletions) FILTER (WHERE ce.is_merge = false), 0)::INTEGER AS deletions
+            FROM commit_event ce
+            JOIN repository_meta rm ON rm.id = ce.repo_id
+            WHERE rm.owner_login = $1 AND ce.author_login IS NOT NULL
+            GROUP BY ce.author_login, ce.committed_at::DATE
+        ),
+        pr_opened AS (
+            SELECT pe.author_login AS contributor_login,
+                   pe.created_at::DATE::TEXT AS date, COUNT(*)::INTEGER AS cnt
+            FROM pr_event pe
+            JOIN repository_meta rm ON rm.id = pe.repo_id
+            WHERE rm.owner_login = $1 AND pe.author_login IS NOT NULL
+            GROUP BY pe.author_login, pe.created_at::DATE
+        ),
+        pr_merged AS (
+            SELECT pe.author_login AS contributor_login,
+                   pe.merged_at::DATE::TEXT AS date, COUNT(*)::INTEGER AS cnt
+            FROM pr_event pe
+            JOIN repository_meta rm ON rm.id = pe.repo_id
+            WHERE rm.owner_login = $1 AND pe.merged_at IS NOT NULL AND pe.author_login IS NOT NULL
+            GROUP BY pe.author_login, pe.merged_at::DATE
+        ),
+        pr_closed AS (
+            SELECT pe.author_login AS contributor_login,
+                   pe.closed_at::DATE::TEXT AS date, COUNT(*)::INTEGER AS cnt
+            FROM pr_event pe
+            JOIN repository_meta rm ON rm.id = pe.repo_id
+            WHERE rm.owner_login = $1 AND pe.closed_at IS NOT NULL AND pe.merged_at IS NULL AND pe.author_login IS NOT NULL
+            GROUP BY pe.author_login, pe.closed_at::DATE
+        ),
+        all_contributor_dates AS (
+            SELECT contributor_login, date FROM commit_daily
+            UNION SELECT contributor_login, date FROM pr_opened
+            UNION SELECT contributor_login, date FROM pr_merged
+            UNION SELECT contributor_login, date FROM pr_closed
+        )
+        SELECT
+            $1::TEXT AS owner_login,
+            NULL::INTEGER AS repo_id,
+            d.contributor_login,
+            d.date,
+            COALESCE(cd.commit_count, 0) AS commit_count,
+            COALESCE(cd.additions, 0) AS additions,
+            COALESCE(cd.deletions, 0) AS deletions,
+            COALESCE(po.cnt, 0) AS pr_opened,
+            COALESCE(pm.cnt, 0) AS pr_merged,
+            COALESCE(pc.cnt, 0) AS pr_closed,
+            0 AS workflow_runs,
+            0 AS workflow_failures
+        FROM all_contributor_dates d
+        LEFT JOIN commit_daily cd ON cd.contributor_login = d.contributor_login AND cd.date = d.date
+        LEFT JOIN pr_opened po ON po.contributor_login = d.contributor_login AND po.date = d.date
+        LEFT JOIN pr_merged pm ON pm.contributor_login = d.contributor_login AND pm.date = d.date
+        LEFT JOIN pr_closed pc ON pc.contributor_login = d.contributor_login AND pc.date = d.date`,
+        [ownerLogin]
+    );
+
+    if (rows.length > 0) {
+        await upsertDailyActivity(rows);
+    }
+
+    return rows.length;
+}
+
 // ── Contributor Snapshots ────────────────────────────────────────────────────────
 
 /**
@@ -506,6 +600,8 @@ async function rebuildContributorSnapshots(ownerLogin: string): Promise<number> 
         repo_count: number;
         first_commit_at: Date | null;
         last_commit_at: Date | null;
+        first_pr_at: Date | null;
+        last_pr_at: Date | null;
         active_days: number;
         workflow_runs_triggered: number;
         workflow_failure_rate: number;
@@ -513,13 +609,13 @@ async function rebuildContributorSnapshots(ownerLogin: string): Promise<number> 
         `WITH commit_stats AS (
             SELECT
                 ce.author_login AS login,
-                COUNT(*)::INTEGER AS total_commits,
+                COUNT(*) FILTER (WHERE ce.is_merge = false)::INTEGER AS total_commits,
                 COALESCE(SUM(ce.additions) FILTER (WHERE ce.is_merge = false), 0)::INTEGER AS total_additions,
                 COALESCE(SUM(ce.deletions) FILTER (WHERE ce.is_merge = false), 0)::INTEGER AS total_deletions,
                 ARRAY_AGG(DISTINCT rm.name) AS commit_repos,
                 MIN(ce.committed_at) AS first_commit_at,
                 MAX(ce.committed_at) AS last_commit_at,
-                COUNT(DISTINCT ce.committed_at::DATE)::INTEGER AS active_days
+                ARRAY_AGG(DISTINCT ce.committed_at::DATE) AS commit_dates
             FROM commit_event ce
             JOIN repository_meta rm ON rm.id = ce.repo_id
             WHERE rm.owner_login = $1 AND ce.author_login IS NOT NULL
@@ -530,7 +626,10 @@ async function rebuildContributorSnapshots(ownerLogin: string): Promise<number> 
                 pe.author_login AS login,
                 COUNT(*)::INTEGER AS total_prs,
                 COUNT(*) FILTER (WHERE pe.merged_at IS NOT NULL)::INTEGER AS total_prs_merged,
-                ARRAY_AGG(DISTINCT rm.name) AS pr_repos
+                ARRAY_AGG(DISTINCT rm.name) AS pr_repos,
+                ARRAY_AGG(DISTINCT pe.created_at::DATE) AS pr_dates
+                MIN(pe.created_at) AS first_pr_at,
+                MAX(pe.created_at) AS last_pr_at
             FROM pr_event pe
             JOIN repository_meta rm ON rm.id = pe.repo_id
             WHERE rm.owner_login = $1 AND pe.author_login IS NOT NULL
@@ -558,7 +657,11 @@ async function rebuildContributorSnapshots(ownerLogin: string): Promise<number> 
                 p.pr_repos,
                 c.first_commit_at,
                 c.last_commit_at,
-                COALESCE(c.active_days, 0) AS active_days,
+                p.first_pr_at,
+                p.last_pr_at,
+                (SELECT COUNT(DISTINCT d) FROM UNNEST(
+                    COALESCE(c.commit_dates, '{}') || COALESCE(p.pr_dates, '{}')
+                ) AS d)::INTEGER AS active_days,
                 COALESCE(w.runs_triggered, 0) AS workflow_runs_triggered,
                 COALESCE(w.failure_rate, 0) AS workflow_failure_rate
             FROM commit_stats c
@@ -582,6 +685,8 @@ async function rebuildContributorSnapshots(ownerLogin: string): Promise<number> 
             ) AS r)::INTEGER AS repo_count,
             combined.first_commit_at,
             combined.last_commit_at,
+            combined.first_pr_at,
+            combined.last_pr_at,
             combined.active_days,
             combined.workflow_runs_triggered,
             combined.workflow_failure_rate
@@ -608,7 +713,9 @@ async function rebuildContributorSnapshots(ownerLogin: string): Promise<number> 
             workflow_failure_rate: Number(row.workflow_failure_rate) || 0,
             first_commit_at: row.first_commit_at,
             last_commit_at: row.last_commit_at,
-            active_days: row.active_days
+            active_days: row.active_days,
+            first_pr_at: row.first_pr_at,
+            last_pr_at: row.last_pr_at,
         };
 
         await upsertContributorSnapshot(snap);

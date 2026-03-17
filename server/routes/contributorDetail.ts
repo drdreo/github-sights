@@ -64,6 +64,12 @@ contributorDetail.get("/api/contributors/:owner/:login", async (c) => {
             lastCommitAt: snapshot.last_commit_at
                 ? new Date(snapshot.last_commit_at).toISOString()
                 : null,
+            firstPrAt: snapshot.first_pr_at
+                ? new Date(snapshot.first_pr_at).toISOString()
+                : null,
+            lastPrAt: snapshot.last_pr_at
+                ? new Date(snapshot.last_pr_at).toISOString()
+                : null,
             repoBreakdown: repoBreakdown.map((r) => ({
                 repo: r.repo,
                 commits: Number(r.commits),
