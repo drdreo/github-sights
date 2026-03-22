@@ -160,9 +160,15 @@ export async function ensureFresh(
     return false;
 }
 
+/** How long a job can go without a heartbeat before we consider the crawler stale. */
+const CRAWLER_STALE_MS = 2 * 60 * 1000; // 2 minutes — matches STALE_MINUTES in sync-jobs.ts
+
 /**
  * Get sync progress for an owner. Reads from the sync_job table instead
  * of in-memory state — survives crawler restarts.
+ *
+ * If the active job looks stale (crawler likely asleep), re-wakes the crawler
+ * so it can resume processing.
  */
 export async function getProgress(owner: string): Promise<SyncProgress> {
     const ownerRow = await getOwner(owner);
@@ -171,6 +177,17 @@ export async function getProgress(owner: string): Promise<SyncProgress> {
     // Check for active job first
     const active = await getActiveJob(owner);
     if (active) {
+        // If the job hasn't been touched recently, the crawler likely went to sleep.
+        // Re-wake it so it picks the job back up.
+        const heartbeat = active.claimed_at ?? active.created_at;
+        const staleSince = Date.now() - heartbeat.getTime();
+        if (staleSince > CRAWLER_STALE_MS) {
+            console.log(
+                `[sync] Active job #${active.id} stale for ${Math.round(staleSince / 1000)}s — re-waking crawler`
+            );
+            // Fire-and-forget — don't block the progress response
+            wakeCrawler().catch(() => {});
+        }
         return jobToProgress(active, lastSyncedAt);
     }
 

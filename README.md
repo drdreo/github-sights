@@ -29,3 +29,28 @@ Deploy web app via `wrangler depoly`.
 
 Deno.
 Deploy server via `deno deploy` but the repository is connected anyways and auto-deploys
+
+
+
+### Architecture
+
+Static frontend app is hosted as a Cloudflare worker.
+Server app is deployed on Deno which will sleep on idle requests within minutes.
+Crawler app is hosted on Railway which sleeps on inactivity after 10 minutes.
+
+#### Wake chain
+
+All three services can sleep independently. The wake chain ensures sync jobs
+resume even after prolonged inactivity:
+
+```
+Client polls /api/sync/progress/:owner
+  → Deno server wakes up (Deno auto-wakes on HTTP)
+  → Server reads sync_job from DB
+  → If the job's heartbeat (claimed_at) is stale (>2 min), server POSTs /wake to the crawler
+  → Railway wakes the crawler on the inbound request
+  → Crawler resumes draining the job queue
+```
+
+The server acts as the bridge: a client progress poll can transitively wake the
+crawler, so no job stays stuck in "running" after the crawler scales to zero.
