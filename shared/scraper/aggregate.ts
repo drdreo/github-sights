@@ -627,7 +627,7 @@ async function rebuildContributorSnapshots(ownerLogin: string): Promise<number> 
                 COUNT(*)::INTEGER AS total_prs,
                 COUNT(*) FILTER (WHERE pe.merged_at IS NOT NULL)::INTEGER AS total_prs_merged,
                 ARRAY_AGG(DISTINCT rm.name) AS pr_repos,
-                ARRAY_AGG(DISTINCT pe.created_at::DATE) AS pr_dates
+                ARRAY_AGG(DISTINCT pe.created_at::DATE) AS pr_dates,
                 MIN(pe.created_at) AS first_pr_at,
                 MAX(pe.created_at) AS last_pr_at
             FROM pr_event pe
