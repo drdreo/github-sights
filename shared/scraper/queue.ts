@@ -24,6 +24,7 @@ import {
     createOctokit,
     refreshRateLimit,
     getRateLimitState,
+    setRateLimitHeartbeat,
     type GitHubRepo
 } from "./github-client.ts";
 import {
@@ -74,6 +75,18 @@ export async function tick(): Promise<boolean> {
 
         const octokit = createOctokit(config.token);
 
+        // Register heartbeat on this octokit so rate-limit pauses keep
+        // claimed_at fresh and surface the reset time to the UI.
+        // Keyed per-octokit, so concurrent jobs don't clobber each other.
+        setRateLimitHeartbeat(octokit, async (resetAt) => {
+            await advanceJob(job.id, { rate_limit_reset_at: resetAt });
+            if (resetAt) {
+                console.log(`[queue] Job #${job.id}: heartbeat (rate-limit pause until ${resetAt})`);
+            } else {
+                console.log(`[queue] Job #${job.id}: heartbeat (rate-limit pause ended)`);
+            }
+        });
+
         switch (job.job_type) {
             case "full_sync":
                 await processFullSync(job, octokit, config.ownerType, tickStart);
@@ -82,6 +95,8 @@ export async function tick(): Promise<boolean> {
                 await processRepoSync(job, octokit);
                 break;
         }
+
+        setRateLimitHeartbeat(octokit, null);
     } catch (err) {
         console.error(`[queue] Job #${job.id} tick failed:`, err);
         await failJob(job.id, String(err));

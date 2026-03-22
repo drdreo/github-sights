@@ -51,6 +51,7 @@ export interface SyncProgress {
     lastSyncedAt: string | null;
     errors: string[];
     jobId: number | null;
+    rateLimitResetAt: string | null;
 }
 
 export interface EnqueueResult {
@@ -163,12 +164,16 @@ export async function ensureFresh(
 /** How long a job can go without a heartbeat before we consider the crawler stale. */
 const CRAWLER_STALE_MS = 2 * 60 * 1000; // 2 minutes — matches STALE_MINUTES in sync-jobs.ts
 
+/** Don't re-wake the crawler more than once per 30 seconds per job. */
+const WAKE_COOLDOWN_MS = 30_000;
+const lastWakeByJob = new Map<number, number>();
+
 /**
  * Get sync progress for an owner. Reads from the sync_job table instead
  * of in-memory state — survives crawler restarts.
  *
  * If the active job looks stale (crawler likely asleep), re-wakes the crawler
- * so it can resume processing.
+ * so it can resume processing (at most once per 30s per job).
  */
 export async function getProgress(owner: string): Promise<SyncProgress> {
     const ownerRow = await getOwner(owner);
@@ -178,18 +183,22 @@ export async function getProgress(owner: string): Promise<SyncProgress> {
     const active = await getActiveJob(owner);
     if (active) {
         // If the job hasn't been touched recently, the crawler likely went to sleep.
-        // Re-wake it so it picks the job back up.
+        // Re-wake it so it picks the job back up (with cooldown to avoid spam).
         const heartbeat = active.claimed_at ?? active.created_at;
         const staleSince = Date.now() - heartbeat.getTime();
-        if (staleSince > CRAWLER_STALE_MS) {
+        const lastWake = lastWakeByJob.get(active.id) ?? 0;
+        if (staleSince > CRAWLER_STALE_MS && Date.now() - lastWake > WAKE_COOLDOWN_MS) {
+            lastWakeByJob.set(active.id, Date.now());
             console.log(
                 `[sync] Active job #${active.id} stale for ${Math.round(staleSince / 1000)}s — re-waking crawler`
             );
-            // Fire-and-forget — don't block the progress response
             wakeCrawler().catch(() => {});
         }
         return jobToProgress(active, lastSyncedAt);
     }
+
+    // Clean up cooldown entries for jobs that are no longer active
+    lastWakeByJob.clear();
 
     // No active job — check most recent completed/failed job
     const latest = await getLatestJob(owner);
@@ -208,7 +217,8 @@ export async function getProgress(owner: string): Promise<SyncProgress> {
                     : 0,
             lastSyncedAt,
             errors: latest.errors ?? [],
-            jobId: latest.id
+            jobId: latest.id,
+            rateLimitResetAt: null
         };
     }
 
@@ -223,7 +233,8 @@ export async function getProgress(owner: string): Promise<SyncProgress> {
         elapsedMs: 0,
         lastSyncedAt,
         errors: [],
-        jobId: null
+        jobId: null,
+        rateLimitResetAt: null
     };
 }
 
@@ -275,7 +286,8 @@ function jobToProgress(job: SyncJobRow, lastSyncedAt: string | null): SyncProgre
         elapsedMs: job.started_at ? Date.now() - job.started_at.getTime() : 0,
         lastSyncedAt,
         errors: job.errors ?? [],
-        jobId: job.id
+        jobId: job.id,
+        rateLimitResetAt: job.rate_limit_reset_at?.toISOString() ?? null
     };
 }
 

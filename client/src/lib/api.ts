@@ -33,6 +33,7 @@ export interface SyncProgressResponse {
     lastSyncedAt?: string | null;
     errors?: string[];
     jobId?: number | null;
+    rateLimitResetAt?: string | null;
 }
 
 export const API_BASE = `${import.meta.env.VITE_API_BASE_URL ?? ""}/api`;

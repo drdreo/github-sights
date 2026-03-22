@@ -29,6 +29,7 @@ export interface SyncJobRow {
     created_at: Date;
     errors: string[];
     last_error: string | null;
+    rate_limit_reset_at: Date | null;
     result: unknown;
 }
 
@@ -138,6 +139,7 @@ export async function advanceJob(
         total_repos?: number;
         repo_ids?: number[];
         repo_names?: string[];
+        rate_limit_reset_at?: string | null;
     }
 ): Promise<void> {
     const setClauses: string[] = ["claimed_at = NOW()"];
@@ -171,6 +173,10 @@ export async function advanceJob(
     if (updates.repo_names !== undefined) {
         setClauses.push(`repo_names = $${idx++}`);
         params.push(JSON.stringify(updates.repo_names));
+    }
+    if (updates.rate_limit_reset_at !== undefined) {
+        setClauses.push(`rate_limit_reset_at = $${idx++}`);
+        params.push(updates.rate_limit_reset_at);
     }
 
     params.push(jobId);

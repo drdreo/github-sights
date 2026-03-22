@@ -14,6 +14,13 @@ function formatElapsed(ms: number): string {
     return `${min}m ${sec.toString().padStart(2, "0")}s`;
 }
 
+function formatTimeUntil(isoDate: string): string | null {
+    const ms = new Date(isoDate).getTime() - Date.now();
+    if (ms <= 0) return null;
+    const min = Math.ceil(ms / 60000);
+    return `~${min}m`;
+}
+
 function parseError(raw: string): { repo: string | null; message: string } {
     // Extract "owner/RepoName" from end of string
     const repoMatch = raw.match(/for\s+[\w.-]+\/([\w.-]+)\s*$/i);
@@ -117,7 +124,8 @@ export function SyncProgressBar({ progress, barWidth = "w-32" }: SyncProgressBar
 
     if (!progress.active) return null;
 
-    const { status, totalRepos, syncedRepos, totalEvents, currentRepo, elapsedMs } = progress;
+    const { status, totalRepos, syncedRepos, totalEvents, currentRepo, elapsedMs, rateLimitResetAt } = progress;
+    const rateLimitWait = rateLimitResetAt ? formatTimeUntil(rateLimitResetAt) : null;
 
     return (
         <div className="text-sm space-y-1">
@@ -151,13 +159,17 @@ export function SyncProgressBar({ progress, barWidth = "w-32" }: SyncProgressBar
                     <span className="text-gray-400">Syncing…</span>
                 ) : null}
             </div>
-            {status === "syncing_repos" && (currentRepo || hasErrors) && (
+            {status === "syncing_repos" && (currentRepo || hasErrors || rateLimitWait) && (
                 <div className="flex items-center gap-2 pl-5.5">
-                    {currentRepo && (
+                    {rateLimitWait ? (
+                        <span className="text-amber-400/80 text-xs">
+                            API rate limit reached, resuming in {rateLimitWait}
+                        </span>
+                    ) : currentRepo ? (
                         <span className="text-gray-500 text-xs truncate max-w-[200px]">
                             {currentRepo}
                         </span>
-                    )}
+                    ) : null}
                     {hasErrors && (
                         <button
                             onClick={() => setExpanded((v) => !v)}

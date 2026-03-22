@@ -152,8 +152,29 @@ function getBudget(octokit: Octokit): RateLimitBudget {
 }
 
 /**
+ * Per-Octokit heartbeat callbacks invoked during long rate-limit pauses.
+ * Keyed by Octokit instance so concurrent jobs (each with their own Octokit)
+ * don't clobber each other's heartbeat.  Entries are auto-GC'd when the
+ * Octokit is no longer referenced.
+ */
+type HeartbeatFn = (resetAt: string | null) => Promise<void>;
+const heartbeats = new WeakMap<Octokit, HeartbeatFn>();
+
+/** Register (or clear) a heartbeat callback for rate-limit pauses on a specific Octokit. */
+export function setRateLimitHeartbeat(octokit: Octokit, fn: HeartbeatFn | null): void {
+    if (fn) {
+        heartbeats.set(octokit, fn);
+    } else {
+        heartbeats.delete(octokit);
+    }
+}
+
+/**
  * Check rate limit budget and sleep until reset if exhausted.
  * Call this before expensive API operations (pagination loops, enrichment).
+ *
+ * Sleeps in 60s chunks, calling the heartbeat callback between each chunk
+ * so the job's claimed_at stays fresh and the server doesn't consider it stale.
  */
 export async function guardRateLimit(octokit: Octokit): Promise<void> {
     const budget = getBudget(octokit);
@@ -165,7 +186,32 @@ export async function guardRateLimit(octokit: Octokit): Promise<void> {
         `[rate-limit] Budget low: ${budget.remaining}/${budget.limit} remaining. ` +
             `Pausing ${waitMin}min until reset at ${budget.resetAt.toISOString()}`
     );
-    await new Promise((resolve) => setTimeout(resolve, waitMs));
+
+    const resetIso = budget.resetAt.toISOString();
+    const heartbeatFn = heartbeats.get(octokit);
+
+    // Notify the heartbeat that we're pausing (so the UI can show it)
+    if (heartbeatFn) {
+        try { await heartbeatFn(resetIso); } catch { /* best-effort */ }
+    }
+
+    // Sleep in chunks so we can heartbeat and avoid stale-job detection
+    const CHUNK_MS = 60_000;
+    let remaining = waitMs;
+    while (remaining > 0) {
+        const sleepFor = Math.min(remaining, CHUNK_MS);
+        await new Promise((resolve) => setTimeout(resolve, sleepFor));
+        remaining -= sleepFor;
+        if (heartbeatFn && remaining > 0) {
+            try { await heartbeatFn(resetIso); } catch { /* best-effort */ }
+        }
+    }
+
+    // Clear the rate-limit pause indicator
+    if (heartbeatFn) {
+        try { await heartbeatFn(null); } catch { /* best-effort */ }
+    }
+
     // After waking, re-check via explicit API call
     await refreshRateLimit(octokit);
 }
