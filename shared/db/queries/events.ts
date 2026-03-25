@@ -51,7 +51,7 @@ export async function insertCommits(commits: InsertCommitInput[]): Promise<numbe
             const chunk = commits.slice(i, i + BATCH_SIZE);
             const { text, params } = buildMultiRowValues(chunk, (c) => [
                 c.sha,
-                c.repo_id,
+                String(c.repo_id),
                 c.author_login,
                 c.committer_login,
                 c.message,
@@ -172,8 +172,8 @@ export async function upsertPrs(prs: InsertPrInput[]): Promise<number> {
         for (let i = 0; i < prs.length; i += BATCH_SIZE) {
             const chunk = prs.slice(i, i + BATCH_SIZE);
             const { text, params } = buildMultiRowValues(chunk, (pr) => [
-                pr.id,
-                pr.repo_id,
+                String(pr.id),
+                String(pr.repo_id),
                 pr.number,
                 pr.author_login,
                 pr.title,
@@ -439,8 +439,8 @@ export async function insertWorkflows(workflows: InsertWorkflowInput[]): Promise
         for (let i = 0; i < workflows.length; i += BATCH_SIZE) {
             const chunk = workflows.slice(i, i + BATCH_SIZE);
             const { text, params } = buildMultiRowValues(chunk, (w) => [
-                w.id,
-                w.repo_id,
+                String(w.id),
+                String(w.repo_id),
                 w.workflow_name,
                 w.workflow_path,
                 w.actor_login,
@@ -503,9 +503,9 @@ export async function insertWorkflowJobs(jobs: InsertWorkflowJobInput[]): Promis
         for (let i = 0; i < jobs.length; i += BATCH_SIZE) {
             const chunk = jobs.slice(i, i + BATCH_SIZE);
             const { text, params } = buildMultiRowValues(chunk, (j) => [
-                j.id,
-                j.workflow_run_id,
-                j.repo_id,
+                String(j.id),
+                String(j.workflow_run_id),
+                String(j.repo_id),
                 j.name,
                 j.status,
                 j.conclusion,
@@ -537,7 +537,7 @@ export async function insertWorkflowSteps(steps: InsertWorkflowStepInput[]): Pro
         for (let i = 0; i < steps.length; i += BATCH_SIZE) {
             const chunk = steps.slice(i, i + BATCH_SIZE);
             const { text, params } = buildMultiRowValues(chunk, (s) => [
-                s.job_id,
+                String(s.job_id),
                 s.number,
                 s.name,
                 s.status,
@@ -582,9 +582,9 @@ export async function markJobsFetched(
     if (accurateDuration !== null) {
         await query(
             `UPDATE workflow_event SET jobs_fetched = TRUE, duration_seconds = $2 WHERE id = $1`,
-            [runId, accurateDuration]
+            [String(runId), accurateDuration]
         );
     } else {
-        await query(`UPDATE workflow_event SET jobs_fetched = TRUE WHERE id = $1`, [runId]);
+        await query(`UPDATE workflow_event SET jobs_fetched = TRUE WHERE id = $1`, [String(runId)]);
     }
 }
