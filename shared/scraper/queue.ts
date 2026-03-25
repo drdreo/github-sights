@@ -31,8 +31,7 @@ import {
     ingestRepos,
     ingestCommitsForRepo,
     ingestPRsForRepo,
-    ingestWorkflowsForRepo,
-    ingestWorkflowJobsForRepo
+    ingestWorkflowsForRepo
 } from "./ingest.ts";
 import { aggregateOwner, aggregateRepo } from "./aggregate.ts";
 import { getRepoByName, updateOwnerSyncedAt } from "../db/queries/identity.ts";
@@ -266,9 +265,6 @@ async function phaseSyncRepos(
                     ingestWorkflowsForRepo(octokit, job.owner_login, ghRepo)
                 ]);
 
-                // Backfill jobs/steps for unfetched runs (budget-capped)
-                await ingestWorkflowJobsForRepo(octokit, job.owner_login, ghRepo);
-
                 const events = commits.inserted + prs.upserted + workflows.inserted;
 
                 // Progressive per-repo aggregation
@@ -394,9 +390,6 @@ async function processRepoSync(job: SyncJobRow, octokit: Octokit): Promise<void>
         commitCount = commits.inserted;
         prCount = prs.upserted;
         workflowCount = workflows.inserted;
-
-        // Backfill jobs/steps for unfetched runs (budget-capped)
-        await ingestWorkflowJobsForRepo(octokit, job.owner_login, ghRepo);
     } catch (err) {
         errors.push(String(err));
     }
