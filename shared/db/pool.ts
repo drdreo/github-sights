@@ -56,6 +56,38 @@ export async function initPool(): Promise<boolean> {
     return true;
 }
 
+// ── Retry helper ─────────────────────────────────────────────────────────────────
+
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 2_000;
+
+function isConnectionError(err: unknown): boolean {
+    if (!(err instanceof Error)) return false;
+    const msg = err.message.toLowerCase();
+    return msg.includes("timeout exceeded when trying to connect") ||
+        msg.includes("connection terminated") ||
+        msg.includes("connection refused");
+}
+
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            return await fn();
+        } catch (err) {
+            lastErr = err;
+            if (attempt < MAX_RETRIES && isConnectionError(err)) {
+                const delay = RETRY_BASE_MS * (attempt + 1);
+                console.warn(`[db] Connection failed, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})...`);
+                await new Promise((r) => setTimeout(r, delay));
+                continue;
+            }
+            throw err;
+        }
+    }
+    throw lastErr;
+}
+
 // ── Query helpers ────────────────────────────────────────────────────────────────
 
 /**
@@ -69,8 +101,10 @@ export async function query<T extends Record<string, any> = Record<string, any>>
     params?: unknown[]
 ): Promise<T[]> {
     if (!pool) return [];
-    const result = await pool.query(text, params);
-    return result.rows as T[];
+    return withRetry(async () => {
+        const result = await pool!.query(text, params);
+        return result.rows as T[];
+    });
 }
 
 /**
@@ -82,8 +116,10 @@ export async function execute<T extends Record<string, any> = Record<string, any
     params?: unknown[]
 ): Promise<QueryResult<T>> {
     if (!pool) return { rows: [], rowCount: 0 };
-    const result = await pool.query(text, params);
-    return { rows: result.rows as T[], rowCount: result.rowCount };
+    return withRetry(async () => {
+        const result = await pool!.query(text, params);
+        return { rows: result.rows as T[], rowCount: result.rowCount };
+    });
 }
 
 /**
@@ -110,7 +146,7 @@ export async function queryOne<T extends Record<string, any> = Record<string, an
  */
 export async function transaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
     if (!pool) throw new Error("[db] Pool not initialized");
-    const client = await pool.connect();
+    const client = await withRetry(() => pool!.connect());
     try {
         await client.query("BEGIN");
         const result = await fn(client);
