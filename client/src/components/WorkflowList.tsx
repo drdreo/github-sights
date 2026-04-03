@@ -1,12 +1,11 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { useParams } from "react-router-dom";
 import { ResponsiveContainer, AreaChart, Area } from "recharts";
-import { CheckCircle2, XCircle, MinusCircle, Clock, Timer, ExternalLink } from "lucide-react";
+import { CheckCircle2, XCircle, MinusCircle, Clock, Timer, ExternalLink, ChevronRight } from "lucide-react";
 import { LoadingSkeleton } from "./LoadingSkeleton";
-import { WorkflowInsightsPanel } from "./WorkflowInsightsPanel";
 import { useOwner } from "../hooks/useOwner";
-import type { WorkflowRun, WorkflowStat, WorkflowJobStepInsights } from "../types";
+import type { WorkflowRun, WorkflowStat, WorkflowJobStepInsights, JobInsight } from "../types";
 
 function formatDuration(seconds: number | null): string {
     if (seconds == null) return "-";
@@ -81,15 +80,194 @@ function ConclusionBadge({ conclusion }: { conclusion: string | null }) {
 
 // ── Workflow Stats Panel ─────────────────────────────────────────────────────
 
+// ── Inline Job/Step Insights for a single workflow ──────────────────────────
+
+function WorkflowInlineInsights({
+    workflowName,
+    insights
+}: {
+    workflowName: string;
+    insights: WorkflowJobStepInsights | undefined;
+}) {
+    if (!insights) return null;
+
+    const jobs = insights.jobs.filter((j) => j.workflowName === workflowName);
+    const steps = insights.steps.filter((s) => s.workflowName === workflowName);
+
+    if (jobs.length === 0 && steps.length === 0) {
+        return (
+            <div className="px-4 py-3 text-xs text-gray-500">
+                No job or step data available for this workflow yet.
+            </div>
+        );
+    }
+
+    const slowestJobs = [...jobs]
+        .sort((a, b) => b.avgDurationSeconds - a.avgDurationSeconds)
+        .slice(0, 5);
+
+    const failingSteps = [...steps]
+        .filter((s) => s.failureCount > 0)
+        .sort((a, b) => b.failureCount - a.failureCount || b.failureRate - a.failureRate)
+        .slice(0, 5);
+
+    const failingJobs = [...jobs]
+        .filter((j) => j.failureCount > 0)
+        .sort((a, b) => b.failureCount - a.failureCount || b.failureRate - a.failureRate)
+        .slice(0, 5);
+
+    return (
+        <div className="px-4 pb-3 pt-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {slowestJobs.length > 0 && (
+                    <div>
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <Timer className="w-3 h-3 text-blue-400" />
+                            <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">
+                                Slowest Jobs
+                            </span>
+                        </div>
+                        <div className="space-y-1">
+                            {slowestJobs.map((job) => (
+                                <InsightRow
+                                    key={job.name}
+                                    name={job.name}
+                                    barPct={Math.max(
+                                        (job.avgDurationSeconds / (slowestJobs[0]?.avgDurationSeconds || 1)) * 100,
+                                        2
+                                    )}
+                                    barColor="bg-blue-500/20"
+                                >
+                                    <span className="text-blue-400 font-medium">
+                                        ~{formatDuration(job.avgDurationSeconds)}
+                                    </span>
+                                    <span className="text-gray-600">
+                                        max {formatDuration(job.maxDurationSeconds)}
+                                    </span>
+                                    <span>{job.totalRuns} runs</span>
+                                </InsightRow>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {failingSteps.length > 0 ? (
+                    <div>
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <XCircle className="w-3 h-3 text-red-400" />
+                            <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">
+                                Most Failing Steps
+                            </span>
+                        </div>
+                        <div className="space-y-1">
+                            {failingSteps.map((step) => (
+                                <InsightRow
+                                    key={step.name}
+                                    name={step.name}
+                                    barPct={Math.max((step.failureRate / 100) * 100, 2)}
+                                    barColor="bg-red-500/20"
+                                >
+                                    <span className="text-red-400 font-medium">
+                                        {step.failureCount} fail{step.failureCount !== 1 ? "s" : ""}
+                                    </span>
+                                    <span
+                                        className={
+                                            step.failureRate >= 20
+                                                ? "text-red-400"
+                                                : step.failureRate >= 10
+                                                  ? "text-yellow-400"
+                                                  : "text-gray-500"
+                                        }
+                                    >
+                                        {step.failureRate}%
+                                    </span>
+                                    <span>{step.totalRuns} runs</span>
+                                </InsightRow>
+                            ))}
+                        </div>
+                    </div>
+                ) : failingJobs.length > 0 ? (
+                    <div>
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <XCircle className="w-3 h-3 text-red-400" />
+                            <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">
+                                Most Failing Jobs
+                            </span>
+                        </div>
+                        <div className="space-y-1">
+                            {failingJobs.map((job) => (
+                                <InsightRow
+                                    key={job.name}
+                                    name={job.name}
+                                    barPct={Math.max((job.failureRate / 100) * 100, 2)}
+                                    barColor="bg-red-500/20"
+                                >
+                                    <span className="text-red-400 font-medium">
+                                        {job.failureCount} fail{job.failureCount !== 1 ? "s" : ""}
+                                    </span>
+                                    <span
+                                        className={
+                                            job.failureRate >= 20
+                                                ? "text-red-400"
+                                                : job.failureRate >= 10
+                                                  ? "text-yellow-400"
+                                                  : "text-gray-500"
+                                        }
+                                    >
+                                        {job.failureRate}%
+                                    </span>
+                                    <span>{job.totalRuns} runs</span>
+                                </InsightRow>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
+            </div>
+        </div>
+    );
+}
+
+function InsightRow({
+    name,
+    barPct,
+    barColor,
+    children
+}: {
+    name: string;
+    barPct: number;
+    barColor: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="relative p-2 bg-gray-800/30 rounded overflow-hidden">
+            <div
+                className={`absolute inset-y-0 left-0 ${barColor} transition-all`}
+                style={{ width: `${barPct}%` }}
+            />
+            <div className="relative flex items-center justify-between">
+                <span className="text-xs text-gray-300 truncate">{name}</span>
+                <div className="flex items-center gap-2 text-[11px] text-gray-500 flex-shrink-0 ml-2">
+                    {children}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Workflow Stats Panel ─────────────────────────────────────────────────────
+
 interface WorkflowStatsPanelProps {
     stats: WorkflowStat[] | undefined;
     workflows: WorkflowRun[] | undefined;
+    insights: WorkflowJobStepInsights | undefined;
+    insightsLoading: boolean;
     loading: boolean;
 }
 
-export function WorkflowStatsPanel({ stats, workflows, loading }: WorkflowStatsPanelProps) {
+export function WorkflowStatsPanel({ stats, workflows, insights, insightsLoading, loading }: WorkflowStatsPanelProps) {
     const owner = useOwner();
     const { repo } = useParams<{ repo: string }>();
+    const [expandedWorkflow, setExpandedWorkflow] = useState<string | null>(null);
 
     // Build sparkline data per workflow name: last 20 runs, showing duration
     const sparklinesByName = useMemo(() => {
@@ -106,7 +284,6 @@ export function WorkflowStatsPanel({ stats, workflows, loading }: WorkflowStatsP
         }
         const result = new Map<string, { i: number; v: number; c: string }[]>();
         for (const [name, runs] of grouped) {
-            // runs are already sorted newest first, reverse for chronological sparkline
             const recent = runs.slice(0, 20).reverse();
             result.set(
                 name,
@@ -146,64 +323,91 @@ export function WorkflowStatsPanel({ stats, workflows, loading }: WorkflowStatsP
                             filename && repo
                                 ? `https://github.com/${owner}/${repo}/actions/workflows/${filename}`
                                 : null;
+                        const isExpanded = expandedWorkflow === stat.workflowName;
 
                         return (
                             <div
                                 key={stat.workflowName}
-                                className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg"
+                                className="bg-gray-800/50 rounded-lg overflow-hidden"
                             >
-                                <div className="min-w-0 flex-1">
-                                    {ghUrl ? (
-                                        <a
-                                            href={ghUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-sm font-medium text-gray-200 truncate hover:text-blue-400 transition-colors inline-flex items-center gap-1.5 group"
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setExpandedWorkflow(isExpanded ? null : stat.workflowName)
+                                    }
+                                    className="w-full flex items-center justify-between p-3 hover:bg-gray-800/80 transition-colors cursor-pointer"
+                                >
+                                    <div className="min-w-0 flex-1 text-left">
+                                        <div className="flex items-center gap-1.5">
+                                            <ChevronRight
+                                                className={`w-3.5 h-3.5 text-gray-500 transition-transform duration-200 flex-shrink-0 ${isExpanded ? "rotate-90" : ""}`}
+                                            />
+                                            <span className="text-sm font-medium text-gray-200 truncate">
+                                                {stat.workflowName}
+                                            </span>
+                                            {ghUrl && (
+                                                <a
+                                                    href={ghUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-gray-600 hover:text-blue-400 transition-colors"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <ExternalLink className="w-3 h-3" />
+                                                </a>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 pl-5">
+                                            <span>{stat.totalRuns} runs</span>
+                                            <span className="text-green-400">
+                                                {stat.successCount} passed
+                                            </span>
+                                            {stat.failureCount > 0 && (
+                                                <span className="text-red-400">
+                                                    {stat.failureCount} failed
+                                                </span>
+                                            )}
+                                            {stat.cancelledCount > 0 && (
+                                                <span className="text-yellow-400">
+                                                    {stat.cancelledCount} cancelled
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4 text-xs text-gray-400 flex-shrink-0 ml-4">
+                                        <WorkflowSparkline
+                                            data={sparklinesByName.get(stat.workflowName) ?? []}
+                                            color={stat.successRate >= 80 ? "#4ade80" : stat.successRate >= 50 ? "#facc15" : "#f87171"}
+                                        />
+                                        <div className="flex items-center gap-1">
+                                            <Timer className="w-3.5 h-3.5" />
+                                            <span>~{formatDuration(stat.avgDurationSeconds)}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <Clock className="w-3.5 h-3.5" />
+                                            <span>{formatDuration(stat.totalDurationSeconds)}</span>
+                                        </div>
+                                        <span
+                                            className={`font-medium ${stat.successRate >= 80 ? "text-green-400" : stat.successRate >= 50 ? "text-yellow-400" : "text-red-400"}`}
                                         >
-                                            {stat.workflowName}
-                                            <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                        </a>
-                                    ) : (
-                                        <p className="text-sm font-medium text-gray-200 truncate">
-                                            {stat.workflowName}
-                                        </p>
-                                    )}
-                                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                                        <span>{stat.totalRuns} runs</span>
-                                        <span className="text-green-400">
-                                            {stat.successCount} passed
+                                            {stat.successRate}%
                                         </span>
-                                        {stat.failureCount > 0 && (
-                                            <span className="text-red-400">
-                                                {stat.failureCount} failed
-                                            </span>
+                                    </div>
+                                </button>
+                                {isExpanded && (
+                                    <div className="border-t border-gray-700/50">
+                                        {insightsLoading ? (
+                                            <div className="p-4">
+                                                <LoadingSkeleton className="h-16 w-full" />
+                                            </div>
+                                        ) : (
+                                            <WorkflowInlineInsights
+                                                workflowName={stat.workflowName}
+                                                insights={insights}
+                                            />
                                         )}
-                                        {stat.cancelledCount > 0 && (
-                                            <span className="text-yellow-400">
-                                                {stat.cancelledCount} cancelled
-                                            </span>
-                                        )}
                                     </div>
-                                </div>
-                                <div className="flex items-center gap-4 text-xs text-gray-400 flex-shrink-0 ml-4">
-                                    <WorkflowSparkline
-                                        data={sparklinesByName.get(stat.workflowName) ?? []}
-                                        color={stat.successRate >= 80 ? "#4ade80" : stat.successRate >= 50 ? "#facc15" : "#f87171"}
-                                    />
-                                    <div className="flex items-center gap-1">
-                                        <Timer className="w-3.5 h-3.5" />
-                                        <span>~{formatDuration(stat.avgDurationSeconds)}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <Clock className="w-3.5 h-3.5" />
-                                        <span>{formatDuration(stat.totalDurationSeconds)}</span>
-                                    </div>
-                                    <span
-                                        className={`font-medium ${stat.successRate >= 80 ? "text-green-400" : stat.successRate >= 50 ? "text-yellow-400" : "text-red-400"}`}
-                                    >
-                                        {stat.successRate}%
-                                    </span>
-                                </div>
+                                )}
                             </div>
                         );
                     })}
@@ -252,8 +456,13 @@ export function WorkflowList({
 
     return (
         <div>
-            <WorkflowStatsPanel stats={workflowStats} workflows={workflows} loading={statsLoading} />
-            <WorkflowInsightsPanel insights={workflowInsights} loading={insightsLoading ?? false} />
+            <WorkflowStatsPanel
+                stats={workflowStats}
+                workflows={workflows}
+                insights={workflowInsights}
+                insightsLoading={insightsLoading ?? false}
+                loading={statsLoading}
+            />
             <div className="divide-y divide-gray-800">
                 {workflows.map((run) => (
                     <div

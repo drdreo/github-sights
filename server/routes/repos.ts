@@ -319,6 +319,7 @@ repos.get("/api/repos/:owner/:repo/workflow-insights", async (c) => {
         const { jobs, steps } = await getJobStepInsightsByRepo(repoRow.id);
         return c.json({
             jobs: jobs.map((j) => ({
+                workflowName: j.workflow_name,
                 name: j.name,
                 totalRuns: j.total_runs,
                 failureCount: j.failure_count,
@@ -327,6 +328,7 @@ repos.get("/api/repos/:owner/:repo/workflow-insights", async (c) => {
                 maxDurationSeconds: j.max_duration_seconds
             })),
             steps: steps.map((s) => ({
+                workflowName: s.workflow_name,
                 name: s.name,
                 totalRuns: s.total_runs,
                 failureCount: s.failure_count,

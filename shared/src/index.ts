@@ -115,6 +115,7 @@ export interface WorkflowStat {
 }
 
 export interface JobInsight {
+    workflowName: string;
     name: string;
     totalRuns: number;
     failureCount: number;
