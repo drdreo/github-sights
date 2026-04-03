@@ -1,9 +1,12 @@
 import React, { useState } from "react";
 import { GitCommit, GitPullRequest, Play, Users } from "lucide-react";
+import { useParams } from "react-router-dom";
 import { CommitList } from "./CommitList";
 import { PullRequestList } from "./PullRequestList";
 import { ContributorGrid } from "./ContributorGrid";
 import { WorkflowList } from "./WorkflowList";
+import { useWorkflowInsights } from "../hooks/useGitHub";
+import { useOwner } from "../hooks/useOwner";
 import type { Commit, PullRequest, RepoContributorStat, WorkflowRun, WorkflowStat } from "../types";
 
 type TabId = "commits" | "pulls" | "contributors" | "workflows";
@@ -68,7 +71,14 @@ export function RepoTabs({
     workflowStats,
     workflowStatsLoading
 }: RepoTabsProps) {
+    const owner = useOwner();
+    const { repo } = useParams<{ repo: string }>();
     const [activeTab, setActiveTab] = useState<TabId>("commits");
+    const { data: workflowInsights, isLoading: insightsLoading } = useWorkflowInsights(
+        owner,
+        repo ?? "",
+        activeTab === "workflows"
+    );
 
     return (
         <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden min-h-[500px]">
@@ -120,6 +130,8 @@ export function RepoTabs({
                         workflowStats={workflowStats}
                         loading={workflowsLoading}
                         statsLoading={workflowStatsLoading}
+                        workflowInsights={workflowInsights}
+                        insightsLoading={insightsLoading}
                     />
                 )}
             </div>

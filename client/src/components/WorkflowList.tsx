@@ -1,10 +1,12 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { format } from "date-fns";
 import { useParams } from "react-router-dom";
+import { ResponsiveContainer, AreaChart, Area } from "recharts";
 import { CheckCircle2, XCircle, MinusCircle, Clock, Timer, ExternalLink } from "lucide-react";
 import { LoadingSkeleton } from "./LoadingSkeleton";
+import { WorkflowInsightsPanel } from "./WorkflowInsightsPanel";
 import { useOwner } from "../hooks/useOwner";
-import type { WorkflowRun, WorkflowStat } from "../types";
+import type { WorkflowRun, WorkflowStat, WorkflowJobStepInsights } from "../types";
 
 function formatDuration(seconds: number | null): string {
     if (seconds == null) return "-";
@@ -15,6 +17,34 @@ function formatDuration(seconds: number | null): string {
     const hours = Math.floor(mins / 60);
     const remMins = mins % 60;
     return `${hours}h ${remMins}m`;
+}
+
+function WorkflowSparkline({ data, color }: { data: { i: number; v: number; c: string }[]; color: string }) {
+    if (data.length < 2) return null;
+    const id = `wf-spark-${color.replace("#", "")}`;
+    return (
+        <div className="w-[72px] h-[28px] shrink-0">
+            <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data} margin={{ top: 1, right: 0, left: 0, bottom: 1 }}>
+                    <defs>
+                        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+                            <stop offset="100%" stopColor={color} stopOpacity={0} />
+                        </linearGradient>
+                    </defs>
+                    <Area
+                        type="monotone"
+                        dataKey="v"
+                        stroke={color}
+                        strokeWidth={1.2}
+                        fill={`url(#${id})`}
+                        dot={false}
+                        animationDuration={600}
+                    />
+                </AreaChart>
+            </ResponsiveContainer>
+        </div>
+    );
 }
 
 function ConclusionBadge({ conclusion }: { conclusion: string | null }) {
@@ -53,12 +83,42 @@ function ConclusionBadge({ conclusion }: { conclusion: string | null }) {
 
 interface WorkflowStatsPanelProps {
     stats: WorkflowStat[] | undefined;
+    workflows: WorkflowRun[] | undefined;
     loading: boolean;
 }
 
-export function WorkflowStatsPanel({ stats, loading }: WorkflowStatsPanelProps) {
+export function WorkflowStatsPanel({ stats, workflows, loading }: WorkflowStatsPanelProps) {
     const owner = useOwner();
     const { repo } = useParams<{ repo: string }>();
+
+    // Build sparkline data per workflow name: last 20 runs, showing duration
+    const sparklinesByName = useMemo(() => {
+        if (!workflows?.length) return new Map<string, { i: number; v: number; c: string }[]>();
+        const grouped = new Map<string, WorkflowRun[]>();
+        for (const run of workflows) {
+            const name = run.workflowName ?? "Unknown";
+            let arr = grouped.get(name);
+            if (!arr) {
+                arr = [];
+                grouped.set(name, arr);
+            }
+            arr.push(run);
+        }
+        const result = new Map<string, { i: number; v: number; c: string }[]>();
+        for (const [name, runs] of grouped) {
+            // runs are already sorted newest first, reverse for chronological sparkline
+            const recent = runs.slice(0, 20).reverse();
+            result.set(
+                name,
+                recent.map((r, i) => ({
+                    i,
+                    v: r.durationSeconds ?? 0,
+                    c: r.conclusion ?? "unknown"
+                }))
+            );
+        }
+        return result;
+    }, [workflows]);
 
     if (loading) {
         return (
@@ -126,6 +186,10 @@ export function WorkflowStatsPanel({ stats, loading }: WorkflowStatsPanelProps) 
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-4 text-xs text-gray-400 flex-shrink-0 ml-4">
+                                    <WorkflowSparkline
+                                        data={sparklinesByName.get(stat.workflowName) ?? []}
+                                        color={stat.successRate >= 80 ? "#4ade80" : stat.successRate >= 50 ? "#facc15" : "#f87171"}
+                                    />
                                     <div className="flex items-center gap-1">
                                         <Timer className="w-3.5 h-3.5" />
                                         <span>~{formatDuration(stat.avgDurationSeconds)}</span>
@@ -156,13 +220,17 @@ interface WorkflowListProps {
     workflowStats: WorkflowStat[] | undefined;
     loading: boolean;
     statsLoading: boolean;
+    workflowInsights?: WorkflowJobStepInsights;
+    insightsLoading?: boolean;
 }
 
 export function WorkflowList({
     workflows,
     workflowStats,
     loading,
-    statsLoading
+    statsLoading,
+    workflowInsights,
+    insightsLoading
 }: WorkflowListProps) {
     if (loading) {
         return (
@@ -184,7 +252,8 @@ export function WorkflowList({
 
     return (
         <div>
-            <WorkflowStatsPanel stats={workflowStats} loading={statsLoading} />
+            <WorkflowStatsPanel stats={workflowStats} workflows={workflows} loading={statsLoading} />
+            <WorkflowInsightsPanel insights={workflowInsights} loading={insightsLoading ?? false} />
             <div className="divide-y divide-gray-800">
                 {workflows.map((run) => (
                     <div
