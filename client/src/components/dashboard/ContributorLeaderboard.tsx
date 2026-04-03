@@ -128,11 +128,11 @@ export function ContributorLeaderboard({
                                     </div>
 
                                     {/* Progress bar */}
-                                    <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                                    <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden flex">
                                         <motion.div
                                             className="h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-500"
                                             initial={{ width: 0 }}
-                                            animate={{ width: `${pct}%` }}
+                                            animate={{ width: `${pct}%`, backgroundSize: `${100 / (pct / 100)}% 100%` }}
                                             transition={{
                                                 duration: 0.8,
                                                 ease: "easeOut",

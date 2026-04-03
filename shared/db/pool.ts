@@ -36,11 +36,12 @@ export async function initPool(): Promise<boolean> {
         return false;
     }
 
+    const poolMax = parseInt(Deno.env.get("POOL_MAX") || "8", 10);
     const dbName = new URL(connectionString).pathname.slice(1) || "unknown";
-    console.log(`[db] connecting to database: ${dbName}`);
+    console.log(`[db] connecting to database: ${dbName} (pool max: ${poolMax})`);
     pool = new Pool({
         connectionString,
-        max: 3,
+        max: poolMax,
         idleTimeoutMillis: 30_000,
         connectionTimeoutMillis: 10_000
     });

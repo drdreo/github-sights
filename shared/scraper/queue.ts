@@ -33,8 +33,9 @@ import {
     ingestPRsForRepo,
     ingestWorkflowsForRepo
 } from "./ingest.ts";
-import { aggregateOwner, aggregateRepo } from "./aggregate.ts";
+import { aggregateOwner, aggregateOwnerIncremental, aggregateRepo } from "./aggregate.ts";
 import { getRepoByName, updateOwnerSyncedAt } from "../db/queries/identity.ts";
+import { poolStats } from "../db/pool.ts";
 import { getSyncSince } from "../db/queries/config.ts";
 import type { RepositoryMetaRow } from "../db/types.ts";
 
@@ -303,9 +304,11 @@ async function phaseSyncRepos(
 
         const rateBudget = getRateLimitState(octokit);
         const mem = Math.round(Deno.memoryUsage().heapUsed / 1024 / 1024);
+        const ps = poolStats();
         console.log(
             `[queue] Job #${job.id}: batch done ` +
-                `(API: ${rateBudget.remaining}/${rateBudget.limit}, heap: ${mem}MB)`
+                `(API: ${rateBudget.remaining}/${rateBudget.limit}, heap: ${mem}MB, ` +
+                `pool: ${ps.totalCount - ps.idleCount}/${ps.totalCount} active, ${ps.waitingCount} waiting)`
         );
     }
 
@@ -337,7 +340,8 @@ async function phaseSyncRepos(
 async function phaseAggregate(job: SyncJobRow): Promise<void> {
     console.log(`[queue] Job #${job.id}: running owner aggregation for ${job.owner_login}`);
 
-    const aggregation = await aggregateOwner(job.owner_login);
+    // Use incremental path (falls back to full rebuild if no watermark exists)
+    const aggregation = await aggregateOwnerIncremental(job.owner_login);
     await updateOwnerSyncedAt(job.owner_login);
 
     console.log(

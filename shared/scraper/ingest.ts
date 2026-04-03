@@ -429,6 +429,7 @@ export async function ingestWorkflowsForRepo(
                 run_number: run.run_number,
                 status: run.status,
                 conclusion: run.conclusion,
+                event: run.event,
                 head_branch: run.head_branch,
                 head_sha: run.head_sha,
                 display_title: run.display_title,

@@ -709,6 +709,7 @@ export interface GitHubWorkflowRun {
         | "stale"
         | "startup_failure"
         | null;
+    event: string | null;
     head_branch: string | null;
     head_sha: string | null;
     display_title: string | null;
@@ -767,6 +768,7 @@ export async function fetchWorkflowRuns(
                     run_number: run.run_number,
                     status: run.status,
                     conclusion: sanitizeConclusion(run.conclusion),
+                    event: run.event ?? null,
                     head_branch: run.head_branch ?? null,
                     head_sha: run.head_sha ?? null,
                     display_title: run.display_title ?? null,

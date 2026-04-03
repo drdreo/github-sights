@@ -12,12 +12,13 @@
 
 import { query } from "../db/pool.ts";
 import { getReposByOwner } from "../db/queries/identity.ts";
-import { getCommitsByRepo, getPrsByRepo, getContributorStatsByRepo } from "../db/queries/events.ts";
+import { getContributorStatsByRepo } from "../db/queries/events.ts";
 import {
     upsertOwnerSnapshot,
     upsertRepoSnapshot,
-    upsertContributorSnapshot,
+    upsertContributorSnapshotsBatch,
     getRepoSnapshotsByOwner,
+    getAggregationWatermark,
     type UpsertOwnerSnapshotInput,
     type UpsertRepoSnapshotInput,
     type UpsertContributorSnapshotInput
@@ -31,9 +32,7 @@ import { LANGUAGE_COLORS } from "./github-client.ts";
 import type {
     SnapshotContributor,
     LanguageBreakdownEntry,
-    RepositoryMetaRow,
-    CommitEventRow,
-    PrEventRow
+    RepositoryMetaRow
 } from "../db/types.ts";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────
@@ -55,9 +54,9 @@ async function getCiStatsByRepo(repoId: number): Promise<{
         last_ci_conclusion: string | null;
     }>(
         `SELECT
-            COALESCE((SELECT ROUND(COUNT(*) FILTER (WHERE conclusion = 'success')::NUMERIC / NULLIF(COUNT(*), 0) * 100, 1) FROM workflow_event WHERE repo_id = $1 AND status = 'completed'), 0)::NUMERIC AS ci_success_rate,
-            COALESCE((SELECT AVG(duration_seconds)::INTEGER FROM workflow_event WHERE repo_id = $1 AND status = 'completed' AND duration_seconds IS NOT NULL), 0) AS ci_avg_duration_seconds,
-            (SELECT conclusion FROM workflow_event WHERE repo_id = $1 AND status = 'completed' ORDER BY created_at DESC LIMIT 1) AS last_ci_conclusion`,
+            COALESCE((SELECT ROUND(COUNT(*) FILTER (WHERE conclusion = 'success')::NUMERIC / NULLIF(COUNT(*), 0) * 100, 1) FROM workflow_event WHERE repo_id = $1 AND status = 'completed' AND event IS DISTINCT FROM 'dynamic'), 0)::NUMERIC AS ci_success_rate,
+            COALESCE((SELECT AVG(duration_seconds)::INTEGER FROM workflow_event WHERE repo_id = $1 AND status = 'completed' AND event IS DISTINCT FROM 'dynamic' AND duration_seconds IS NOT NULL), 0) AS ci_avg_duration_seconds,
+            (SELECT conclusion FROM workflow_event WHERE repo_id = $1 AND status = 'completed' AND event IS DISTINCT FROM 'dynamic' ORDER BY created_at DESC LIMIT 1) AS last_ci_conclusion`,
         [repoId]
     );
     return {
@@ -80,23 +79,29 @@ export interface AggregateResult {
 // ── Per-Repo Aggregation (progressive) ──────────────────────────────────────────
 
 /**
- * Aggregate a single repo: rebuild its repo_snapshot.
+ * Aggregate a single repo: rebuild its repo_snapshot and daily_activity.
  * Called right after a repo's commits and PRs are ingested so the repo detail
  * page has data immediately — no need to wait for the full owner sync.
  *
- * NOTE: Per-repo daily_activity is NOT built here because no frontend consumer
- * uses it. Owner-level daily_activity is rebuilt in aggregateOwner().
+ * Building daily_activity progressively allows aggregateOwner() to skip
+ * repos already handled here.
  */
 export async function aggregateRepo(ownerLogin: string, repo: RepositoryMetaRow): Promise<void> {
     console.log(`[aggregate] ${ownerLogin}/${repo.name}: aggregating repo`);
-    const commits = await getCommitsByRepo(repo.id);
-    const prs = await getPrsByRepo(repo.id);
+    await clearRepoDailyActivity(repo.id);
+    const daRows = await rebuildRepoDailyActivitySQL(ownerLogin, repo.id);
+    await rebuildRepoSnapshotSQL(ownerLogin, repo);
+    console.log(`[aggregate] ${ownerLogin}/${repo.name}: repo snapshot + ${daRows} daily_activity rows built (SQL)`);
+}
 
-    await buildAndUpsertRepoSnapshot(ownerLogin, repo, commits, prs);
+// ── Timing Helper ───────────────────────────────────────────────────────────────
 
-    console.log(
-        `[aggregate] ${ownerLogin}/${repo.name}: repo snapshot built (${commits.length} commits, ${prs.length} PRs)`
-    );
+/** Measure execution time of an async function, returning result and duration. */
+async function timed<T>(label: string, fn: () => Promise<T>): Promise<{ result: T; ms: number }> {
+    const start = performance.now();
+    const result = await fn();
+    const ms = Math.round(performance.now() - start);
+    return { result, ms };
 }
 
 // ── Full Owner Aggregation ──────────────────────────────────────────────────────
@@ -109,6 +114,7 @@ export async function aggregateRepo(ownerLogin: string, repo: RepositoryMetaRow)
  * repo snapshots are rebuilt anyway (idempotent, ensures consistency).
  */
 export async function aggregateOwner(ownerLogin: string): Promise<AggregateResult> {
+    const pipelineStart = performance.now();
     const repos = await getReposByOwner(ownerLogin);
     const nonForkRepos = repos.filter((r) => !r.is_fork);
 
@@ -116,59 +122,78 @@ export async function aggregateOwner(ownerLogin: string): Promise<AggregateResul
         `[aggregate] ${ownerLogin}: starting full aggregation for ${nonForkRepos.length} repos`
     );
 
+    // Build a set of repo IDs already aggregated progressively in this sync.
+    // If a repo_snapshot.computed_at is within the last 30 minutes, it was
+    // built by aggregateRepo() during the sync phase and can be skipped.
+    const existingSnapshots = await getRepoSnapshotsByOwner(ownerLogin);
+    const recentThreshold = Date.now() - 30 * 60_000;
+    const recentlyAggregated = new Set(
+        existingSnapshots
+            .filter((s) => s.computed_at && s.computed_at.getTime() > recentThreshold)
+            .map((s) => s.repo_id)
+    );
+
     // Step 1: Rebuild per-repo daily_activity via SQL (INSERT INTO ... SELECT)
-    let dailyActivityRows = 0;
-    for (let i = 0; i < nonForkRepos.length; i++) {
-        const repo = nonForkRepos[i];
-        await clearRepoDailyActivity(repo.id);
-        const inserted = await rebuildRepoDailyActivitySQL(ownerLogin, repo.id);
-        dailyActivityRows += inserted;
-        if ((i + 1) % 50 === 0) {
-            console.log(
-                `[aggregate] ${ownerLogin}: daily activity ${i + 1}/${nonForkRepos.length} repos done`
-            );
+    const { result: { dailyRows: step1DailyRows, skipped: step1Skipped }, ms: step1Ms } = await timed(
+        "per-repo",
+        async () => {
+            let dailyRows = 0;
+            let skipped = 0;
+            for (let i = 0; i < nonForkRepos.length; i++) {
+                const repo = nonForkRepos[i];
+                if (recentlyAggregated.has(repo.id)) {
+                    skipped++;
+                    continue;
+                }
+                await clearRepoDailyActivity(repo.id);
+                dailyRows += await rebuildRepoDailyActivitySQL(ownerLogin, repo.id);
+                await rebuildRepoSnapshotSQL(ownerLogin, repo);
+                if ((i + 1) % 50 === 0) {
+                    console.log(
+                        `[aggregate] ${ownerLogin}: repo ${i + 1}/${nonForkRepos.length} done`
+                    );
+                }
+            }
+            return { dailyRows, skipped };
         }
-    }
+    );
+    let dailyActivityRows = step1DailyRows;
 
-    // Rebuild repo snapshots via SQL aggregation (no raw event rows in JS)
-    for (let i = 0; i < nonForkRepos.length; i++) {
-        const repo = nonForkRepos[i];
-        await rebuildRepoSnapshotSQL(ownerLogin, repo);
-        if ((i + 1) % 50 === 0) {
-            console.log(
-                `[aggregate] ${ownerLogin}: repo snapshots ${i + 1}/${nonForkRepos.length} done`
-            );
-        }
-    }
     console.log(
-        `[aggregate] ${ownerLogin}: rebuilt ${nonForkRepos.length} repo snapshots + ${dailyActivityRows} repo daily activity rows`
+        `[aggregate] ${ownerLogin}: Step 1 done in ${step1Ms}ms — ${nonForkRepos.length - step1Skipped} rebuilt, ${step1Skipped} skipped`
     );
 
-    // Step 2: Rebuild owner-level daily_activity (aggregated across all repos)
-    console.log(`[aggregate] ${ownerLogin}: rebuilding owner daily activity`);
-    const ownerDailyRows = await rebuildOwnerDailyActivity(ownerLogin);
-    dailyActivityRows += ownerDailyRows;
-    console.log(
-        `[aggregate] ${ownerLogin}: rebuilt ${ownerDailyRows} owner-level daily activity rows`
+    // Step 2: Rebuild owner + contributor daily_activity in parallel
+    const { result: [ownerDailyRows, contribDailyRows], ms: step2Ms } = await timed(
+        "daily-activity",
+        () => Promise.all([
+            rebuildOwnerDailyActivity(ownerLogin),
+            rebuildContributorDailyActivity(ownerLogin)
+        ])
     );
-
-    // Step 2b: Rebuild contributor-level daily_activity (per-contributor, repo_id IS NULL)
-    console.log(`[aggregate] ${ownerLogin}: rebuilding contributor daily activity`);
-    const contribDailyRows = await rebuildContributorDailyActivity(ownerLogin);
-    dailyActivityRows += contribDailyRows;
+    dailyActivityRows += ownerDailyRows + contribDailyRows;
     console.log(
-        `[aggregate] ${ownerLogin}: rebuilt ${contribDailyRows} contributor-level daily activity rows`
+        `[aggregate] ${ownerLogin}: Step 2 done in ${step2Ms}ms — ${ownerDailyRows} owner + ${contribDailyRows} contributor rows`
     );
 
     // Step 3: Rebuild contributor_snapshot
-    console.log(`[aggregate] ${ownerLogin}: rebuilding contributor snapshots`);
-    const contributorSnapshots = await rebuildContributorSnapshots(ownerLogin);
-    console.log(`[aggregate] ${ownerLogin}: rebuilt ${contributorSnapshots} contributor snapshots`);
+    const { result: contributorSnapshots, ms: step3Ms } = await timed(
+        "contributor-snapshots",
+        () => rebuildContributorSnapshots(ownerLogin)
+    );
+    console.log(`[aggregate] ${ownerLogin}: Step 3 done in ${step3Ms}ms — ${contributorSnapshots} contributor snapshots`);
 
     // Step 4: Rebuild owner_snapshot
-    console.log(`[aggregate] ${ownerLogin}: rebuilding owner snapshot`);
-    await rebuildOwnerSnapshot(ownerLogin, nonForkRepos);
-    console.log(`[aggregate] ${ownerLogin}: owner snapshot updated`);
+    const { ms: step4Ms } = await timed(
+        "owner-snapshot",
+        () => rebuildOwnerSnapshot(ownerLogin, nonForkRepos)
+    );
+
+    const totalMs = Math.round(performance.now() - pipelineStart);
+    console.log(
+        `[aggregate] ${ownerLogin}: full aggregation complete in ${totalMs}ms ` +
+            `(per-repo: ${step1Ms}ms, daily: ${step2Ms}ms, contributors: ${step3Ms}ms, owner: ${step4Ms}ms)`
+    );
 
     return {
         owner: ownerLogin,
@@ -218,7 +243,7 @@ async function rebuildRepoDailyActivitySQL(ownerLogin: string, repoId: number): 
             SELECT we.created_at::DATE::TEXT AS date,
                    COUNT(*)::INTEGER AS runs,
                    COUNT(*) FILTER (WHERE we.conclusion IN ('failure','timed_out'))::INTEGER AS failures
-            FROM workflow_event we WHERE we.repo_id = $2 AND we.status = 'completed'
+            FROM workflow_event we WHERE we.repo_id = $2 AND we.status = 'completed' AND we.event IS DISTINCT FROM 'dynamic'
             GROUP BY we.created_at::DATE
         ),
         all_dates AS (
@@ -309,141 +334,6 @@ async function rebuildRepoSnapshotSQL(ownerLogin: string, repo: RepositoryMetaRo
         merged_prs: stats.merged_prs,
         total_additions: stats.total_additions,
         total_deletions: stats.total_deletions,
-        contributor_count: contribStats.length,
-        ci_success_rate: ciStats.ci_success_rate,
-        ci_avg_duration_seconds: ciStats.ci_avg_duration_seconds,
-        last_ci_conclusion: ciStats.last_ci_conclusion,
-        top_contributors: topContributors
-    };
-
-    await upsertRepoSnapshot(snap);
-}
-
-/**
- * Build daily_activity rows for a single repo from its commits and PRs.
- * Pure function — does not touch the database.
- * Used by aggregateRepo() for progressive single-repo aggregation during ingestion.
- */
-function buildRepoDailyActivity(
-    ownerLogin: string,
-    repoId: number,
-    commits: CommitEventRow[],
-    prs: PrEventRow[]
-): UpsertDailyActivityInput[] {
-    const dateMap = new Map<
-        string,
-        {
-            commits: number;
-            additions: number;
-            deletions: number;
-            prOpened: number;
-            prMerged: number;
-            prClosed: number;
-        }
-    >();
-
-    const ensureDate = (date: string) => {
-        if (!dateMap.has(date)) {
-            dateMap.set(date, {
-                commits: 0,
-                additions: 0,
-                deletions: 0,
-                prOpened: 0,
-                prMerged: 0,
-                prClosed: 0
-            });
-        }
-        return dateMap.get(date)!;
-    };
-
-    // Aggregate commits by date — LoC from non-merge commits
-    for (const c of commits) {
-        const date = toDateString(c.committed_at);
-        const entry = ensureDate(date);
-        entry.commits++;
-        if (!c.is_merge) {
-            entry.additions += c.additions;
-            entry.deletions += c.deletions;
-        }
-    }
-
-    // Aggregate PRs by date (counts only, no LoC)
-    for (const pr of prs) {
-        const createdDate = toDateString(pr.created_at);
-        ensureDate(createdDate).prOpened++;
-
-        if (pr.merged_at) {
-            ensureDate(toDateString(pr.merged_at)).prMerged++;
-        } else if (pr.closed_at) {
-            ensureDate(toDateString(pr.closed_at)).prClosed++;
-        }
-    }
-
-    return Array.from(dateMap.entries()).map(([date, data]) => ({
-        owner_login: ownerLogin,
-        repo_id: repoId,
-        contributor_login: null,
-        date,
-        commit_count: data.commits,
-        additions: data.additions,
-        deletions: data.deletions,
-        pr_opened: data.prOpened,
-        pr_merged: data.prMerged,
-        pr_closed: data.prClosed,
-        workflow_runs: 0,
-        workflow_failures: 0
-    }));
-}
-
-// ── Shared: Repo Snapshot Builder ────────────────────────────────────────────────
-
-/**
- * Build and upsert a repo_snapshot for a single repo.
- */
-async function buildAndUpsertRepoSnapshot(
-    ownerLogin: string,
-    repo: RepositoryMetaRow,
-    commits: CommitEventRow[],
-    prs: PrEventRow[]
-): Promise<void> {
-    const contribStats = await getContributorStatsByRepo(repo.id);
-
-    // LoC sourced from non-merge commits
-    const nonMergeCommits = commits.filter((c) => !c.is_merge);
-    const mergedPrs = prs.filter((pr) => pr.merged_at !== null);
-    const openPrs = prs.filter((pr) => pr.state === "open").length;
-
-    const totalAdditions = nonMergeCommits.reduce((sum, c) => sum + c.additions, 0);
-    const totalDeletions = nonMergeCommits.reduce((sum, c) => sum + c.deletions, 0);
-
-    // Build top contributors for this repo
-    const topContributors: SnapshotContributor[] = contribStats.slice(0, 10).map((cs) => ({
-        login: cs.login,
-        avatar_url: cs.avatar_url ?? "",
-        commits: cs.commits,
-        additions: cs.additions,
-        deletions: cs.deletions
-    }));
-
-    const ciStats = await getCiStatsByRepo(repo.id);
-
-    const snap: UpsertRepoSnapshotInput = {
-        repo_id: repo.id,
-        owner_login: ownerLogin,
-        name: repo.name,
-        description: repo.description,
-        language: repo.language,
-        stargazers_count: repo.stargazers_count,
-        forks_count: repo.forks_count,
-        open_issues_count: repo.open_issues_count,
-        updated_at: repo.updated_at,
-        pushed_at: repo.pushed_at,
-        total_commits: commits.length,
-        total_prs: prs.length,
-        open_prs: openPrs,
-        merged_prs: mergedPrs.length,
-        total_additions: totalAdditions,
-        total_deletions: totalDeletions,
         contributor_count: contribStats.length,
         ci_success_rate: ciStats.ci_success_rate,
         ci_avg_duration_seconds: ciStats.ci_avg_duration_seconds,
@@ -642,7 +532,7 @@ async function rebuildContributorSnapshots(ownerLogin: string): Promise<number> 
                 COALESCE(ROUND(COUNT(*) FILTER (WHERE we.conclusion IN ('failure','timed_out'))::NUMERIC / NULLIF(COUNT(*), 0) * 100, 1), 0)::NUMERIC AS failure_rate
             FROM workflow_event we
             JOIN repository_meta rm ON rm.id = we.repo_id
-            WHERE rm.owner_login = $1 AND we.actor_login IS NOT NULL AND we.status = 'completed'
+            WHERE rm.owner_login = $1 AND we.actor_login IS NOT NULL AND we.status = 'completed' AND we.event IS DISTINCT FROM 'dynamic'
             GROUP BY we.actor_login
         ),
         combined AS (
@@ -695,34 +585,30 @@ async function rebuildContributorSnapshots(ownerLogin: string): Promise<number> 
         [ownerLogin]
     );
 
-    let count = 0;
-    for (const row of rows) {
-        const snap: UpsertContributorSnapshotInput = {
-            owner_login: ownerLogin,
-            contributor_login: row.login,
-            avatar_url: row.avatar_url,
-            html_url: row.html_url,
-            total_commits: row.total_commits,
-            total_additions: row.total_additions,
-            total_deletions: row.total_deletions,
-            total_prs: row.total_prs,
-            total_prs_merged: row.total_prs_merged,
-            repos: row.repos ?? [],
-            repo_count: row.repo_count,
-            workflow_runs_triggered: row.workflow_runs_triggered,
-            workflow_failure_rate: Number(row.workflow_failure_rate) || 0,
-            first_commit_at: row.first_commit_at,
-            last_commit_at: row.last_commit_at,
-            active_days: row.active_days,
-            first_pr_at: row.first_pr_at,
-            last_pr_at: row.last_pr_at,
-        };
+    const snaps: UpsertContributorSnapshotInput[] = rows.map((row) => ({
+        owner_login: ownerLogin,
+        contributor_login: row.login,
+        avatar_url: row.avatar_url,
+        html_url: row.html_url,
+        total_commits: row.total_commits,
+        total_additions: row.total_additions,
+        total_deletions: row.total_deletions,
+        total_prs: row.total_prs,
+        total_prs_merged: row.total_prs_merged,
+        repos: row.repos ?? [],
+        repo_count: row.repo_count,
+        workflow_runs_triggered: row.workflow_runs_triggered,
+        workflow_failure_rate: Number(row.workflow_failure_rate) || 0,
+        first_commit_at: row.first_commit_at,
+        last_commit_at: row.last_commit_at,
+        active_days: row.active_days,
+        first_pr_at: row.first_pr_at,
+        last_pr_at: row.last_pr_at,
+    }));
 
-        await upsertContributorSnapshot(snap);
-        count++;
-    }
+    await upsertContributorSnapshotsBatch(snaps);
 
-    return count;
+    return snaps.length;
 }
 
 // ── Owner Snapshot ───────────────────────────────────────────────────────────────
@@ -824,7 +710,7 @@ async function rebuildOwnerSnapshot(ownerLogin: string, repos: RepositoryMetaRow
             COALESCE(AVG(we.duration_seconds) FILTER (WHERE we.duration_seconds IS NOT NULL), 0)::INTEGER AS avg_duration
          FROM workflow_event we
          JOIN repository_meta rm ON rm.id = we.repo_id
-         WHERE rm.owner_login = $1 AND we.status = 'completed'`,
+         WHERE rm.owner_login = $1 AND we.status = 'completed' AND we.event IS DISTINCT FROM 'dynamic'`,
         [ownerLogin]
     );
 
@@ -926,4 +812,112 @@ function calculateStreaks(dateCounts: Array<{ date: string; count: number }>): {
     const avgCommitsPerDay = Math.round((totalCommits / daysDiff) * 100) / 100;
 
     return { longestStreak, currentStreak, avgCommitsPerDay };
+}
+
+// ── Incremental Owner Aggregation ───────────────────────────────────────────────
+
+/**
+ * Incremental aggregation pipeline for an owner.
+ *
+ * Leverages the watermark (`last_aggregated_at` in owner_snapshot) to skip
+ * per-repo work that was already done progressively by `aggregateRepo()`.
+ * Owner/contributor-level aggregation is rebuilt from per-repo data (cheap).
+ *
+ * Parallelizes independent steps where dependencies allow:
+ *   - Steps 2a + 2b: owner + contributor daily_activity (both read per-repo rows)
+ *   - Steps 3 + streak calc: contributor_snapshot + commit dates (no cross-dependency)
+ *   - Step 4 waits for Steps 2 + 3
+ *
+ * Falls back to full rebuild when no watermark exists (first sync).
+ */
+export async function aggregateOwnerIncremental(ownerLogin: string): Promise<AggregateResult> {
+    const watermark = await getAggregationWatermark(ownerLogin);
+
+    // No watermark → first sync or manual reset → full rebuild
+    if (!watermark) {
+        console.log(`[aggregate] ${ownerLogin}: no watermark, falling back to full rebuild`);
+        return aggregateOwner(ownerLogin);
+    }
+
+    const pipelineStart = performance.now();
+    const repos = await getReposByOwner(ownerLogin);
+    const nonForkRepos = repos.filter((r) => !r.is_fork);
+
+    console.log(
+        `[aggregate] ${ownerLogin}: incremental aggregation for ${nonForkRepos.length} repos ` +
+            `(watermark: ${watermark.toISOString()})`
+    );
+
+    // Step 1: Per-repo daily_activity + snapshots for repos not done progressively
+    const existingSnapshots = await getRepoSnapshotsByOwner(ownerLogin);
+    const recentThreshold = watermark.getTime();
+    const recentlyAggregated = new Set(
+        existingSnapshots
+            .filter((s) => s.computed_at && s.computed_at.getTime() > recentThreshold)
+            .map((s) => s.repo_id)
+    );
+
+    const { result: { dailyRows: step1DailyRows, skipped: step1Skipped }, ms: step1Ms } = await timed(
+        "per-repo",
+        async () => {
+            let dailyRows = 0;
+            let skipped = 0;
+            for (const repo of nonForkRepos) {
+                if (recentlyAggregated.has(repo.id)) {
+                    skipped++;
+                    continue;
+                }
+                await clearRepoDailyActivity(repo.id);
+                dailyRows += await rebuildRepoDailyActivitySQL(ownerLogin, repo.id);
+                await rebuildRepoSnapshotSQL(ownerLogin, repo);
+            }
+            return { dailyRows, skipped };
+        }
+    );
+    let dailyActivityRows = step1DailyRows;
+
+    console.log(
+        `[aggregate] ${ownerLogin}: Step 1 done in ${step1Ms}ms — ${nonForkRepos.length - step1Skipped} rebuilt, ${step1Skipped} skipped`
+    );
+
+    // Steps 2a + 2b: Rebuild owner + contributor daily_activity in parallel
+    const { result: [ownerDailyRows, contribDailyRows], ms: step2Ms } = await timed(
+        "daily-activity",
+        () => Promise.all([
+            rebuildOwnerDailyActivity(ownerLogin),
+            rebuildContributorDailyActivity(ownerLogin)
+        ])
+    );
+    dailyActivityRows += ownerDailyRows + contribDailyRows;
+
+    console.log(
+        `[aggregate] ${ownerLogin}: Step 2 done in ${step2Ms}ms — ${ownerDailyRows} owner + ${contribDailyRows} contributor rows`
+    );
+
+    // Step 3: Rebuild contributor_snapshot
+    const { result: contributorSnapshots, ms: step3Ms } = await timed(
+        "contributor-snapshots",
+        () => rebuildContributorSnapshots(ownerLogin)
+    );
+    console.log(`[aggregate] ${ownerLogin}: Step 3 done in ${step3Ms}ms — ${contributorSnapshots} contributor snapshots`);
+
+    // Step 4: Rebuild owner_snapshot
+    const { ms: step4Ms } = await timed(
+        "owner-snapshot",
+        () => rebuildOwnerSnapshot(ownerLogin, nonForkRepos)
+    );
+
+    const totalMs = Math.round(performance.now() - pipelineStart);
+    console.log(
+        `[aggregate] ${ownerLogin}: incremental aggregation complete in ${totalMs}ms ` +
+            `(per-repo: ${step1Ms}ms, daily: ${step2Ms}ms, contributors: ${step3Ms}ms, owner: ${step4Ms}ms)`
+    );
+
+    return {
+        owner: ownerLogin,
+        dailyActivityRows,
+        repoSnapshots: nonForkRepos.length,
+        contributorSnapshots,
+        ownerSnapshotUpdated: true
+    };
 }

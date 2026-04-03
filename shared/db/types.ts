@@ -116,6 +116,7 @@ export interface WorkflowEventRow {
         | "neutral"
         | "stale"
         | null;
+    event: string | null;
     head_branch: string | null;
     head_sha: string | null;
     display_title: string | null;
@@ -161,6 +162,7 @@ export interface OwnerSnapshotRow {
     workflow_success_rate: number;
     avg_workflow_duration: number;
     computed_at: Date;
+    last_aggregated_at: Date | null;
 }
 
 export interface RepoSnapshotRow {

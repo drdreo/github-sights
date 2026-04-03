@@ -281,6 +281,7 @@ export interface InsertWorkflowInput {
     run_number: number | null;
     status: "completed" | "in_progress" | "queued" | null;
     conclusion: string | null;
+    event: string | null;
     head_branch: string | null;
     head_sha: string | null;
     display_title: string | null;
@@ -297,7 +298,7 @@ export async function getWorkflowsByRepo(
     const offset = options?.offset ?? 0;
     return query<import("../types.ts").WorkflowEventRow>(
         `SELECT * FROM workflow_event
-         WHERE repo_id = $1 AND status = 'completed'
+         WHERE repo_id = $1 AND status = 'completed' AND event IS DISTINCT FROM 'dynamic'
          ORDER BY created_at DESC
          LIMIT $2 OFFSET $3`,
         [repoId, limit, offset]
@@ -330,7 +331,7 @@ export async function getWorkflowStatsByRepo(repoId: number): Promise<
             COALESCE(SUM(duration_seconds) FILTER (WHERE duration_seconds IS NOT NULL), 0)::BIGINT AS total_duration_seconds,
             COALESCE(ROUND(COUNT(*) FILTER (WHERE conclusion = 'success')::NUMERIC / NULLIF(COUNT(*), 0) * 100, 1), 0)::NUMERIC AS success_rate
          FROM workflow_event
-         WHERE repo_id = $1 AND status = 'completed'
+         WHERE repo_id = $1 AND status = 'completed' AND event IS DISTINCT FROM 'dynamic'
          GROUP BY workflow_name
          ORDER BY total_runs DESC`,
         [repoId]
@@ -379,7 +380,7 @@ export async function getWorkflowStatsByOwner(ownerLogin: string, since?: string
                 COALESCE(AVG(we.duration_seconds) FILTER (WHERE we.duration_seconds IS NOT NULL), 0)::INTEGER AS avg_duration_seconds
              FROM workflow_event we
              JOIN repository_meta rm ON rm.id = we.repo_id
-             WHERE rm.owner_login = $1 AND we.status = 'completed'${dateFilter}`,
+             WHERE rm.owner_login = $1 AND we.status = 'completed' AND we.event IS DISTINCT FROM 'dynamic'${dateFilter}`,
             params
         ),
         query<{
@@ -393,7 +394,7 @@ export async function getWorkflowStatsByOwner(ownerLogin: string, since?: string
                 COUNT(*)::INTEGER AS failure_count
              FROM workflow_event we
              JOIN repository_meta rm ON rm.id = we.repo_id
-             WHERE rm.owner_login = $1 AND we.status = 'completed' AND we.conclusion IN ('failure','timed_out')${dateFilter}
+             WHERE rm.owner_login = $1 AND we.status = 'completed' AND we.event IS DISTINCT FROM 'dynamic' AND we.conclusion IN ('failure','timed_out')${dateFilter}
              GROUP BY we.workflow_name, rm.name
              ORDER BY failure_count DESC
              LIMIT 5`,
@@ -410,7 +411,7 @@ export async function getWorkflowStatsByOwner(ownerLogin: string, since?: string
                 COUNT(*)::INTEGER AS run_count
              FROM workflow_event we
              JOIN repository_meta rm ON rm.id = we.repo_id
-             WHERE rm.owner_login = $1 AND we.status = 'completed' AND we.actor_login IS NOT NULL${dateFilter}
+             WHERE rm.owner_login = $1 AND we.status = 'completed' AND we.event IS DISTINCT FROM 'dynamic' AND we.actor_login IS NOT NULL${dateFilter}
              GROUP BY we.actor_login
              ORDER BY total_duration_seconds DESC
              LIMIT 10`,
@@ -447,6 +448,7 @@ export async function insertWorkflows(workflows: InsertWorkflowInput[]): Promise
                 w.run_number,
                 w.status,
                 w.conclusion,
+                w.event,
                 w.head_branch,
                 w.head_sha,
                 w.display_title,
@@ -456,10 +458,10 @@ export async function insertWorkflows(workflows: InsertWorkflowInput[]): Promise
             const result = await client.query(
                 `INSERT INTO workflow_event (
                     id, repo_id, workflow_name, workflow_path, actor_login,
-                    run_number, status, conclusion, head_branch, head_sha,
+                    run_number, status, conclusion, event, head_branch, head_sha,
                     display_title, duration_seconds, created_at
                  ) VALUES ${text}
-                 ON CONFLICT (id) DO NOTHING`,
+                 ON CONFLICT (id) DO UPDATE SET event = EXCLUDED.event`,
                 params
             );
             inserted += result.rowCount ?? 0;

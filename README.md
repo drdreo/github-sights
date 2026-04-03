@@ -22,14 +22,18 @@ See who's contributing, how much, and where. View individual contributor profile
 
 ## Frontend
 
-React.
+React. on Cloudflare Workers
 Deploy web app via `wrangler depoly`.
 
 ## Backend
 
-Deno.
-Deploy server via `deno deploy` but the repository is connected anyways and auto-deploys
+### Server
+Deno. on Deno Deploy
+Deploy server via `deno deploy` but the repository is connected anyway and auto-deploys.
 
+### Crawler
+Deno. on Railway
+Will auto-generate a new docker image that railway listens to.
 
 
 ### Architecture

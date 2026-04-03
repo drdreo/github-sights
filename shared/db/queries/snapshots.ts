@@ -3,7 +3,8 @@
 // Upsert and query operations for all snapshot tables.
 // Snapshots are rebuilt by the aggregation pipeline after each sync.
 
-import { query, queryOne, execute } from "../pool.ts";
+import { query, queryOne, execute, transaction } from "../pool.ts";
+import { buildMultiRowValues } from "./events.ts";
 import type {
     OwnerSnapshotRow,
     RepoSnapshotRow,
@@ -45,8 +46,8 @@ export async function upsertOwnerSnapshot(snap: UpsertOwnerSnapshotInput): Promi
             longest_streak, current_streak, avg_commits_per_day,
             top_contributors, language_breakdown,
             total_workflow_runs, workflow_success_rate, avg_workflow_duration,
-            computed_at
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,NOW())
+            computed_at, last_aggregated_at
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,NOW(),NOW())
          ON CONFLICT (owner_login) DO UPDATE SET
             total_repos=$2, total_commits=$3, total_prs=$4, open_prs=$5, merged_prs=$6,
             total_additions=$7, total_deletions=$8, unique_contributors=$9,
@@ -54,7 +55,7 @@ export async function upsertOwnerSnapshot(snap: UpsertOwnerSnapshotInput): Promi
             longest_streak=$12, current_streak=$13, avg_commits_per_day=$14,
             top_contributors=$15, language_breakdown=$16,
             total_workflow_runs=$17, workflow_success_rate=$18, avg_workflow_duration=$19,
-            computed_at=NOW()`,
+            computed_at=NOW(), last_aggregated_at=NOW()`,
         [
             snap.owner_login,
             snap.total_repos,
@@ -83,6 +84,15 @@ export async function getOwnerSnapshot(ownerLogin: string): Promise<OwnerSnapsho
     return queryOne<OwnerSnapshotRow>("SELECT * FROM owner_snapshot WHERE owner_login = $1", [
         ownerLogin
     ]);
+}
+
+/** Get the aggregation watermark for incremental processing. */
+export async function getAggregationWatermark(ownerLogin: string): Promise<Date | null> {
+    const row = await queryOne<{ last_aggregated_at: Date | null }>(
+        "SELECT last_aggregated_at FROM owner_snapshot WHERE owner_login = $1",
+        [ownerLogin]
+    );
+    return row?.last_aggregated_at ?? null;
 }
 
 // ── Repo Snapshot ────────────────────────────────────────────────────────────────
@@ -245,6 +255,71 @@ export async function upsertContributorSnapshot(
             snap.last_pr_at
         ]
     );
+}
+
+const SNAPSHOT_BATCH_SIZE = 500;
+
+/**
+ * Batch upsert contributor snapshots using multi-row VALUES.
+ * Replaces the row-by-row loop for much higher throughput.
+ */
+export async function upsertContributorSnapshotsBatch(
+    snaps: UpsertContributorSnapshotInput[]
+): Promise<void> {
+    if (snaps.length === 0) return;
+
+    const now = new Date().toISOString();
+
+    await transaction(async (client) => {
+        for (let i = 0; i < snaps.length; i += SNAPSHOT_BATCH_SIZE) {
+            const chunk = snaps.slice(i, i + SNAPSHOT_BATCH_SIZE);
+            const { text, params } = buildMultiRowValues(chunk, (s) => [
+                s.owner_login,
+                s.contributor_login,
+                s.avatar_url,
+                s.html_url,
+                s.total_commits,
+                s.total_additions,
+                s.total_deletions,
+                s.total_prs,
+                s.total_prs_merged,
+                JSON.stringify(s.repos),
+                s.repo_count,
+                s.workflow_runs_triggered,
+                s.workflow_failure_rate,
+                s.first_commit_at,
+                s.last_commit_at,
+                s.active_days,
+                s.first_pr_at,
+                s.last_pr_at,
+                now
+            ]);
+
+            await client.query(
+                `INSERT INTO contributor_snapshot (
+                    owner_login, contributor_login, avatar_url, html_url,
+                    total_commits, total_additions, total_deletions,
+                    total_prs, total_prs_merged,
+                    repos, repo_count,
+                    workflow_runs_triggered, workflow_failure_rate,
+                    first_commit_at, last_commit_at, active_days,
+                    first_pr_at, last_pr_at,
+                    computed_at
+                 ) VALUES ${text}
+                 ON CONFLICT (owner_login, contributor_login) DO UPDATE SET
+                    avatar_url=COALESCE(EXCLUDED.avatar_url, contributor_snapshot.avatar_url),
+                    html_url=COALESCE(EXCLUDED.html_url, contributor_snapshot.html_url),
+                    total_commits=EXCLUDED.total_commits, total_additions=EXCLUDED.total_additions, total_deletions=EXCLUDED.total_deletions,
+                    total_prs=EXCLUDED.total_prs, total_prs_merged=EXCLUDED.total_prs_merged,
+                    repos=EXCLUDED.repos, repo_count=EXCLUDED.repo_count,
+                    workflow_runs_triggered=EXCLUDED.workflow_runs_triggered, workflow_failure_rate=EXCLUDED.workflow_failure_rate,
+                    first_commit_at=EXCLUDED.first_commit_at, last_commit_at=EXCLUDED.last_commit_at, active_days=EXCLUDED.active_days,
+                    first_pr_at=EXCLUDED.first_pr_at, last_pr_at=EXCLUDED.last_pr_at,
+                    computed_at=EXCLUDED.computed_at`,
+                params
+            );
+        }
+    });
 }
 
 export async function getContributorSnapshotsByOwner(
