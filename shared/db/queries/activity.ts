@@ -214,9 +214,10 @@ export async function aggregateOwnerActivity(
     const t = totals[0];
     if (!t) return null;
 
-    const dayCount = Math.max(1, Math.round(
-        (new Date(until).getTime() - new Date(since).getTime()) / (1000 * 60 * 60 * 24)
-    ));
+    const dayCount = Math.max(
+        1,
+        Math.round((new Date(until).getTime() - new Date(since).getTime()) / (1000 * 60 * 60 * 24))
+    );
 
     return {
         total_commits: t.total_commits,

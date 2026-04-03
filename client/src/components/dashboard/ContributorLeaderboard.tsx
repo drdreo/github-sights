@@ -132,7 +132,10 @@ export function ContributorLeaderboard({
                                         <motion.div
                                             className="h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-500"
                                             initial={{ width: 0 }}
-                                            animate={{ width: `${pct}%`, backgroundSize: `${100 / (pct / 100)}% 100%` }}
+                                            animate={{
+                                                width: `${pct}%`,
+                                                backgroundSize: `${100 / (pct / 100)}% 100%`
+                                            }}
                                             transition={{
                                                 duration: 0.8,
                                                 ease: "easeOut",

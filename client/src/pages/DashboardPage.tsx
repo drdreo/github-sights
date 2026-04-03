@@ -36,8 +36,11 @@ export default function DashboardPage() {
         since,
         until
     );
-    const { data: contributors, isLoading: contributorsLoading } =
-        useContributorOverview(owner, since, until);
+    const { data: contributors, isLoading: contributorsLoading } = useContributorOverview(
+        owner,
+        since,
+        until
+    );
 
     // Read initial sync range from URL (set by SetupPage on first-time redirect)
     const [searchParams] = useSearchParams();

@@ -192,7 +192,11 @@ export async function guardRateLimit(octokit: Octokit): Promise<void> {
 
     // Notify the heartbeat that we're pausing (so the UI can show it)
     if (heartbeatFn) {
-        try { await heartbeatFn(resetIso); } catch { /* best-effort */ }
+        try {
+            await heartbeatFn(resetIso);
+        } catch {
+            /* best-effort */
+        }
     }
 
     // Sleep in chunks so we can heartbeat and avoid stale-job detection
@@ -203,13 +207,21 @@ export async function guardRateLimit(octokit: Octokit): Promise<void> {
         await new Promise((resolve) => setTimeout(resolve, sleepFor));
         remaining -= sleepFor;
         if (heartbeatFn && remaining > 0) {
-            try { await heartbeatFn(resetIso); } catch { /* best-effort */ }
+            try {
+                await heartbeatFn(resetIso);
+            } catch {
+                /* best-effort */
+            }
         }
     }
 
     // Clear the rate-limit pause indicator
     if (heartbeatFn) {
-        try { await heartbeatFn(null); } catch { /* best-effort */ }
+        try {
+            await heartbeatFn(null);
+        } catch {
+            /* best-effort */
+        }
     }
 
     // After waking, re-check via explicit API call
@@ -680,8 +692,15 @@ export async function fetchPullRequests(
 // ── Workflow Runs ─────────────────────────────────────────────────────────────
 
 const VALID_CONCLUSIONS = new Set([
-    "success", "failure", "cancelled", "skipped", "timed_out",
-    "action_required", "neutral", "stale", "startup_failure"
+    "success",
+    "failure",
+    "cancelled",
+    "skipped",
+    "timed_out",
+    "action_required",
+    "neutral",
+    "stale",
+    "startup_failure"
 ]);
 
 /** Coerce unknown conclusion values to null so they don't violate the DB check constraint. */

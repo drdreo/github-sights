@@ -13,7 +13,7 @@ export function FetchedAtBadge({ fetchedAt }: FetchedAtBadgeProps) {
     let label = "";
     try {
         label = formatDistanceToNow(new Date(fetchedAt), { addSuffix: true });
-    } catch (e) {
+    } catch {
         console.error("Invalid date for fetchedAt:", fetchedAt);
         return null;
     }

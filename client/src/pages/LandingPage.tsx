@@ -1,12 +1,11 @@
-import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
-    LandingHero,
-    LandingShowcase,
     LandingAnalytics,
-    LandingFeatures,
     LandingCTA,
-    LandingFooter
+    LandingFeatures,
+    LandingFooter,
+    LandingHero,
+    LandingShowcase
 } from "../components/landing";
 
 const RECENT_OWNERS_KEY = "github-sights:recent-owners";

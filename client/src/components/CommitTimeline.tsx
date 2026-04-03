@@ -122,13 +122,7 @@ export function CommitTimeline({ timelines, startDate, endDate, loading }: Commi
                 {/* 2. Repo Rows */}
                 <div className="flex flex-col">
                     {timelines.map((timeline) => (
-                        <RepoRow
-                            key={timeline.repo.id}
-                            timeline={timeline}
-                            startDate={startDate}
-                            totalDays={totalDays}
-                            allDays={allDays}
-                        />
+                        <RepoRow key={timeline.repo.id} timeline={timeline} allDays={allDays} />
                     ))}
 
                     {timelines.length === 0 && (
@@ -142,17 +136,7 @@ export function CommitTimeline({ timelines, startDate, endDate, loading }: Commi
     );
 }
 
-function RepoRow({
-    timeline,
-    startDate,
-    totalDays,
-    allDays
-}: {
-    timeline: RepoCommitTimeline;
-    startDate: Date;
-    totalDays: number;
-    allDays: Date[];
-}) {
+function RepoRow({ timeline, allDays }: { timeline: RepoCommitTimeline; allDays: Date[] }) {
     const repoColor = getRepoColor(timeline.repo.name);
 
     // Calculate max stack height for this row to determine row height

@@ -12,9 +12,7 @@ export function LandingFeatures() {
                         <div className="p-2.5 bg-gray-800 rounded-lg w-fit mb-3">
                             <f.icon className="w-5 h-5 text-blue-400" />
                         </div>
-                        <h3 className="text-sm font-semibold text-gray-100 mb-1.5">
-                            {f.title}
-                        </h3>
+                        <h3 className="text-sm font-semibold text-gray-100 mb-1.5">{f.title}</h3>
                         <p className="text-xs text-gray-400 leading-relaxed">{f.desc}</p>
                     </div>
                 ))}

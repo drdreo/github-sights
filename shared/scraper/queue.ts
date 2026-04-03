@@ -9,35 +9,35 @@
 //   queued → syncing_repos → aggregating → complete
 
 import { Octokit } from "octokit";
+import { getConfig } from "../config.ts";
+import { poolStats } from "../db/pool.ts";
+import { getSyncSince } from "../db/queries/config.ts";
+import { getRepoByName, updateOwnerSyncedAt } from "../db/queries/identity.ts";
 import {
-    claimJob,
     advanceJob,
-    yieldJob,
+    claimJob,
+    cleanupOldJobs,
     completeJob,
     failJob,
     recordJobError,
-    cleanupOldJobs,
-    type SyncJobRow
+    type SyncJobRow,
+    yieldJob
 } from "../db/queries/sync-jobs.ts";
-import { getConfig } from "../config.ts";
+import type { RepositoryMetaRow } from "../db/types.ts";
+import { aggregateOwnerIncremental, aggregateRepo } from "./aggregate.ts";
 import {
     createOctokit,
-    refreshRateLimit,
     getRateLimitState,
-    setRateLimitHeartbeat,
-    type GitHubRepo
+    type GitHubRepo,
+    refreshRateLimit,
+    setRateLimitHeartbeat
 } from "./github-client.ts";
 import {
-    ingestRepos,
     ingestCommitsForRepo,
     ingestPRsForRepo,
+    ingestRepos,
     ingestWorkflowsForRepo
 } from "./ingest.ts";
-import { aggregateOwner, aggregateOwnerIncremental, aggregateRepo } from "./aggregate.ts";
-import { getRepoByName, updateOwnerSyncedAt } from "../db/queries/identity.ts";
-import { poolStats } from "../db/pool.ts";
-import { getSyncSince } from "../db/queries/config.ts";
-import type { RepositoryMetaRow } from "../db/types.ts";
 
 // ── Config ───────────────────────────────────────────────────────────────────────
 
@@ -81,7 +81,9 @@ export async function tick(): Promise<boolean> {
         setRateLimitHeartbeat(octokit, async (resetAt) => {
             await advanceJob(job.id, { rate_limit_reset_at: resetAt });
             if (resetAt) {
-                console.log(`[queue] Job #${job.id}: heartbeat (rate-limit pause until ${resetAt})`);
+                console.log(
+                    `[queue] Job #${job.id}: heartbeat (rate-limit pause until ${resetAt})`
+                );
             } else {
                 console.log(`[queue] Job #${job.id}: heartbeat (rate-limit pause ended)`);
             }

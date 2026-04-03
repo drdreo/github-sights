@@ -4,15 +4,14 @@
 // Maintains an in-memory Map for fast lookups, backed by Postgres for persistence.
 // Replaces the old config.ts that depended on GitHubService and the old db.ts.
 
-import type { ApiConfig } from "./src/index.ts";
-import {
-    getConfig as dbGetConfig,
-    getAllConfigs,
-    upsertConfig as dbUpsertConfig,
-    deleteConfig as dbDeleteConfig
-} from "./db/queries/config.ts";
 import { isPoolAvailable } from "./db/pool.ts";
+import {
+    deleteConfig as dbDeleteConfig,
+    getAllConfigs,
+    upsertConfig as dbUpsertConfig
+} from "./db/queries/config.ts";
 import { notConfigured } from "./errors.ts";
+import type { ApiConfig } from "./src/index.ts";
 
 // ── In-memory cache ─────────────────────────────────────────────────────────────
 

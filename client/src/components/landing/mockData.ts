@@ -66,7 +66,7 @@ export const REPO_RANKING_MOCK: RepoCommitTimeline[] = SHOWCASE_REPOS.map((repo)
     return {
         repo: {
             name: repo.name,
-            language: repo.language,
+            language: repo.language
         } as Repository,
         totalCommits: repo.totalCommits,
         daily: repo.commitData.map((d, i) => ({
@@ -135,9 +135,11 @@ export const SWIMLANE_MOCK: RepoCommitTimeline[] = (() => {
             const date = subDays(now, days - 1 - i);
             const isWeekend = date.getDay() === 0 || date.getDay() === 6;
             // Less commits on weekend
-            const numCommits = Math.floor(Math.random() * (isWeekend ? maxPerDay / 2 + 1 : maxPerDay));
+            const numCommits = Math.floor(
+                Math.random() * (isWeekend ? maxPerDay / 2 + 1 : maxPerDay)
+            );
             totalCommits += numCommits;
-            
+
             const commits = Array.from({ length: numCommits }, () => {
                 const author = FAKE_AUTHORS[Math.floor(Math.random() * FAKE_AUTHORS.length)];
                 const msg = FAKE_MESSAGES[Math.floor(Math.random() * FAKE_MESSAGES.length)];
@@ -167,7 +169,7 @@ export const SWIMLANE_MOCK: RepoCommitTimeline[] = (() => {
                     }
                 } as any;
             });
-            
+
             return {
                 date: format(date, "yyyy-MM-dd"),
                 count: numCommits,
@@ -199,7 +201,7 @@ export const CONTRIBUTORS_MOCK = [
     { login: "ThePrimeagen", commits: 23145 },
     { login: "geohot", commits: 18402 },
     { login: "ry", commits: 15320 },
-    { login: "bashbunni", commits: 9876 },
+    { login: "bashbunni", commits: 9876 }
 ];
 
 export const FEATURES = [

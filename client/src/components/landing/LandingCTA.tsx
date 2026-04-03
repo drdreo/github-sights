@@ -9,8 +9,8 @@ export function LandingCTA() {
                 <div className="relative">
                     <h2 className="text-2xl font-bold text-gray-100 mb-3">Ready to explore?</h2>
                     <p className="text-gray-400 mb-6 max-w-md mx-auto">
-                        Connect your GitHub account and start visualizing your repository
-                        analytics in seconds.
+                        Connect your GitHub account and start visualizing your repository analytics
+                        in seconds.
                     </p>
                     <Link
                         to="/setup"

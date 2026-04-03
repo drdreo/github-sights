@@ -6,9 +6,9 @@
 // Tokens are AES-256-GCM encrypted before storage and decrypted on read.
 // Encryption/decryption is handled at this DB boundary using shared/crypto.ts.
 
-import { query, queryOne, execute } from "../pool.ts";
+import { decryptToken, encryptToken } from "../../crypto.ts";
+import { execute, query, queryOne } from "../pool.ts";
 import type { OwnerConfigRow } from "../types.ts";
-import { encryptToken, decryptToken } from "../../crypto.ts";
 
 /** Get config for a specific owner (case-insensitive). */
 export async function getConfig(owner: string): Promise<OwnerConfigRow | null> {

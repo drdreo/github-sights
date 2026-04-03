@@ -28,13 +28,14 @@ Deploy web app via `wrangler depoly`.
 ## Backend
 
 ### Server
+
 Deno. on Deno Deploy
 Deploy server via `deno deploy` but the repository is connected anyway and auto-deploys.
 
 ### Crawler
+
 Deno. on Railway
 Will auto-generate a new docker image that railway listens to.
-
 
 ### Architecture
 

@@ -1,11 +1,19 @@
-import React, { useMemo, useState } from "react";
 import { format } from "date-fns";
+import {
+    CheckCircle2,
+    ChevronRight,
+    Clock,
+    ExternalLink,
+    MinusCircle,
+    Timer,
+    XCircle
+} from "lucide-react";
+import React, { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ResponsiveContainer, AreaChart, Area } from "recharts";
-import { CheckCircle2, XCircle, MinusCircle, Clock, Timer, ExternalLink, ChevronRight } from "lucide-react";
-import { LoadingSkeleton } from "./LoadingSkeleton";
+import { Area, AreaChart, ResponsiveContainer } from "recharts";
 import { useOwner } from "../hooks/useOwner";
-import type { WorkflowRun, WorkflowStat, WorkflowJobStepInsights, JobInsight } from "../types";
+import type { WorkflowJobStepInsights, WorkflowRun, WorkflowStat } from "../types";
+import { LoadingSkeleton } from "./LoadingSkeleton";
 
 function formatDuration(seconds: number | null): string {
     if (seconds == null) return "-";
@@ -18,7 +26,13 @@ function formatDuration(seconds: number | null): string {
     return `${hours}h ${remMins}m`;
 }
 
-function WorkflowSparkline({ data, color }: { data: { i: number; v: number; c: string }[]; color: string }) {
+function WorkflowSparkline({
+    data,
+    color
+}: {
+    data: { i: number; v: number; c: string }[];
+    color: string;
+}) {
     if (data.length < 2) return null;
     const id = `wf-spark-${color.replace("#", "")}`;
     return (
@@ -133,7 +147,9 @@ function WorkflowInlineInsights({
                                     key={job.name}
                                     name={job.name}
                                     barPct={Math.max(
-                                        (job.avgDurationSeconds / (slowestJobs[0]?.avgDurationSeconds || 1)) * 100,
+                                        (job.avgDurationSeconds /
+                                            (slowestJobs[0]?.avgDurationSeconds || 1)) *
+                                            100,
                                         2
                                     )}
                                     barColor="bg-blue-500/20"
@@ -264,7 +280,13 @@ interface WorkflowStatsPanelProps {
     loading: boolean;
 }
 
-export function WorkflowStatsPanel({ stats, workflows, insights, insightsLoading, loading }: WorkflowStatsPanelProps) {
+export function WorkflowStatsPanel({
+    stats,
+    workflows,
+    insights,
+    insightsLoading,
+    loading
+}: WorkflowStatsPanelProps) {
     const owner = useOwner();
     const { repo } = useParams<{ repo: string }>();
     const [expandedWorkflow, setExpandedWorkflow] = useState<string | null>(null);
@@ -377,7 +399,13 @@ export function WorkflowStatsPanel({ stats, workflows, insights, insightsLoading
                                     <div className="flex items-center gap-4 text-xs text-gray-400 flex-shrink-0 ml-4">
                                         <WorkflowSparkline
                                             data={sparklinesByName.get(stat.workflowName) ?? []}
-                                            color={stat.successRate >= 80 ? "#4ade80" : stat.successRate >= 50 ? "#facc15" : "#f87171"}
+                                            color={
+                                                stat.successRate >= 80
+                                                    ? "#4ade80"
+                                                    : stat.successRate >= 50
+                                                      ? "#facc15"
+                                                      : "#f87171"
+                                            }
                                         />
                                         <div className="flex items-center gap-1">
                                             <Timer className="w-3.5 h-3.5" />

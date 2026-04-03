@@ -339,7 +339,11 @@ export async function getWorkflowStatsByRepo(repoId: number): Promise<
 }
 
 /** Owner-wide workflow stats for dashboard. */
-export async function getWorkflowStatsByOwner(ownerLogin: string, since?: string, until?: string): Promise<{
+export async function getWorkflowStatsByOwner(
+    ownerLogin: string,
+    since?: string,
+    until?: string
+): Promise<{
     total_runs: number;
     total_duration_seconds: number;
     success_rate: number;

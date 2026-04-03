@@ -194,7 +194,9 @@ export function StatCards({
             <div>
                 <h3 className="text-sm uppercase tracking-wider mb-4">
                     <span className="font-semibold text-gray-300">Activity</span>
-                    {dateRangeLabel && <span className="font-medium text-gray-500"> · {dateRangeLabel}</span>}
+                    {dateRangeLabel && (
+                        <span className="font-medium text-gray-500"> · {dateRangeLabel}</span>
+                    )}
                 </h3>
                 <div
                     className={`grid grid-cols-1 gap-6 ${activityCards.length > 3 ? "md:grid-cols-2 lg:grid-cols-4" : "md:grid-cols-3"}`}
@@ -205,7 +207,9 @@ export function StatCards({
             <div>
                 <h3 className="text-sm uppercase tracking-wider mb-4">
                     <span className="font-semibold text-gray-300">Overview</span>
-                    {dateRangeLabel && <span className="font-medium text-gray-500"> · {dateRangeLabel}</span>}
+                    {dateRangeLabel && (
+                        <span className="font-medium text-gray-500"> · {dateRangeLabel}</span>
+                    )}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {overviewCards.map(renderCard)}

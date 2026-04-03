@@ -9,45 +9,41 @@
 
 import type { Octokit } from "octokit";
 import {
-    fetchRepos,
-    fetchCommits,
-    fetchPullRequests,
-    fetchWorkflowRuns,
-    fetchWorkflowJobs,
-    isRepoExcluded,
-    type GitHubRepo
-} from "./github-client.ts";
-import {
-    upsertOwner,
-    upsertRepos,
-    upsertContributors,
-    type UpsertRepoInput,
-    type UpsertContributorInput
-} from "../db/queries/identity.ts";
-import {
-    insertCommits,
-    upsertPrs,
-    insertWorkflows,
-    insertWorkflowJobs,
-    insertWorkflowSteps,
     getUnfetchedWorkflowRuns,
-    markJobsFetched,
     type InsertCommitInput,
+    insertCommits,
     type InsertPrInput,
     type InsertWorkflowInput,
     type InsertWorkflowJobInput,
-    type InsertWorkflowStepInput
+    insertWorkflowJobs,
+    insertWorkflows,
+    type InsertWorkflowStepInput,
+    insertWorkflowSteps,
+    markJobsFetched,
+    upsertPrs
 } from "../db/queries/events.ts";
 import {
-    getSyncState,
+    type UpsertContributorInput,
+    upsertContributors,
+    upsertOwner,
+    type UpsertRepoInput,
+    upsertRepos
+} from "../db/queries/identity.ts";
+import {
     advanceSyncState,
-    retreatEarliestSynced,
     getEarliestSynced,
-    recordSyncError
+    getSyncState,
+    retreatEarliestSynced
 } from "../db/queries/sync-state.ts";
-import { updateOwnerSyncedAt } from "../db/queries/identity.ts";
-import { aggregateRepo } from "./aggregate.ts";
-import type { RepositoryMetaRow } from "../db/types.ts";
+import {
+    fetchCommits,
+    fetchPullRequests,
+    fetchRepos,
+    fetchWorkflowJobs,
+    fetchWorkflowRuns,
+    type GitHubRepo,
+    isRepoExcluded
+} from "./github-client.ts";
 
 // ── Types ────────────────────────────────────────────────────────────────────────
 
@@ -75,21 +71,6 @@ export interface IngestWorkflowsResult {
     repoId: number;
     inserted: number;
 }
-
-export interface IngestOwnerResult {
-    owner: string;
-    repoCount: number;
-    repos: Array<{
-        name: string;
-        commits: IngestCommitsResult;
-        prs: IngestPRsResult;
-    }>;
-    errors: string[];
-}
-
-// ── Constants ────────────────────────────────────────────────────────────────────
-
-const CONCURRENCY = 2;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────
 

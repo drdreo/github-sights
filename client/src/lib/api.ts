@@ -69,7 +69,7 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
 
     try {
         return await response.json();
-    } catch (_) {
+    } catch {
         // If JSON parsing fails but request was ok, return empty object or text
         return {} as T;
     }
@@ -188,7 +188,9 @@ export const api = {
         if (since) params.set("since", since);
         if (until) params.set("until", until);
         const qs = params.toString();
-        return fetchApi<OwnerWorkflowStats>(`/workflow-stats/${encodeURIComponent(owner)}${qs ? `?${qs}` : ""}`);
+        return fetchApi<OwnerWorkflowStats>(
+            `/workflow-stats/${encodeURIComponent(owner)}${qs ? `?${qs}` : ""}`
+        );
     },
 
     /** Trigger sync — ensures data freshness (debounced to hourly).

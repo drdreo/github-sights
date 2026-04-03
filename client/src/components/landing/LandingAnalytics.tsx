@@ -1,8 +1,21 @@
-import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip } from "recharts";
+import {
+    ResponsiveContainer,
+    AreaChart,
+    Area,
+    CartesianGrid,
+    XAxis,
+    YAxis,
+    Tooltip
+} from "recharts";
 import { subDays } from "date-fns";
 import { CommitTimeline } from "../CommitTimeline";
 import { RepoRanking } from "../dashboard/RepoRanking";
-import { ACTIVITY_CHART_DATA, CONTRIBUTORS_MOCK, REPO_RANKING_MOCK, SWIMLANE_MOCK } from "./mockData";
+import {
+    ACTIVITY_CHART_DATA,
+    CONTRIBUTORS_MOCK,
+    REPO_RANKING_MOCK,
+    SWIMLANE_MOCK
+} from "./mockData";
 
 interface TooltipEntry {
     dataKey: string;
@@ -60,13 +73,7 @@ export function LandingAnalytics() {
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={ACTIVITY_CHART_DATA}>
                                     <defs>
-                                        <linearGradient
-                                            id="gradTotal"
-                                            x1="0"
-                                            y1="0"
-                                            x2="0"
-                                            y2="1"
-                                        >
+                                        <linearGradient id="gradTotal" x1="0" y1="0" x2="0" y2="1">
                                             <stop
                                                 offset="5%"
                                                 stopColor="#e5e7eb"
@@ -161,9 +168,7 @@ export function LandingAnalytics() {
                     {/* Commit Activity Swim Lane */}
                     <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
                         <div className="p-5">
-                            <h3 className="text-sm font-medium text-gray-100">
-                                Commit Activity
-                            </h3>
+                            <h3 className="text-sm font-medium text-gray-100">Commit Activity</h3>
                             <p className="text-xs text-gray-500 mt-0.5">
                                 Real-time commit swim lane across repositories
                             </p>
@@ -183,29 +188,30 @@ export function LandingAnalytics() {
                 <div className="space-y-4">
                     {/* Active contributors list */}
                     <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-                        <h3 className="text-sm font-medium text-gray-100 mb-1">
-                            Top Contributors
-                        </h3>
-                        <p className="text-xs text-gray-500 mb-4">
-                            All-time commit leaders
-                        </p>
+                        <h3 className="text-sm font-medium text-gray-100 mb-1">Top Contributors</h3>
+                        <p className="text-xs text-gray-500 mb-4">All-time commit leaders</p>
                         <div className="space-y-1">
                             {CONTRIBUTORS_MOCK.map((contributor, i) => {
                                 const rank = i + 1;
-                                const pct = (contributor.commits / CONTRIBUTORS_MOCK[0].commits) * 100;
+                                const pct =
+                                    (contributor.commits / CONTRIBUTORS_MOCK[0].commits) * 100;
                                 const rankColors: Record<number, string> = {
                                     1: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
                                     2: "text-gray-300 bg-gray-400/10 border-gray-400/20",
                                     3: "text-orange-400 bg-orange-500/10 border-orange-500/20"
                                 };
-                                const colorClass = rankColors[rank] || "text-gray-500 bg-gray-800/50 border-gray-700";
+                                const colorClass =
+                                    rankColors[rank] ||
+                                    "text-gray-500 bg-gray-800/50 border-gray-700";
 
                                 return (
                                     <div
                                         key={contributor.login}
                                         className="flex items-center gap-3 py-2 px-2 -mx-2 rounded-lg hover:bg-gray-800/50 transition-colors duration-150 group"
                                     >
-                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border shrink-0 ${colorClass}`}>
+                                        <div
+                                            className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border shrink-0 ${colorClass}`}
+                                        >
                                             {rank}
                                         </div>
                                         <img
@@ -226,7 +232,10 @@ export function LandingAnalytics() {
                                             <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden flex">
                                                 <div
                                                     className="h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-1000 ease-out"
-                                                    style={{ width: `${pct}%`, backgroundSize: `${100 / (pct / 100)}% 100%` }}
+                                                    style={{
+                                                        width: `${pct}%`,
+                                                        backgroundSize: `${100 / (pct / 100)}% 100%`
+                                                    }}
                                                 />
                                             </div>
                                         </div>
@@ -238,11 +247,11 @@ export function LandingAnalytics() {
 
                     {/* Repo ranking */}
                     <div>
-                        <RepoRanking 
-                            timelines={REPO_RANKING_MOCK} 
-                            owner="showcase" 
-                            limit={4} 
-                            loading={false} 
+                        <RepoRanking
+                            timelines={REPO_RANKING_MOCK}
+                            owner="showcase"
+                            limit={4}
+                            loading={false}
                         />
                     </div>
                 </div>

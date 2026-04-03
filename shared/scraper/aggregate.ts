@@ -11,36 +11,29 @@
 //                      Also rebuilds all repo snapshots if they haven't been built yet.
 
 import { query } from "../db/pool.ts";
-import { getReposByOwner } from "../db/queries/identity.ts";
-import { getContributorStatsByRepo } from "../db/queries/events.ts";
-import {
-    upsertOwnerSnapshot,
-    upsertRepoSnapshot,
-    upsertContributorSnapshotsBatch,
-    getRepoSnapshotsByOwner,
-    getAggregationWatermark,
-    type UpsertOwnerSnapshotInput,
-    type UpsertRepoSnapshotInput,
-    type UpsertContributorSnapshotInput
-} from "../db/queries/snapshots.ts";
 import {
     clearRepoDailyActivity,
     upsertDailyActivity,
     type UpsertDailyActivityInput
 } from "../db/queries/activity.ts";
-import { LANGUAGE_COLORS } from "./github-client.ts";
+import { getContributorStatsByRepo } from "../db/queries/events.ts";
+import { getReposByOwner } from "../db/queries/identity.ts";
+import {
+    getAggregationWatermark,
+    getRepoSnapshotsByOwner,
+    type UpsertContributorSnapshotInput,
+    upsertContributorSnapshotsBatch,
+    upsertOwnerSnapshot,
+    type UpsertOwnerSnapshotInput,
+    upsertRepoSnapshot,
+    type UpsertRepoSnapshotInput
+} from "../db/queries/snapshots.ts";
 import type {
-    SnapshotContributor,
     LanguageBreakdownEntry,
-    RepositoryMetaRow
+    RepositoryMetaRow,
+    SnapshotContributor
 } from "../db/types.ts";
-
-// ── Helpers ──────────────────────────────────────────────────────────────────────
-
-/** Extract YYYY-MM-DD date string from a Date object. */
-function toDateString(d: Date): string {
-    return d.toISOString().split("T")[0];
-}
+import { LANGUAGE_COLORS } from "./github-client.ts";
 
 /** Fetch CI stats (success rate, avg duration, last conclusion) for a repo. */
 async function getCiStatsByRepo(repoId: number): Promise<{
@@ -91,7 +84,9 @@ export async function aggregateRepo(ownerLogin: string, repo: RepositoryMetaRow)
     await clearRepoDailyActivity(repo.id);
     const daRows = await rebuildRepoDailyActivitySQL(ownerLogin, repo.id);
     await rebuildRepoSnapshotSQL(ownerLogin, repo);
-    console.log(`[aggregate] ${ownerLogin}/${repo.name}: repo snapshot + ${daRows} daily_activity rows built (SQL)`);
+    console.log(
+        `[aggregate] ${ownerLogin}/${repo.name}: repo snapshot + ${daRows} daily_activity rows built (SQL)`
+    );
 }
 
 // ── Timing Helper ───────────────────────────────────────────────────────────────
@@ -134,29 +129,27 @@ export async function aggregateOwner(ownerLogin: string): Promise<AggregateResul
     );
 
     // Step 1: Rebuild per-repo daily_activity via SQL (INSERT INTO ... SELECT)
-    const { result: { dailyRows: step1DailyRows, skipped: step1Skipped }, ms: step1Ms } = await timed(
-        "per-repo",
-        async () => {
-            let dailyRows = 0;
-            let skipped = 0;
-            for (let i = 0; i < nonForkRepos.length; i++) {
-                const repo = nonForkRepos[i];
-                if (recentlyAggregated.has(repo.id)) {
-                    skipped++;
-                    continue;
-                }
-                await clearRepoDailyActivity(repo.id);
-                dailyRows += await rebuildRepoDailyActivitySQL(ownerLogin, repo.id);
-                await rebuildRepoSnapshotSQL(ownerLogin, repo);
-                if ((i + 1) % 50 === 0) {
-                    console.log(
-                        `[aggregate] ${ownerLogin}: repo ${i + 1}/${nonForkRepos.length} done`
-                    );
-                }
+    const {
+        result: { dailyRows: step1DailyRows, skipped: step1Skipped },
+        ms: step1Ms
+    } = await timed("per-repo", async () => {
+        let dailyRows = 0;
+        let skipped = 0;
+        for (let i = 0; i < nonForkRepos.length; i++) {
+            const repo = nonForkRepos[i];
+            if (recentlyAggregated.has(repo.id)) {
+                skipped++;
+                continue;
             }
-            return { dailyRows, skipped };
+            await clearRepoDailyActivity(repo.id);
+            dailyRows += await rebuildRepoDailyActivitySQL(ownerLogin, repo.id);
+            await rebuildRepoSnapshotSQL(ownerLogin, repo);
+            if ((i + 1) % 50 === 0) {
+                console.log(`[aggregate] ${ownerLogin}: repo ${i + 1}/${nonForkRepos.length} done`);
+            }
         }
-    );
+        return { dailyRows, skipped };
+    });
     let dailyActivityRows = step1DailyRows;
 
     console.log(
@@ -164,9 +157,11 @@ export async function aggregateOwner(ownerLogin: string): Promise<AggregateResul
     );
 
     // Step 2: Rebuild owner + contributor daily_activity in parallel
-    const { result: [ownerDailyRows, contribDailyRows], ms: step2Ms } = await timed(
-        "daily-activity",
-        () => Promise.all([
+    const {
+        result: [ownerDailyRows, contribDailyRows],
+        ms: step2Ms
+    } = await timed("daily-activity", () =>
+        Promise.all([
             rebuildOwnerDailyActivity(ownerLogin),
             rebuildContributorDailyActivity(ownerLogin)
         ])
@@ -177,16 +172,16 @@ export async function aggregateOwner(ownerLogin: string): Promise<AggregateResul
     );
 
     // Step 3: Rebuild contributor_snapshot
-    const { result: contributorSnapshots, ms: step3Ms } = await timed(
-        "contributor-snapshots",
-        () => rebuildContributorSnapshots(ownerLogin)
+    const { result: contributorSnapshots, ms: step3Ms } = await timed("contributor-snapshots", () =>
+        rebuildContributorSnapshots(ownerLogin)
     );
-    console.log(`[aggregate] ${ownerLogin}: Step 3 done in ${step3Ms}ms — ${contributorSnapshots} contributor snapshots`);
+    console.log(
+        `[aggregate] ${ownerLogin}: Step 3 done in ${step3Ms}ms — ${contributorSnapshots} contributor snapshots`
+    );
 
     // Step 4: Rebuild owner_snapshot
-    const { ms: step4Ms } = await timed(
-        "owner-snapshot",
-        () => rebuildOwnerSnapshot(ownerLogin, nonForkRepos)
+    const { ms: step4Ms } = await timed("owner-snapshot", () =>
+        rebuildOwnerSnapshot(ownerLogin, nonForkRepos)
     );
 
     const totalMs = Math.round(performance.now() - pipelineStart);
@@ -352,9 +347,10 @@ async function rebuildRepoSnapshotSQL(ownerLogin: string, repo: RepositoryMetaRo
  */
 async function rebuildOwnerDailyActivity(ownerLogin: string): Promise<number> {
     // Clear existing owner-level rows (repo_id IS NULL)
-    await query("DELETE FROM daily_activity WHERE owner_login = $1 AND repo_id IS NULL AND contributor_login IS NULL", [
-        ownerLogin
-    ]);
+    await query(
+        "DELETE FROM daily_activity WHERE owner_login = $1 AND repo_id IS NULL AND contributor_login IS NULL",
+        [ownerLogin]
+    );
 
     // Aggregate per-repo daily_activity rows into owner-level rows via SQL
     const rows = await query<UpsertDailyActivityInput>(
@@ -603,7 +599,7 @@ async function rebuildContributorSnapshots(ownerLogin: string): Promise<number> 
         last_commit_at: row.last_commit_at,
         active_days: row.active_days,
         first_pr_at: row.first_pr_at,
-        last_pr_at: row.last_pr_at,
+        last_pr_at: row.last_pr_at
     }));
 
     await upsertContributorSnapshotsBatch(snaps);
@@ -857,23 +853,23 @@ export async function aggregateOwnerIncremental(ownerLogin: string): Promise<Agg
             .map((s) => s.repo_id)
     );
 
-    const { result: { dailyRows: step1DailyRows, skipped: step1Skipped }, ms: step1Ms } = await timed(
-        "per-repo",
-        async () => {
-            let dailyRows = 0;
-            let skipped = 0;
-            for (const repo of nonForkRepos) {
-                if (recentlyAggregated.has(repo.id)) {
-                    skipped++;
-                    continue;
-                }
-                await clearRepoDailyActivity(repo.id);
-                dailyRows += await rebuildRepoDailyActivitySQL(ownerLogin, repo.id);
-                await rebuildRepoSnapshotSQL(ownerLogin, repo);
+    const {
+        result: { dailyRows: step1DailyRows, skipped: step1Skipped },
+        ms: step1Ms
+    } = await timed("per-repo", async () => {
+        let dailyRows = 0;
+        let skipped = 0;
+        for (const repo of nonForkRepos) {
+            if (recentlyAggregated.has(repo.id)) {
+                skipped++;
+                continue;
             }
-            return { dailyRows, skipped };
+            await clearRepoDailyActivity(repo.id);
+            dailyRows += await rebuildRepoDailyActivitySQL(ownerLogin, repo.id);
+            await rebuildRepoSnapshotSQL(ownerLogin, repo);
         }
-    );
+        return { dailyRows, skipped };
+    });
     let dailyActivityRows = step1DailyRows;
 
     console.log(
@@ -881,9 +877,11 @@ export async function aggregateOwnerIncremental(ownerLogin: string): Promise<Agg
     );
 
     // Steps 2a + 2b: Rebuild owner + contributor daily_activity in parallel
-    const { result: [ownerDailyRows, contribDailyRows], ms: step2Ms } = await timed(
-        "daily-activity",
-        () => Promise.all([
+    const {
+        result: [ownerDailyRows, contribDailyRows],
+        ms: step2Ms
+    } = await timed("daily-activity", () =>
+        Promise.all([
             rebuildOwnerDailyActivity(ownerLogin),
             rebuildContributorDailyActivity(ownerLogin)
         ])
@@ -895,16 +893,16 @@ export async function aggregateOwnerIncremental(ownerLogin: string): Promise<Agg
     );
 
     // Step 3: Rebuild contributor_snapshot
-    const { result: contributorSnapshots, ms: step3Ms } = await timed(
-        "contributor-snapshots",
-        () => rebuildContributorSnapshots(ownerLogin)
+    const { result: contributorSnapshots, ms: step3Ms } = await timed("contributor-snapshots", () =>
+        rebuildContributorSnapshots(ownerLogin)
     );
-    console.log(`[aggregate] ${ownerLogin}: Step 3 done in ${step3Ms}ms — ${contributorSnapshots} contributor snapshots`);
+    console.log(
+        `[aggregate] ${ownerLogin}: Step 3 done in ${step3Ms}ms — ${contributorSnapshots} contributor snapshots`
+    );
 
     // Step 4: Rebuild owner_snapshot
-    const { ms: step4Ms } = await timed(
-        "owner-snapshot",
-        () => rebuildOwnerSnapshot(ownerLogin, nonForkRepos)
+    const { ms: step4Ms } = await timed("owner-snapshot", () =>
+        rebuildOwnerSnapshot(ownerLogin, nonForkRepos)
     );
 
     const totalMs = Math.round(performance.now() - pipelineStart);

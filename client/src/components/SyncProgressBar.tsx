@@ -124,7 +124,15 @@ export function SyncProgressBar({ progress, barWidth = "w-32" }: SyncProgressBar
 
     if (!progress.active) return null;
 
-    const { status, totalRepos, syncedRepos, totalEvents, currentRepo, elapsedMs, rateLimitResetAt } = progress;
+    const {
+        status,
+        totalRepos,
+        syncedRepos,
+        totalEvents,
+        currentRepo,
+        elapsedMs,
+        rateLimitResetAt
+    } = progress;
     const rateLimitWait = rateLimitResetAt ? formatTimeUntil(rateLimitResetAt) : null;
 
     return (

@@ -44,8 +44,8 @@ export function LandingHero({ recentOwners }: LandingHeroProps) {
                     </h1>
 
                     <p className="text-lg text-gray-400 max-w-xl mx-auto mb-10 leading-relaxed">
-                        Track commits, analyze contributors, and uncover trends across any
-                        GitHub user or organization. Beautiful analytics in minutes.
+                        Track commits, analyze contributors, and uncover trends across any GitHub
+                        user or organization. Beautiful analytics in minutes.
                     </p>
 
                     {recentOwners.length > 0 ? (
@@ -66,7 +66,7 @@ export function LandingHero({ recentOwners }: LandingHeroProps) {
                                     New Analysis
                                 </Link>
                             </div>
-                            
+
                             {recentOwners.length > 1 && (
                                 <div className="flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-700">
                                     <div className="text-xs text-gray-500 mb-3 uppercase tracking-wider font-semibold">

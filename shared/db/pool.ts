@@ -65,9 +65,11 @@ const RETRY_BASE_MS = 2_000;
 function isConnectionError(err: unknown): boolean {
     if (!(err instanceof Error)) return false;
     const msg = err.message.toLowerCase();
-    return msg.includes("timeout exceeded when trying to connect") ||
+    return (
+        msg.includes("timeout exceeded when trying to connect") ||
         msg.includes("connection terminated") ||
-        msg.includes("connection refused");
+        msg.includes("connection refused")
+    );
 }
 
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
@@ -79,7 +81,9 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
             lastErr = err;
             if (attempt < MAX_RETRIES && isConnectionError(err)) {
                 const delay = RETRY_BASE_MS * (attempt + 1);
-                console.warn(`[db] Connection failed, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})...`);
+                console.warn(
+                    `[db] Connection failed, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})...`
+                );
                 await new Promise((r) => setTimeout(r, delay));
                 continue;
             }
