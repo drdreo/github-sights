@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getRecentOwners } from "../../shared/lib/recentOwners";
 import {
     LandingAnalytics,
     LandingCTA,
@@ -7,7 +8,6 @@ import {
     LandingHero,
     LandingShowcase
 } from "./components";
-import { getRecentOwners } from "../../shared/lib/recentOwners";
 
 export default function LandingPage() {
     const [recentOwners, setRecentOwners] = useState<string[]>([]);

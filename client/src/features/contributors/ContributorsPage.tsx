@@ -1,17 +1,17 @@
+import type { ContributorOverview } from "@github-sights/shared";
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { ArrowLeft } from "lucide-react";
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { DataTable } from "../../shared/components/DataTable";
-import { LoadingSkeleton } from "../../shared/components/LoadingSkeleton";
-import { TimeRangeSelector } from "../../shared/components/TimeRangeSelector";
 import { FetchedAtBadge } from "../../shared/components/FetchedAtBadge";
-
-import { useContributorOverview } from "./hooks";
+import { LoadingSkeleton } from "../../shared/components/LoadingSkeleton";
+import { SyncBanner } from "../../shared/components/SyncBanner";
+import { TimeRangeSelector } from "../../shared/components/TimeRangeSelector";
 import { useOwner } from "../../shared/hooks/useOwner";
 import { getContributorColumns } from "../../shared/lib/contributorColumns";
-import { SyncBanner } from "../../shared/components/SyncBanner";
-import type { ContributorOverview } from "../../shared/types";
+
+import { useContributorOverview } from "./hooks";
 
 const columnHelper = createColumnHelper<ContributorOverview>();
 

@@ -1,8 +1,8 @@
+import type { RepoContributorStat } from "@github-sights/shared";
 import React from "react";
-import type { RepoContributorStat } from "../../../shared/types";
-import { getContributorColumns } from "../../../shared/lib/contributorColumns";
 import { DataTable } from "../../../shared/components/DataTable";
 import { LoadingSkeleton } from "../../../shared/components/LoadingSkeleton";
+import { getContributorColumns } from "../../../shared/lib/contributorColumns";
 
 const columns = getContributorColumns();
 

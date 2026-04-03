@@ -1,8 +1,8 @@
-import React from "react";
+import type { OverviewStats } from "@github-sights/shared";
 import { Code2 } from "lucide-react";
-import { LanguageBar } from "./LanguageBar";
+import React from "react";
 import { LoadingSkeleton } from "../../../shared/components/LoadingSkeleton";
-import type { OverviewStats } from "../../../shared/types";
+import { LanguageBar } from "./LanguageBar";
 
 interface LanguageDistributionProps {
     stats: OverviewStats | undefined;

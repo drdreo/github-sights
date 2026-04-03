@@ -8,12 +8,12 @@ import {
     Trash2,
     Users
 } from "lucide-react";
-import { Github } from "./Github.tsx";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth, useLogout } from "../hooks/useAuth";
 import { useOwner } from "../hooks/useOwner";
 import { api } from "../lib/api";
+import { Github } from "./Github.tsx";
 
 export default function Layout() {
     const location = useLocation();

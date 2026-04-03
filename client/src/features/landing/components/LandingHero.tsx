@@ -1,5 +1,5 @@
+import { ArrowRight, Clock, Eye, Search } from "lucide-react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Clock, Search, Eye } from "lucide-react";
 import { Github } from "../../../shared/components/Github.tsx";
 
 interface LandingHeroProps {

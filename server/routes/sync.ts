@@ -12,7 +12,7 @@ import {
     isSyncing,
     abortSync
 } from "../../shared/scraper/index.ts";
-import { aggregateOwner } from "../../shared/scraper/aggregate.ts";
+import { aggregateOwner } from "../../shared/scraper/index.ts";
 
 const sync = new Hono();
 

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { RefreshCw, AlertTriangle, ChevronDown, ChevronUp, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, RefreshCw, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import type { SyncProgressResponse } from "../lib/api";
 
 function formatEvents(n: number): string {

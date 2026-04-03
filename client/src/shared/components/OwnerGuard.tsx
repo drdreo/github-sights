@@ -1,7 +1,7 @@
-import { Navigate } from "react-router-dom";
-import { useOwnerConfig } from "../hooks/useOwnerConfig";
-import { useOwner } from "../hooks/useOwner";
 import { Loader2 } from "lucide-react";
+import { Navigate } from "react-router-dom";
+import { useOwner } from "../hooks/useOwner";
+import { useOwnerConfig } from "../hooks/useOwnerConfig";
 
 /**
  * Wraps owner-scoped routes. Checks if the owner has a config on the server.

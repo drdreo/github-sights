@@ -4,7 +4,7 @@
 // Snapshots are rebuilt by the aggregation pipeline after each sync.
 
 import { query, queryOne, execute, transaction } from "../pool.ts";
-import { buildMultiRowValues } from "./events.ts";
+import { buildMultiRowValues } from "../utils.ts";
 import type {
     OwnerSnapshotRow,
     RepoSnapshotRow,

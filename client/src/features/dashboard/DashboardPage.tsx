@@ -1,12 +1,14 @@
 import { differenceInDays, subDays } from "date-fns";
 import React, { useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useOwner } from "../../shared/hooks/useOwner";
+import { useSyncProgress } from "../../shared/hooks/useSyncProgress";
 import { CommitActivity } from "./components/CommitActivity";
 import { CommitTrends } from "./components/CommitTrends";
-import { DashboardHeader } from "./components/DashboardHeader";
 import { ContributorLeaderboard } from "./components/ContributorLeaderboard";
-import { RepoRanking } from "./components/RepoRanking";
+import { DashboardHeader } from "./components/DashboardHeader";
 import { LanguageDistribution } from "./components/LanguageDistribution";
+import { RepoRanking } from "./components/RepoRanking";
 import { StatCards } from "./components/StatCards";
 import {
     useCommitTimelines,
@@ -15,8 +17,6 @@ import {
     useStats,
     useSync
 } from "./hooks";
-import { useOwner } from "../../shared/hooks/useOwner";
-import { useSyncProgress } from "../../shared/hooks/useSyncProgress";
 
 export default function DashboardPage() {
     const [dateRange, setDateRange] = useState({

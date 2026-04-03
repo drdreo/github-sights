@@ -1,13 +1,19 @@
-import React, { useState } from "react";
+import type {
+    Commit,
+    PullRequest,
+    RepoContributorStat,
+    WorkflowRun,
+    WorkflowStat
+} from "@github-sights/shared";
 import { GitCommit, GitPullRequest, Play, Users } from "lucide-react";
+import React, { useState } from "react";
 import { useParams } from "react-router-dom";
-import { CommitList } from "./CommitList";
-import { PullRequestList } from "./PullRequestList";
-import { ContributorGrid } from "./ContributorGrid";
-import { WorkflowList } from "./WorkflowList";
-import { useWorkflowInsights } from "../hooks";
 import { useOwner } from "../../../shared/hooks/useOwner";
-import type { Commit, PullRequest, RepoContributorStat, WorkflowRun, WorkflowStat } from "../../../shared/types";
+import { useWorkflowInsights } from "../hooks";
+import { CommitList } from "./CommitList";
+import { ContributorGrid } from "./ContributorGrid";
+import { PullRequestList } from "./PullRequestList";
+import { WorkflowList } from "./WorkflowList";
 
 type TabId = "commits" | "pulls" | "contributors" | "workflows";
 

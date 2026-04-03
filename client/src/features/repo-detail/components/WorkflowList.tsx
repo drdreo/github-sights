@@ -1,3 +1,4 @@
+import type { WorkflowJobStepInsights, WorkflowRun, WorkflowStat } from "@github-sights/shared";
 import { format } from "date-fns";
 import {
     CheckCircle2,
@@ -11,9 +12,8 @@ import {
 import React, { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Area, AreaChart, ResponsiveContainer } from "recharts";
-import { useOwner } from "../../../shared/hooks/useOwner";
-import type { WorkflowJobStepInsights, WorkflowRun, WorkflowStat } from "../../../shared/types";
 import { LoadingSkeleton } from "../../../shared/components/LoadingSkeleton";
+import { useOwner } from "../../../shared/hooks/useOwner";
 
 function formatDuration(seconds: number | null): string {
     if (seconds == null) return "-";

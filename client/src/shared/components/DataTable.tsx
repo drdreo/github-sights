@@ -1,10 +1,10 @@
 import {
     type ColumnDef,
-    type RowData,
-    type SortingState,
     flexRender,
     getCoreRowModel,
     getSortedRowModel,
+    type RowData,
+    type SortingState,
     useReactTable
 } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";

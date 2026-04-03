@@ -1,6 +1,6 @@
+import type { Commit, DailyCommitActivity, RepoCommitTimeline } from "@github-sights/shared";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../shared/lib/api";
-import type { Commit, DailyCommitActivity, RepoCommitTimeline } from "../../shared/types";
 
 export function useRepo(owner: string, repo: string) {
     return useQuery({

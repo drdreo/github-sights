@@ -1,7 +1,7 @@
 import React from "react";
-import type { SyncProgressResponse } from "../../../shared/lib/api";
 import { SyncProgressBar } from "../../../shared/components/SyncProgressBar";
 import { TimeRangeSelector } from "../../../shared/components/TimeRangeSelector";
+import type { SyncProgressResponse } from "../../../shared/lib/api";
 
 interface DateRange {
     startDate: Date;

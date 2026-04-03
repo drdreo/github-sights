@@ -1,18 +1,18 @@
-import React from "react";
+import type { Commit, PullRequest, RepoContributorStat, Repository } from "@github-sights/shared";
 import { formatDistanceToNow } from "date-fns";
 import {
-    Star,
-    GitBranch,
-    ExternalLink,
-    Clock,
     AlertCircle,
+    Clock,
+    Code,
+    ExternalLink,
+    GitBranch,
     GitCommit,
-    GitPullRequest,
     GitMerge,
-    Users,
-    Code
+    GitPullRequest,
+    Star,
+    Users
 } from "lucide-react";
-import type { Repository, Commit, PullRequest, RepoContributorStat } from "../../../shared/types";
+import React from "react";
 import { getLanguageColor } from "../../../shared/lib/languageColors";
 
 function formatCompact(n: number): string {

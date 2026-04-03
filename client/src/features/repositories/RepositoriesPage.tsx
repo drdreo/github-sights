@@ -1,12 +1,12 @@
+import { ArrowLeft } from "lucide-react";
 import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
-
-import { useRepos, useCommitTimelines, useRepoSnapshots } from "./hooks";
-import { useOwner } from "../../shared/hooks/useOwner";
-import { RepoGrid } from "./components/RepoGrid";
 import { FetchedAtBadge } from "../../shared/components/FetchedAtBadge";
 import { SyncBanner } from "../../shared/components/SyncBanner";
+import { useOwner } from "../../shared/hooks/useOwner";
+import { RepoGrid } from "./components/RepoGrid";
+
+import { useCommitTimelines, useRepos, useRepoSnapshots } from "./hooks";
 
 export default function RepositoriesPage() {
     const owner = useOwner();

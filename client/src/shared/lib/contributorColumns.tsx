@@ -1,7 +1,7 @@
+import type { RepoContributorStat } from "@github-sights/shared";
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import React from "react";
 import { Link } from "react-router-dom";
-import type { RepoContributorStat } from "../types";
 import { LocCell } from "../components/LocCell";
 import { formatLoc } from "./format";
 

@@ -1,10 +1,10 @@
+import type { OwnerWorkflowStats } from "@github-sights/shared";
+import { OverviewStats } from "@github-sights/shared";
+import { Activity, Box, Code, Flame, GitCommit, GitPullRequest, Timer, Users } from "lucide-react";
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { formatDuration, formatLoc } from "../../../shared/lib/format";
-import { OverviewStats } from "../../../shared/types";
 import { LoadingSkeleton } from "../../../shared/components/LoadingSkeleton";
-import { Activity, Box, Code, Flame, GitCommit, GitPullRequest, Timer, Users } from "lucide-react";
-import type { OwnerWorkflowStats } from "../../../shared/types";
+import { formatDuration, formatLoc } from "../../../shared/lib/format";
 
 interface StatCardDef {
     label: string;

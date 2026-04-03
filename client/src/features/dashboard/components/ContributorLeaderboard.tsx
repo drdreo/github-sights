@@ -1,9 +1,9 @@
-import React from "react";
-import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
-import { Trophy } from "lucide-react";
+import type { ContributorOverview } from "@github-sights/shared";
 import clsx from "clsx";
-import type { ContributorOverview } from "../../../shared/types";
+import { motion } from "framer-motion";
+import { Trophy } from "lucide-react";
+import React from "react";
+import { Link } from "react-router-dom";
 
 interface ContributorLeaderboardProps {
     contributors: ContributorOverview[];

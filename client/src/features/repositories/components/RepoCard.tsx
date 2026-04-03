@@ -1,5 +1,5 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import type { Repository } from "@github-sights/shared";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import { format } from "date-fns";
 import {
     CheckCircle2,
@@ -12,10 +12,10 @@ import {
     Star,
     XCircle
 } from "lucide-react";
-import * as Tooltip from "@radix-ui/react-tooltip";
-import type { Repository } from "../../../shared/types";
-import type { RepoSnapshotStats } from "./RepoGrid";
+import React from "react";
+import { Link } from "react-router-dom";
 import { getLanguageColor } from "../../../shared/lib/languageColors";
+import type { RepoSnapshotStats } from "./RepoGrid";
 
 function IconTooltip({ children, label }: { children: React.ReactNode; label: string }) {
     return (

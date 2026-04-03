@@ -1,18 +1,19 @@
 import {
     ApiConfig,
-    ContributorOverview,
-    ContributorDetail,
-    OverviewStats,
-    Repository,
     Commit,
-    PullRequest,
     Contributor,
-    RepoContributorStat,
-    WorkflowRun,
-    WorkflowStat,
+    ContributorDetail,
+    ContributorOverview,
+    OverviewStats,
     OwnerWorkflowStats,
-    WorkflowJobStepInsights
-} from "../types";
+    PullRequest,
+    RepoContributorStat,
+    Repository,
+    WorkflowJobStepInsights,
+    WorkflowRun,
+    WorkflowStat
+} from "@github-sights/shared";
+
 export interface CachedResponse<T> {
     data: T;
     fetchedAt: number;

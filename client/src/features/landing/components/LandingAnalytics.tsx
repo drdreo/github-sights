@@ -1,13 +1,13 @@
-import {
-    ResponsiveContainer,
-    AreaChart,
-    Area,
-    CartesianGrid,
-    XAxis,
-    YAxis,
-    Tooltip
-} from "recharts";
 import { subDays } from "date-fns";
+import {
+    Area,
+    AreaChart,
+    CartesianGrid,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis
+} from "recharts";
 import { CommitTimeline } from "../../dashboard/components/CommitTimeline";
 import { RepoRanking } from "../../dashboard/components/RepoRanking";
 import {

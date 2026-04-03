@@ -1,10 +1,10 @@
-import React, { useMemo } from "react";
-import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
-import { BarChart3 } from "lucide-react";
-import { ResponsiveContainer, AreaChart, Area } from "recharts";
+import type { RepoCommitTimeline } from "@github-sights/shared";
 import { format, subDays } from "date-fns";
-import type { RepoCommitTimeline } from "../../../shared/types";
+import { motion } from "framer-motion";
+import { BarChart3 } from "lucide-react";
+import React, { useMemo } from "react";
+import { Link } from "react-router-dom";
+import { Area, AreaChart, ResponsiveContainer } from "recharts";
 
 interface RepoRankingProps {
     timelines: RepoCommitTimeline[];

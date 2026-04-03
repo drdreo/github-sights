@@ -1,6 +1,6 @@
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import type { Commit, DailyCommitActivity, RepoCommitTimeline } from "@github-sights/shared";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../../shared/lib/api";
-import type { Commit, DailyCommitActivity, RepoCommitTimeline } from "../../shared/types";
 
 export function useRepos(owner: string) {
     return useQuery({

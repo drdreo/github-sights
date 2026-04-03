@@ -1,7 +1,7 @@
-import React from "react";
+import type { Commit } from "@github-sights/shared";
 import { formatDistanceToNow } from "date-fns";
+import React from "react";
 import { LoadingSkeleton } from "../../../shared/components/LoadingSkeleton";
-import type { Commit } from "../../../shared/types";
 
 interface CommitListProps {
     commits: Commit[] | undefined;

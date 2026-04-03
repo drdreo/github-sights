@@ -1,7 +1,7 @@
+import type { Repository } from "@github-sights/shared";
 import React from "react";
 import { LoadingSkeleton } from "../../../shared/components/LoadingSkeleton";
 import { RepoCard } from "./RepoCard";
-import type { Repository } from "../../../shared/types";
 
 export interface RepoSnapshotStats {
     totalPRs: number;

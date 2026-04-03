@@ -1,7 +1,7 @@
-import React from "react";
+import type { RepoCommitTimeline } from "@github-sights/shared";
 import { TrendingUp } from "lucide-react";
+import React from "react";
 import { CommitActivityChart } from "./CommitActivityChart";
-import type { RepoCommitTimeline } from "../../../shared/types";
 
 interface CommitTrendsProps {
     timelines: RepoCommitTimeline[];

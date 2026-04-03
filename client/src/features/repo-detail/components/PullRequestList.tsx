@@ -1,8 +1,8 @@
-import React from "react";
+import type { PullRequest } from "@github-sights/shared";
 import { format } from "date-fns";
 import { CheckCircle2, XCircle } from "lucide-react";
+import React from "react";
 import { LoadingSkeleton } from "../../../shared/components/LoadingSkeleton";
-import type { PullRequest } from "../../../shared/types";
 
 interface PullRequestListProps {
     pulls: PullRequest[] | undefined;

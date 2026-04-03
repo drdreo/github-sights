@@ -1,13 +1,13 @@
 import {
-    Repository,
     Commit,
-    PullRequest,
     Contributor,
+    DailyCommitActivity,
     OverviewStats,
+    PullRequest,
     RepoCommitTimeline,
-    DailyCommitActivity
-} from "../shared/types";
-import { subDays, format } from "date-fns";
+    Repository
+} from "@github-sights/shared";
+import { format, subDays } from "date-fns";
 
 // --- Helpers ---
 const avatars = [

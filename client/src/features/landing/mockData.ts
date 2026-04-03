@@ -1,6 +1,6 @@
-import { subDays, format } from "date-fns";
-import { GitCommit, Users, TrendingUp, BarChart3 } from "lucide-react";
-import { RepoCommitTimeline, Repository } from "../../shared/types/index";
+import { RepoCommitTimeline, Repository } from "@github-sights/shared";
+import { format, subDays } from "date-fns";
+import { BarChart3, GitCommit, TrendingUp, Users } from "lucide-react";
 
 // --- Fake showcase data ---
 export const SHOWCASE_REPOS = [

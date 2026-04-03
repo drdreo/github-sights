@@ -3,7 +3,7 @@
 // CRUD for owner, repository_meta, and contributor_profile tables.
 
 import { query, queryOne, execute, transaction } from "../pool.ts";
-import { buildMultiRowValues } from "./events.ts";
+import { buildMultiRowValues } from "../utils.ts";
 import type { OwnerRow, RepositoryMetaRow, ContributorProfileRow } from "../types.ts";
 
 const BATCH_SIZE = 500;

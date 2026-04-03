@@ -24,20 +24,20 @@ import {
     yieldJob
 } from "../db/queries/sync-jobs.ts";
 import type { RepositoryMetaRow } from "../db/types.ts";
-import { aggregateOwnerIncremental, aggregateRepo } from "./aggregate.ts";
+import { aggregateOwnerIncremental, aggregateRepo } from "./aggregate/index.ts";
 import {
     createOctokit,
     getRateLimitState,
     type GitHubRepo,
     refreshRateLimit,
     setRateLimitHeartbeat
-} from "./github-client.ts";
+} from "./client/index.ts";
 import {
     ingestCommitsForRepo,
     ingestPRsForRepo,
     ingestRepos,
     ingestWorkflowsForRepo
-} from "./ingest.ts";
+} from "./ingest/index.ts";
 
 // ── Config ───────────────────────────────────────────────────────────────────────
 

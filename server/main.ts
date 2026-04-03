@@ -6,14 +6,17 @@ import { initPool } from "../shared/db/pool.ts";
 import { runMigrations } from "../shared/db/schema.ts";
 import { deleteExpiredSessions } from "../shared/db/queries/sessions.ts";
 import { auth } from "./routes/auth.ts";
+import { commits } from "./routes/commits.ts";
 import { config } from "./routes/config.ts";
 import { contributorDetail } from "./routes/contributorDetail.ts";
 import "../shared/signals.ts";
 import { contributors } from "./routes/contributors.ts";
 import { health } from "./routes/health.ts";
+import { pulls } from "./routes/pulls.ts";
 import { repos } from "./routes/repos.ts";
 import { stats } from "./routes/stats.ts";
 import { sync } from "./routes/sync.ts";
+import { workflows } from "./routes/workflows.ts";
 import { sessionMiddleware } from "./middleware/session.ts";
 
 // ── App ────────────────────────────────────────────────────────────────────────
@@ -31,12 +34,15 @@ app.use("/*", sessionMiddleware);
 // Mount route modules
 app.route("/", health);
 app.route("/", auth);
+app.route("/", commits);
 app.route("/", config);
 app.route("/", contributorDetail);
 app.route("/", contributors);
+app.route("/", pulls);
 app.route("/", repos);
 app.route("/", stats);
 app.route("/", sync);
+app.route("/", workflows);
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 

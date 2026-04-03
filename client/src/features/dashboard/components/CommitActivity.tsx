@@ -1,7 +1,7 @@
-import React from "react";
+import type { RepoCommitTimeline } from "@github-sights/shared";
 import { GitCommit } from "lucide-react";
+import React from "react";
 import { CommitTimeline } from "./CommitTimeline";
-import type { RepoCommitTimeline } from "../../../shared/types";
 
 interface CommitActivityProps {
     timelines: RepoCommitTimeline[];

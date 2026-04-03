@@ -1,19 +1,19 @@
+import { AlertCircle, ArrowLeft } from "lucide-react";
 import React from "react";
-import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, AlertCircle } from "lucide-react";
-
-import {
-    useRepo,
-    useCommits,
-    usePulls,
-    useRepoContributorStats,
-    useWorkflows,
-    useWorkflowStats
-} from "./hooks";
+import { Link, useParams } from "react-router-dom";
 import { useOwner } from "../../shared/hooks/useOwner";
 import { RepoDetailSkeleton } from "./components/RepoDetailSkeleton";
 import { RepoHeader } from "./components/RepoHeader";
 import { RepoTabs } from "./components/RepoTabs";
+
+import {
+    useCommits,
+    usePulls,
+    useRepo,
+    useRepoContributorStats,
+    useWorkflows,
+    useWorkflowStats
+} from "./hooks";
 
 export default function RepoDetailPage() {
     const owner = useOwner();

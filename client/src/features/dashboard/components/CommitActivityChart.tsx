@@ -1,17 +1,17 @@
-import React, { useMemo, useState, useCallback } from "react";
+import { RepoCommitTimeline } from "@github-sights/shared";
+import { differenceInDays, eachDayOfInterval, format } from "date-fns";
+import React, { useCallback, useMemo, useState } from "react";
 import {
-    ResponsiveContainer,
-    AreaChart,
     Area,
-    XAxis,
-    YAxis,
-    Tooltip,
+    AreaChart,
+    CartesianGrid,
     Legend,
-    CartesianGrid
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis
 } from "recharts";
 import type { Payload } from "recharts/types/component/DefaultLegendContent";
-import { format, eachDayOfInterval, differenceInDays } from "date-fns";
-import { RepoCommitTimeline } from "../../../shared/types";
 
 interface CommitActivityChartProps {
     timelines: RepoCommitTimeline[];

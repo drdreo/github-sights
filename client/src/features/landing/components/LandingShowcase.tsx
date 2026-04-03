@@ -1,6 +1,6 @@
-import { Star, GitCommit, Users, GitPullRequest } from "lucide-react";
+import { GitCommit, GitPullRequest, Star, Users } from "lucide-react";
+import { Area, AreaChart, ResponsiveContainer } from "recharts";
 import { Github } from "../../../shared/components/Github.tsx";
-import { ResponsiveContainer, AreaChart, Area } from "recharts";
 import { SHOWCASE_REPOS } from "../mockData";
 
 export function ShowcaseCard({ repo }: { repo: (typeof SHOWCASE_REPOS)[number] }) {

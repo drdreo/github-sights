@@ -1,5 +1,5 @@
+import { OverviewStats } from "@github-sights/shared";
 import React from "react";
-import { OverviewStats } from "../../../shared/types";
 
 interface LanguageBarProps {
     data: OverviewStats["languageBreakdown"];

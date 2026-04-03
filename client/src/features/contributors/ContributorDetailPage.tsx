@@ -1,26 +1,26 @@
-import React, { useMemo, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, AlertCircle, ExternalLink } from "lucide-react";
-import {
-    ResponsiveContainer,
-    AreaChart,
-    Area,
-    XAxis,
-    YAxis,
-    Tooltip,
-    CartesianGrid
-} from "recharts";
+import type { ContributorDetail } from "@github-sights/shared";
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { format } from "date-fns";
+import { AlertCircle, ArrowLeft, ExternalLink } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import {
+    Area,
+    AreaChart,
+    CartesianGrid,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis
+} from "recharts";
+import { DataTable } from "../../shared/components/DataTable";
+import { LoadingSkeleton } from "../../shared/components/LoadingSkeleton";
+import { LocCell } from "../../shared/components/LocCell";
+import { TimeRangeSelector } from "../../shared/components/TimeRangeSelector";
+import { useOwner } from "../../shared/hooks/useOwner";
+import { formatLoc } from "../../shared/lib/format";
 
 import { useContributorDetail } from "./hooks";
-import { useOwner } from "../../shared/hooks/useOwner";
-import { LoadingSkeleton } from "../../shared/components/LoadingSkeleton";
-import { DataTable } from "../../shared/components/DataTable";
-import { TimeRangeSelector } from "../../shared/components/TimeRangeSelector";
-import { formatLoc } from "../../shared/lib/format";
-import { LocCell } from "../../shared/components/LocCell";
-import type { ContributorDetail } from "../../shared/types";
 
 type RepoBreakdownRow = ContributorDetail["repoBreakdown"][number];
 

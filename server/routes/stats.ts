@@ -3,7 +3,7 @@ import { requireConfig } from "../../shared/config.ts";
 import { errorResponse } from "../errors.ts";
 import { getOwnerSnapshot } from "../../shared/db/queries/snapshots.ts";
 import { aggregateOwnerActivity } from "../../shared/db/queries/activity.ts";
-import { mapOwnerSnapshotToStats, emptyOverviewStats } from "../mappers.ts";
+import { mapOwnerSnapshotToStats, emptyOverviewStats } from "../mappers/index.ts";
 
 const stats = new Hono();
 
