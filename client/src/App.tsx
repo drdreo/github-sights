@@ -1,16 +1,16 @@
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import Layout from "./components/Layout";
-import OwnerGuard from "./components/OwnerGuard";
+import Layout from "./shared/components/Layout";
+import OwnerGuard from "./shared/components/OwnerGuard";
 
-const SetupPage = lazy(() => import("./pages/SetupPage"));
-const LandingPage = lazy(() => import("./pages/LandingPage"));
-const DashboardPage = lazy(() => import("./pages/DashboardPage"));
-const RepoDetailPage = lazy(() => import("./pages/RepoDetailPage"));
-const ContributorsPage = lazy(() => import("./pages/ContributorsPage"));
-const ContributorDetailPage = lazy(() => import("./pages/ContributorDetailPage"));
-const RepositoriesPage = lazy(() => import("./pages/RepositoriesPage"));
+const SetupPage = lazy(() => import("./features/setup/SetupPage"));
+const LandingPage = lazy(() => import("./features/landing/LandingPage"));
+const DashboardPage = lazy(() => import("./features/dashboard/DashboardPage"));
+const RepoDetailPage = lazy(() => import("./features/repo-detail/RepoDetailPage"));
+const ContributorsPage = lazy(() => import("./features/contributors/ContributorsPage"));
+const ContributorDetailPage = lazy(() => import("./features/contributors/ContributorDetailPage"));
+const RepositoriesPage = lazy(() => import("./features/repositories/RepositoriesPage"));
 
 export default function App() {
     return (

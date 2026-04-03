@@ -6,7 +6,7 @@ import {
     OverviewStats,
     RepoCommitTimeline,
     DailyCommitActivity
-} from "../types";
+} from "../shared/types";
 import { subDays, format } from "date-fns";
 
 // --- Helpers ---
