@@ -10,7 +10,8 @@ import {
     RepoContributorStat,
     WorkflowRun,
     WorkflowStat,
-    OwnerWorkflowStats
+    OwnerWorkflowStats,
+    WorkflowJobStepInsights
 } from "../types";
 export interface CachedResponse<T> {
     data: T;
@@ -178,6 +179,9 @@ export const api = {
 
     getWorkflowStats: (owner: string, repo: string) =>
         fetchApi<WorkflowStat[]>(`/repos/${owner}/${repo}/workflow-stats`),
+
+    getWorkflowInsights: (owner: string, repo: string) =>
+        fetchApi<WorkflowJobStepInsights>(`/repos/${owner}/${repo}/workflow-insights`),
 
     getOwnerWorkflowStats: (owner: string, since?: string, until?: string) => {
         const params = new URLSearchParams();

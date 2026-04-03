@@ -562,6 +562,82 @@ export async function insertWorkflowSteps(steps: InsertWorkflowStepInput[]): Pro
     return inserted;
 }
 
+/** Job & step insights aggregated by workflow + name for a repo. */
+export async function getJobStepInsightsByRepo(repoId: number): Promise<{
+    jobs: Array<{
+        workflow_name: string;
+        name: string;
+        total_runs: number;
+        failure_count: number;
+        failure_rate: number;
+        avg_duration_seconds: number;
+        max_duration_seconds: number;
+    }>;
+    steps: Array<{
+        workflow_name: string;
+        name: string;
+        total_runs: number;
+        failure_count: number;
+        failure_rate: number;
+        avg_duration_seconds: number;
+        max_duration_seconds: number;
+    }>;
+}> {
+    const [jobs, steps] = await Promise.all([
+        query<{
+            workflow_name: string;
+            name: string;
+            total_runs: number;
+            failure_count: number;
+            failure_rate: number;
+            avg_duration_seconds: number;
+            max_duration_seconds: number;
+        }>(
+            `SELECT
+                COALESCE(we.workflow_name, 'Unknown') AS workflow_name,
+                wj.name,
+                COUNT(*)::INTEGER AS total_runs,
+                COUNT(*) FILTER (WHERE wj.conclusion = 'failure')::INTEGER AS failure_count,
+                COALESCE(ROUND(COUNT(*) FILTER (WHERE wj.conclusion = 'failure')::NUMERIC / NULLIF(COUNT(*), 0) * 100, 1), 0)::NUMERIC AS failure_rate,
+                COALESCE(AVG(wj.duration_seconds) FILTER (WHERE wj.duration_seconds > 0), 0)::INTEGER AS avg_duration_seconds,
+                COALESCE(MAX(wj.duration_seconds), 0)::INTEGER AS max_duration_seconds
+             FROM workflow_job wj
+             JOIN workflow_event we ON we.id = wj.workflow_run_id
+             WHERE wj.repo_id = $1 AND wj.status = 'completed'
+             GROUP BY we.workflow_name, wj.name
+             ORDER BY failure_count DESC, avg_duration_seconds DESC`,
+            [repoId]
+        ),
+        query<{
+            workflow_name: string;
+            name: string;
+            total_runs: number;
+            failure_count: number;
+            failure_rate: number;
+            avg_duration_seconds: number;
+            max_duration_seconds: number;
+        }>(
+            `SELECT
+                COALESCE(we.workflow_name, 'Unknown') AS workflow_name,
+                ws.name,
+                COUNT(*)::INTEGER AS total_runs,
+                COUNT(*) FILTER (WHERE ws.conclusion = 'failure')::INTEGER AS failure_count,
+                COALESCE(ROUND(COUNT(*) FILTER (WHERE ws.conclusion = 'failure')::NUMERIC / NULLIF(COUNT(*), 0) * 100, 1), 0)::NUMERIC AS failure_rate,
+                COALESCE(AVG(ws.duration_seconds) FILTER (WHERE ws.duration_seconds > 0), 0)::INTEGER AS avg_duration_seconds,
+                COALESCE(MAX(ws.duration_seconds), 0)::INTEGER AS max_duration_seconds
+             FROM workflow_step ws
+             JOIN workflow_job wj ON ws.job_id = wj.id
+             JOIN workflow_event we ON we.id = wj.workflow_run_id
+             WHERE wj.repo_id = $1 AND ws.status = 'completed'
+             GROUP BY we.workflow_name, ws.name
+             ORDER BY failure_count DESC, avg_duration_seconds DESC`,
+            [repoId]
+        )
+    ]);
+
+    return { jobs, steps };
+}
+
 /** Get unfetched workflow runs for a repo (newest first), limited by budget. */
 export async function getUnfetchedWorkflowRuns(
     repoId: number,

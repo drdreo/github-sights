@@ -114,6 +114,21 @@ export interface WorkflowStat {
     successRate: number;
 }
 
+export interface JobInsight {
+    workflowName: string;
+    name: string;
+    totalRuns: number;
+    failureCount: number;
+    failureRate: number;
+    avgDurationSeconds: number;
+    maxDurationSeconds: number;
+}
+
+export interface WorkflowJobStepInsights {
+    jobs: JobInsight[];
+    steps: JobInsight[];
+}
+
 export interface OwnerWorkflowStats {
     totalRuns: number;
     totalDurationSeconds: number;

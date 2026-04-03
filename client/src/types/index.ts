@@ -17,5 +17,7 @@ export type {
     ContributorDetail,
     WorkflowRun,
     WorkflowStat,
-    OwnerWorkflowStats
+    OwnerWorkflowStats,
+    JobInsight,
+    WorkflowJobStepInsights
 } from "@github-sights/shared";

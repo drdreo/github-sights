@@ -253,6 +253,14 @@ export function useWorkflowStats(owner: string, repo: string) {
     });
 }
 
+export function useWorkflowInsights(owner: string, repo: string, enabled = true) {
+    return useQuery({
+        queryKey: ["workflow-insights", owner, repo],
+        queryFn: () => api.getWorkflowInsights(owner, repo),
+        enabled: !!owner && !!repo && enabled
+    });
+}
+
 export function useOwnerWorkflowStats(owner: string, since?: string, until?: string) {
     return useQuery({
         queryKey: ["owner-workflow-stats", owner, since, until],

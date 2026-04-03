@@ -7,6 +7,7 @@ import {
     getCommitsByRepo,
     getContributorStatsByRepo,
     getPrsByRepo,
+    getJobStepInsightsByRepo,
     getWorkflowsByRepo,
     getWorkflowStatsByOwner,
     getWorkflowStatsByRepo
@@ -300,6 +301,42 @@ repos.get("/api/repos/:owner/:repo/workflow-stats", async (c) => {
             successRate: Number(s.success_rate)
         }));
         return c.json(data);
+    } catch (error) {
+        return errorResponse(c, error);
+    }
+});
+
+// ── GET /api/repos/:owner/:repo/workflow-insights — Job & step insights ──────
+
+repos.get("/api/repos/:owner/:repo/workflow-insights", async (c) => {
+    try {
+        const { owner, repo } = c.req.param();
+        requireConfig(owner);
+
+        const repoRow = await getRepoByName(owner, repo);
+        if (!repoRow) throw notFound("Repository", `${owner}/${repo}`);
+
+        const { jobs, steps } = await getJobStepInsightsByRepo(repoRow.id);
+        return c.json({
+            jobs: jobs.map((j) => ({
+                workflowName: j.workflow_name,
+                name: j.name,
+                totalRuns: j.total_runs,
+                failureCount: j.failure_count,
+                failureRate: Number(j.failure_rate),
+                avgDurationSeconds: j.avg_duration_seconds,
+                maxDurationSeconds: j.max_duration_seconds
+            })),
+            steps: steps.map((s) => ({
+                workflowName: s.workflow_name,
+                name: s.name,
+                totalRuns: s.total_runs,
+                failureCount: s.failure_count,
+                failureRate: Number(s.failure_rate),
+                avgDurationSeconds: s.avg_duration_seconds,
+                maxDurationSeconds: s.max_duration_seconds
+            }))
+        });
     } catch (error) {
         return errorResponse(c, error);
     }
