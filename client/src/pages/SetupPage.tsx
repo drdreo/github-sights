@@ -3,7 +3,8 @@ import { useSetConfig } from "../hooks/useGitHub";
 import { useAuth, useMyOrgs } from "../hooks/useAuth";
 import { API_BASE } from "../lib/api";
 import { useNavigate } from "react-router-dom";
-import { Building2, User, ArrowRight, Loader2, Github, Calendar, Pencil, Key } from "lucide-react";
+import { Building2, User, ArrowRight, Loader2, Calendar, Pencil, Key } from "lucide-react";
+import { Github } from "../components/icons/Github.tsx";
 import { addRecentOwner } from "./LandingPage";
 import { subYears, format } from "date-fns";
 

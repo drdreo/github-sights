@@ -1,7 +1,6 @@
 import {
     BarChart3,
     FolderGit2,
-    Github,
     LogIn,
     LogOut,
     RefreshCw,
@@ -9,6 +8,7 @@ import {
     Trash2,
     Users
 } from "lucide-react";
+import { Github } from "./icons/Github.tsx";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth, useLogout } from "../hooks/useAuth";

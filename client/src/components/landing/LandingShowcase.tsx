@@ -1,4 +1,5 @@
-import { Github, Star, GitCommit, Users, GitPullRequest } from "lucide-react";
+import { Star, GitCommit, Users, GitPullRequest } from "lucide-react";
+import { Github } from "../icons/Github.tsx";
 import { ResponsiveContainer, AreaChart, Area } from "recharts";
 import { SHOWCASE_REPOS } from "./mockData";
 

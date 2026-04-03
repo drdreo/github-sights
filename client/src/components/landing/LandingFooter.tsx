@@ -1,4 +1,4 @@
-import { Github } from "lucide-react";
+import { Github } from "../icons/Github.tsx";
 
 export function LandingFooter() {
     return (

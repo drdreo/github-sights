@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { Github, ArrowRight, Clock, Search, Eye } from "lucide-react";
+import { ArrowRight, Clock, Search, Eye } from "lucide-react";
+import { Github } from "../icons/Github.tsx";
 
 interface LandingHeroProps {
     recentOwners: string[];
