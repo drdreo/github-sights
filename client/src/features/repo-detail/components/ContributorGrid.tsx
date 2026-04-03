@@ -1,17 +1,21 @@
 import type { RepoContributorStat } from "@github-sights/shared";
-import React from "react";
+import React, { useMemo } from "react";
 import { DataTable } from "../../../shared/components/DataTable";
 import { LoadingSkeleton } from "../../../shared/components/LoadingSkeleton";
 import { getContributorColumns } from "../../../shared/lib/contributorColumns";
 
-const columns = getContributorColumns();
-
 interface ContributorGridProps {
     contributors: RepoContributorStat[] | undefined;
     loading: boolean;
+    owner: string;
 }
 
-export function ContributorGrid({ contributors, loading }: ContributorGridProps) {
+export function ContributorGrid({ contributors, loading, owner }: ContributorGridProps) {
+    const columns = useMemo(
+        () => getContributorColumns({ linkBase: `/${owner}/contributors` }),
+        [owner]
+    );
+
     if (loading) {
         return (
             <div className="p-6 space-y-3">
@@ -30,5 +34,11 @@ export function ContributorGrid({ contributors, loading }: ContributorGridProps)
         );
     }
 
-    return <DataTable columns={columns} data={contributors} />;
+    return (
+        <DataTable
+            columns={columns}
+            data={contributors}
+            searchPlaceholder="Search contributors..."
+        />
+    );
 }

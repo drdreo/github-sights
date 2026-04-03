@@ -20,15 +20,26 @@ interface RepoGridProps {
     loading: boolean;
     commitCounts?: Map<string, number>;
     snapshotStats?: Map<string, RepoSnapshotStats>;
+    /** Total repo count before filtering (used to show "X of Y") */
+    totalCount?: number;
 }
 
-export function RepoGrid({ repos, owner, loading, commitCounts, snapshotStats }: RepoGridProps) {
+export function RepoGrid({
+    repos,
+    owner,
+    loading,
+    commitCounts,
+    snapshotStats,
+    totalCount
+}: RepoGridProps) {
+    const isFiltered = totalCount !== undefined && totalCount !== repos.length;
+
     return (
         <div>
             <h2 className="text-xl font-semibold text-gray-100 mb-6 flex items-center gap-2">
                 Repositories
                 <span className="bg-gray-800 text-gray-400 text-sm py-0.5 px-2.5 rounded-full font-medium">
-                    {repos.length}
+                    {isFiltered ? `${repos.length} / ${totalCount}` : repos.length}
                 </span>
             </h2>
 

@@ -135,7 +135,11 @@ export default function ContributorsPage() {
                     </div>
                 ) : (
                     <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-                        <DataTable columns={columns} data={contributors} />
+                        <DataTable
+                            columns={columns}
+                            data={contributors}
+                            searchPlaceholder="Search contributors..."
+                        />
                     </div>
                 )}
             </div>

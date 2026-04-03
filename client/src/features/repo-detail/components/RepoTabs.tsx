@@ -128,7 +128,11 @@ export function RepoTabs({
                 )}
                 {activeTab === "pulls" && <PullRequestList pulls={pulls} loading={pullsLoading} />}
                 {activeTab === "contributors" && (
-                    <ContributorGrid contributors={contributors} loading={contribLoading} />
+                    <ContributorGrid
+                        contributors={contributors}
+                        loading={contribLoading}
+                        owner={owner}
+                    />
                 )}
                 {activeTab === "workflows" && (
                     <WorkflowList

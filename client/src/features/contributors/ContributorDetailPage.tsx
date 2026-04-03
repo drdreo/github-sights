@@ -331,7 +331,11 @@ export default function ContributorDetailPage() {
                                 Repository Breakdown
                             </h2>
                         </div>
-                        <DataTable columns={columns} data={contributor.repoBreakdown} />
+                        <DataTable
+                            columns={columns}
+                            data={contributor.repoBreakdown}
+                            searchPlaceholder="Search repositories..."
+                        />
                     </div>
                 )}
             </div>
