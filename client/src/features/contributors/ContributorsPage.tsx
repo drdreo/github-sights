@@ -1,14 +1,17 @@
 import type { ContributorOverview } from "@github-sights/shared";
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { ArrowLeft } from "lucide-react";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { BotFilterToggle } from "../../shared/components/BotFilterToggle";
 import { DataTable } from "../../shared/components/DataTable";
 import { FetchedAtBadge } from "../../shared/components/FetchedAtBadge";
 import { LoadingSkeleton } from "../../shared/components/LoadingSkeleton";
 import { SyncBanner } from "../../shared/components/SyncBanner";
 import { TimeRangeSelector } from "../../shared/components/TimeRangeSelector";
+import { useHideBots } from "../../shared/hooks/useHideBots";
 import { useOwner } from "../../shared/hooks/useOwner";
+import { isBot } from "../../shared/lib/botFilter";
 import { getContributorColumns } from "../../shared/lib/contributorColumns";
 
 import { useContributorOverview } from "./hooks";
@@ -86,8 +89,14 @@ export default function ContributorsPage() {
     const since = dateRange.startDate?.toISOString() ?? undefined;
     const until = dateRange.endDate?.toISOString() ?? undefined;
 
+    const [hideBots, setHideBots] = useHideBots();
+
     const { data: contributorsResponse, isLoading } = useContributorOverview(owner, since, until);
-    const contributors = contributorsResponse?.data;
+    const contributors = useMemo(() => {
+        const data = contributorsResponse?.data;
+        if (!data || !hideBots) return data;
+        return data.filter((c) => !isBot(c.login));
+    }, [contributorsResponse?.data, hideBots]);
     const fetchedAt = contributorsResponse?.fetchedAt;
 
     return (
@@ -114,12 +123,15 @@ export default function ContributorsPage() {
                         </h1>
                         <SyncBanner owner={owner} />
                     </div>
-                    <TimeRangeSelector
-                        startDate={dateRange.startDate}
-                        endDate={dateRange.endDate}
-                        onChange={setDateRange}
-                        showAllTime
-                    />
+                    <div className="flex items-center gap-4">
+                        <BotFilterToggle hideBots={hideBots} onChange={setHideBots} />
+                        <TimeRangeSelector
+                            startDate={dateRange.startDate}
+                            endDate={dateRange.endDate}
+                            onChange={setDateRange}
+                            showAllTime
+                        />
+                    </div>
                 </div>
 
                 {/* Content */}

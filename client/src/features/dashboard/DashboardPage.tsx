@@ -1,8 +1,9 @@
 import { differenceInDays, subDays } from "date-fns";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useOwner } from "../../shared/hooks/useOwner";
 import { useSyncProgress } from "../../shared/hooks/useSyncProgress";
+import { isBot } from "../../shared/lib/botFilter";
 import { CommitActivity } from "./components/CommitActivity";
 import { CommitTrends } from "./components/CommitTrends";
 import { ContributorLeaderboard } from "./components/ContributorLeaderboard";
@@ -36,11 +37,15 @@ export default function DashboardPage() {
         since,
         until
     );
-    const { data: contributors, isLoading: contributorsLoading } = useContributorOverview(
+    const { data: contributorsRaw, isLoading: contributorsLoading } = useContributorOverview(
         owner,
         since,
         until
     );
+    const contributors = useMemo(() => {
+        if (!contributorsRaw) return contributorsRaw;
+        return { ...contributorsRaw, data: contributorsRaw.data.filter((c) => !isBot(c.login)) };
+    }, [contributorsRaw]);
 
     // Read initial sync range from URL (set by SetupPage on first-time redirect)
     const [searchParams] = useSearchParams();

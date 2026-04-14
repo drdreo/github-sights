@@ -1,7 +1,10 @@
 import type { RepoContributorStat } from "@github-sights/shared";
 import React, { useMemo } from "react";
+import { BotFilterToggle } from "../../../shared/components/BotFilterToggle";
 import { DataTable } from "../../../shared/components/DataTable";
 import { LoadingSkeleton } from "../../../shared/components/LoadingSkeleton";
+import { useHideBots } from "../../../shared/hooks/useHideBots";
+import { isBot } from "../../../shared/lib/botFilter";
 import { getContributorColumns } from "../../../shared/lib/contributorColumns";
 
 interface ContributorGridProps {
@@ -11,10 +14,16 @@ interface ContributorGridProps {
 }
 
 export function ContributorGrid({ contributors, loading, owner }: ContributorGridProps) {
+    const [hideBots, setHideBots] = useHideBots();
     const columns = useMemo(
         () => getContributorColumns({ linkBase: `/${owner}/contributors` }),
         [owner]
     );
+
+    const filtered = useMemo(() => {
+        if (!contributors || !hideBots) return contributors;
+        return contributors.filter((c) => !isBot(c.login));
+    }, [contributors, hideBots]);
 
     if (loading) {
         return (
@@ -26,7 +35,7 @@ export function ContributorGrid({ contributors, loading, owner }: ContributorGri
         );
     }
 
-    if (!contributors?.length) {
+    if (!filtered?.length) {
         return (
             <div className="p-12 text-center text-gray-400">
                 No contributor activity found for this repository.
@@ -35,10 +44,15 @@ export function ContributorGrid({ contributors, loading, owner }: ContributorGri
     }
 
     return (
-        <DataTable
-            columns={columns}
-            data={contributors}
-            searchPlaceholder="Search contributors..."
-        />
+        <div>
+            <div className="px-6 pt-4 flex justify-end">
+                <BotFilterToggle hideBots={hideBots} onChange={setHideBots} />
+            </div>
+            <DataTable
+                columns={columns}
+                data={filtered}
+                searchPlaceholder="Search contributors..."
+            />
+        </div>
     );
 }
