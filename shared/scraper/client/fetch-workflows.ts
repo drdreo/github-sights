@@ -4,6 +4,13 @@ import { Octokit } from "octokit";
 import { githubApiError } from "../../errors.ts";
 import { guardRateLimit } from "./rate-limit.ts";
 
+/**
+ * Upper bound for a believable workflow-run wall-clock duration. Used to reject
+ * inflated estimates derived from `updated_at` (which re-runs/late updates bump).
+ * Jobs cap at 6h each; 24h comfortably covers real runs while filtering garbage.
+ */
+const MAX_PLAUSIBLE_RUN_SECONDS = 24 * 60 * 60;
+
 export const VALID_CONCLUSIONS = new Set([
     "success",
     "failure",
@@ -48,7 +55,7 @@ export interface GitHubWorkflowRun {
     head_branch: string | null;
     head_sha: string | null;
     display_title: string | null;
-    duration_seconds: number;
+    duration_seconds: number | null;
     created_at: string;
     html_url: string;
 }
@@ -122,9 +129,16 @@ export async function fetchWorkflowRuns(
 
             // deno-lint-ignore no-explicit-any
             const runs: GitHubWorkflowRun[] = (response.data as any[]).map((run: any) => {
+                // `updated_at` is NOT the run's completion time — GitHub bumps it on
+                // re-runs and late status changes long after a run finishes, so this
+                // estimate can be wildly inflated (days/weeks). Treat anything beyond a
+                // plausible ceiling as unknown (null); accurate durations are filled
+                // on-demand from job timings (see ingestWorkflowJobsForRepo).
                 const startedMs = new Date(run.run_started_at ?? run.created_at).getTime();
                 const updatedMs = new Date(run.updated_at).getTime();
-                const durationSeconds = Math.max(0, Math.round((updatedMs - startedMs) / 1000));
+                const estimate = Math.round((updatedMs - startedMs) / 1000);
+                const durationSeconds =
+                    estimate >= 0 && estimate <= MAX_PLAUSIBLE_RUN_SECONDS ? estimate : null;
 
                 return {
                     id: run.id,

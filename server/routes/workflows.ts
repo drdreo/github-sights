@@ -8,6 +8,7 @@ import {
     getWorkflowStatsByOwner,
     getWorkflowStatsByRepo
 } from "../../shared/db/queries/workflows.ts";
+import { ensureWorkflowJobs } from "../../shared/scraper/index.ts";
 
 const workflows = new Hono();
 
@@ -20,6 +21,9 @@ workflows.get("/api/repos/:owner/:repo/workflows", async (c) => {
 
         const repoRow = await getRepoByName(owner, repo);
         if (!repoRow) throw notFound("Repository", `${owner}/${repo}`);
+
+        // Lazily backfill accurate per-run durations + job/step insights.
+        ensureWorkflowJobs(owner, { id: repoRow.id, name: repoRow.name });
 
         const limit = parseInt(c.req.query("limit") || "100", 10);
         const offset = parseInt(c.req.query("offset") || "0", 10);
@@ -54,6 +58,8 @@ workflows.get("/api/repos/:owner/:repo/workflow-stats", async (c) => {
         const repoRow = await getRepoByName(owner, repo);
         if (!repoRow) throw notFound("Repository", `${owner}/${repo}`);
 
+        ensureWorkflowJobs(owner, { id: repoRow.id, name: repoRow.name });
+
         const stats = await getWorkflowStatsByRepo(repoRow.id);
         const data = stats.map((s) => ({
             workflowName: s.workflow_name,
@@ -81,6 +87,8 @@ workflows.get("/api/repos/:owner/:repo/workflow-insights", async (c) => {
 
         const repoRow = await getRepoByName(owner, repo);
         if (!repoRow) throw notFound("Repository", `${owner}/${repo}`);
+
+        ensureWorkflowJobs(owner, { id: repoRow.id, name: repoRow.name });
 
         const { jobs, steps } = await getJobStepInsightsByRepo(repoRow.id);
         return c.json({

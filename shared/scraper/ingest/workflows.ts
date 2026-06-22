@@ -133,7 +133,7 @@ export async function ingestWorkflowsForRepo(
 export async function ingestWorkflowJobsForRepo(
     octokit: Octokit,
     owner: string,
-    repo: GitHubRepo
+    repo: Pick<GitHubRepo, "id" | "name">
 ): Promise<IngestWorkflowJobsResult> {
     const repoId = repo.id;
     const repoName = repo.name;

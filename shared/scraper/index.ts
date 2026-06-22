@@ -23,6 +23,9 @@ export type { GitHubRepo, GitHubCommit, GitHubPR, RateLimitState } from "./clien
 export { ingestRepos, ingestCommitsForRepo, ingestPRsForRepo } from "./ingest/index.ts";
 export type { IngestCommitsResult, IngestPRsResult } from "./ingest/index.ts";
 
+// On-demand workflow job ingestion (lazy, triggered when workflow data is viewed)
+export { ensureWorkflowJobs } from "./jobs-on-demand.ts";
+
 // Aggregation
 export { aggregateOwner, aggregateOwnerIncremental, aggregateRepo } from "./aggregate/index.ts";
 export type { AggregateResult } from "./aggregate/index.ts";
