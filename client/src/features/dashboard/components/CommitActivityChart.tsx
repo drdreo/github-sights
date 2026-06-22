@@ -175,6 +175,14 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
         setOpacity({});
     }, []);
 
+    const [hidden, setHidden] = useState<Record<string, boolean>>({});
+
+    const handleLegendClick = useCallback((data: Payload) => {
+        const dataKey = data.dataKey != null ? String(data.dataKey) : undefined;
+        if (!dataKey) return;
+        setHidden((prev) => ({ ...prev, [dataKey]: !prev[dataKey] }));
+    }, []);
+
     if (loading) {
         return (
             <div className="w-full h-full bg-gray-900 rounded-xl overflow-hidden relative flex items-center justify-center">
@@ -193,7 +201,7 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
 
     return (
         <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                     {topRepoNames.map((repoName) => {
                         const color = getRepoColor(repoName);
@@ -226,7 +234,7 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
                     tickLine={false}
                     axisLine={false}
                     allowDecimals={false}
-                    width={35}
+                    width={40}
                 />
                 <Tooltip
                     content={<CustomTooltip />}
@@ -240,6 +248,21 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
                     wrapperStyle={{ color: "#6b7280", paddingTop: "10px", fontSize: "11px" }}
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
+                    onClick={handleLegendClick}
+                    formatter={(value, entry) => {
+                        const key = entry?.dataKey != null ? String(entry.dataKey) : "";
+                        return (
+                            <span
+                                style={{
+                                    cursor: "pointer",
+                                    opacity: hidden[key] ? 0.4 : 1,
+                                    textDecoration: hidden[key] ? "line-through" : "none"
+                                }}
+                            >
+                                {value}
+                            </span>
+                        );
+                    }}
                 />
 
                 {/* Render areas for top repos */}
@@ -260,6 +283,7 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
                             activeDot={{ r: 4, strokeWidth: 0 }}
                             animationDuration={1000}
                             connectNulls
+                            hide={hidden[repoName]}
                         />
                     );
                 })}
@@ -277,6 +301,7 @@ export const CommitActivityChart: React.FC<CommitActivityChartProps> = ({
                     dot={false}
                     activeDot={{ r: 5, fill: "#fff", strokeWidth: 0 }}
                     animationDuration={1000}
+                    hide={hidden["total"]}
                 />
             </AreaChart>
         </ResponsiveContainer>
